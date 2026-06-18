@@ -51,4 +51,25 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
+    //  Balão do WhatsApp Inteligente
+    const waBubble = document.getElementById('wa-bubble');
+    const closeBubble = document.getElementById('close-bubble');
+
+    if (waBubble && closeBubble) {
+        // Mostra o balão após 7 segundos (7000 milissegundos)
+        setTimeout(() => {
+            // Verifica se o usuário já não fechou nesta sessão
+            if (!sessionStorage.getItem('wa-bubble-closed')) {
+                waBubble.classList.add('is-visible');
+            }
+        }, 7000);
+
+        // Fecha o balão ao clicar no X
+        closeBubble.addEventListener('click', (e) => {
+            e.preventDefault();
+            waBubble.classList.remove('is-visible');
+            // Salva no navegador para não ficar abrindo toda hora que ela der F5
+            sessionStorage.setItem('wa-bubble-closed', 'true'); 
+        });
+    }
 });

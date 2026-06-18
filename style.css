@@ -222,20 +222,64 @@ a { color: inherit; text-decoration: none; }
 .contact-section h2 { font-family: var(--font-serif); font-size: 36px; color: #fff; margin-bottom: 14px; text-shadow: 0 2px 10px rgba(0,0,0,0.8); }
 .contact-section p { color: var(--color-text-main); font-size: 18px; margin-bottom: 30px; }
 
+
 .location-details { display: flex; justify-content: center; margin-top: 40px; }
-.location-card { display: flex; align-items: flex-start; gap: 16px; text-align: left; background: rgba(0,0,0,0.4); padding: 20px 30px; border-radius: 8px; border: 1px solid var(--border-light); }
-.location-card i { font-size: 24px; margin-top: 4px; color: var(--color-gold-light); }
-.location-card strong { display: block; margin-bottom: 4px; font-size: 16px; color: var(--color-gold-light); }
-.location-card p { font-size: 14px; margin: 0; color: var(--color-text-secondary); }
+
+.location-card { 
+    display: flex; 
+    flex-direction: column; 
+    text-align: left; 
+    background: rgba(0,0,0,0.4); 
+    border-radius: 12px; 
+    border: 1px solid var(--border-light); 
+    overflow: hidden; /* Faz o mapa respeitar a borda arredondada */
+    width: 100%; 
+    max-width: 600px;
+}
+
+.location-map {
+    width: 100%;
+    height: 250px;
+    border-bottom: 1px solid var(--border-light);
+}
+
+.location-map iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    /* Truque para deixar o mapa Escuro/Noturno combinando com o site: */
+    filter: invert(90%) hue-rotate(180deg) brightness(0.8) contrast(1.1); 
+}
+
+.location-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 24px 30px;
+}
+
+.location-info i { font-size: 24px; margin-top: 4px; color: var(--color-gold-light); }
+.location-info strong { display: block; margin-bottom: 4px; font-size: 16px; color: var(--color-gold-light); }
+.location-info p { font-size: 14px; margin: 0; color: var(--color-text-secondary); }
 
 /* ==========================================================================
    WHATSAPP & VOLTAR AO TOPO
    ========================================================================== */
-.floating-whatsapp {
+/* ==========================================================================
+   WHATSAPP FLUTUANTE E BALÃO DE CONVERSÃO
+   ========================================================================== */
+.whatsapp-wrapper {
     position: fixed;
     bottom: 30px;
     right: 30px;
     z-index: 200;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 16px;
+}
+
+.floating-whatsapp {
     background: #243e2e; 
     color: #ffffff;
     height: 56px;
@@ -253,6 +297,80 @@ a { color: inherit; text-decoration: none; }
 .floating-whatsapp:hover {
     background: #2f5743;
     transform: translateY(-4px) scale(1.05);
+}
+
+/* O Balão de Mensagem */
+.whatsapp-bubble {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-light);
+    padding: 12px 16px;
+    border-radius: 12px 12px 2px 12px; /* Pontinha direcionada para o botão */
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    max-width: 290px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+    position: relative;
+    /* Configuração inicial oculta */
+    opacity: 0;
+    transform: translateY(20px) scale(0.9);
+    transform-origin: bottom right;
+    pointer-events: none;
+    transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Animação de pulo (bounce) */
+}
+
+.whatsapp-bubble.is-visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    pointer-events: auto;
+}
+
+.whatsapp-bubble img {
+    width: 46px;
+    height: 46px;
+    min-width: 46px; /* Garante que a largura não diminua */
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--color-gold-light);
+    flex-shrink: 0; /* Proíbe o layout de espremer a foto */
+}
+
+.bubble-text strong {
+    display: block;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.bubble-text p {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-text-main);
+    line-height: 1.4;
+}
+
+.close-bubble {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: var(--bg-dark);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--border-light);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    font-size: 10px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.close-bubble:hover {
+    background: var(--color-gold-light);
+    color: var(--bg-dark);
 }
 
 .back-to-top { position: fixed; bottom: 30px; left: 30px; z-index: 200; width: 44px; height: 44px; background: var(--bg-card); border: 1px solid var(--border-light); color: var(--color-gold); border-radius: 50%; display: inline-flex; justify-content: center; align-items: center; cursor: pointer; opacity: 0; pointer-events: none; transition: all 0.3s; }
@@ -321,7 +439,7 @@ a { color: inherit; text-decoration: none; }
     
     .content-section { padding: 80px 20px; }
     .muted-section { padding-top: 80px; padding-bottom: 80px; }
-    .location-card { flex-direction: column; align-items: center; text-align: center; gap: 16px; padding: 30px 20px; }
+    .location-info { flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 24px 20px; }
 }
 
 @media (max-width: 480px) {
@@ -348,7 +466,37 @@ a { color: inherit; text-decoration: none; }
     .contact-section h2 { font-size: 30px; line-height: 1.2; }
     .contact-actions { width: 100%; }
     
-    .floating-whatsapp { bottom: 20px; right: 20px; }
+    .whatsapp-bubble img {
+        width: 38px;
+        height: 38px;
+        min-width: 38px; /* Mantém a proporção redonda no celular */
+        flex-shrink: 0;
+    }
+    
+    .floating-whatsapp {
+        width: 52px;
+        height: 52px;
+        font-size: 26px;
+    }
+
+    .whatsapp-bubble {
+        max-width: 250px;
+        padding: 12px;
+    }
+    
+    .whatsapp-bubble img {
+    width: 46px;
+    height: 46px;
+    min-width: 46px; /* Garante que a largura não diminua */
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--color-gold-light);
+    flex-shrink: 0; /* Proíbe o layout de espremer a foto */
+}
+    
+    .bubble-text p {
+        font-size: 12px;
+    }
     .back-to-top { bottom: 20px; left: 20px; }
 }
 
