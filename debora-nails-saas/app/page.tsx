@@ -443,7 +443,7 @@ export default function LandingPage() {
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group">
-               <img src="/cadeiras.PNG" alt="Interior do Ateliê" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+               <img src="/cadeiras.png" alt="Interior do Ateliê" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
                <video autoPlay loop muted playsInline className="w-full h-full object-cover">
