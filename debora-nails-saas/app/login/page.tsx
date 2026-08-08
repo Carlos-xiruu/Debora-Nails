@@ -24,7 +24,7 @@ export default function LoginPage() {
         if (error) throw new Error('E-mail ou senha incorretos.');
         
         // Verifica se é a Débora (Admin) ou Cliente para redirecionar
-        window.location.href = data.user?.email === 'contato@deboranails.com.br' ? '/dashboard' : '/';
+        window.location.href = data.user?.email === 'debora199917silva@gmail.com' ? '/dashboard' : '/';
       } 
       
       else if (modo === 'cadastro') {
