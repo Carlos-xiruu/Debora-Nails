@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   CalendarDays, 
   LayoutDashboard, 
@@ -13,12 +13,46 @@ import {
   LogOut,
   Menu,
   Sparkles,
-  BarChart3
+  BarChart3,
+  Loader2
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Controle de Segurança
+  const [autorizado, setAutorizado] = useState(false);
+  const [carregandoAuth, setCarregandoAuth] = useState(true);
+
+  // E-mail da Dona (Substitua se precisar)
+  const EMAIL_ADMIN = 'debora199917silva@gmail.com';
+
+  useEffect(() => {
+    const checarAutenticacao = async () => {
+      setCarregandoAuth(true);
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        router.push('/login');
+      } else if (session.user.email !== EMAIL_ADMIN) {
+        // Se alguém logar mas não for a Débora, joga pro site principal
+        router.push('/');
+      } else {
+        setAutorizado(true);
+      }
+      setCarregandoAuth(false);
+    };
+
+    checarAutenticacao();
+  }, [router]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   const menuItems = [
     { name: 'Visão Geral', icon: LayoutDashboard, path: '/dashboard' },
@@ -29,6 +63,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Relatórios', icon: BarChart3, path: '/dashboard/relatorios' },
     { name: 'Configurações', icon: Settings, path: '/dashboard/configuracoes' },
   ];
+
+  // Tela de Carregamento enquanto verifica a segurança
+  if (carregandoAuth) {
+    return (
+      <div className="min-h-screen bg-[#120308] flex flex-col items-center justify-center">
+        <Loader2 className="animate-spin text-[#C7977D] mb-4" size={48} />
+        <p className="text-[#E8D3C8] text-sm tracking-widest uppercase">Verificando Credenciais...</p>
+      </div>
+    );
+  }
+
+  // Se não foi autorizado (e está redirecionando), não renderiza nada para evitar piscar tela
+  if (!autorizado) return null;
 
   return (
     <div className="min-h-screen bg-[#120308] text-white flex font-sans">
@@ -42,7 +89,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="h-20 flex items-center justify-between px-4 border-b border-[#DCAE96]/30">
           {isSidebarOpen && (
             <div className="overflow-hidden whitespace-nowrap">
-              <h2 className="font-serif text-2xl text-[#F8D1BE] text-shadow-[0_0_10px_rgba(248,209,190,0.4)]">
+              <h2 className="font-serif text-2xl text-[#F8D1BE] drop-shadow-[0_0_10px_rgba(248,209,190,0.4)]">
                 Debora Nails
               </h2>
             </div>
@@ -78,6 +125,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         <div className="p-4 border-t border-[#DCAE96]/30">
           <button 
+            onClick={handleLogout}
             className="flex items-center justify-center gap-3 w-full py-3 rounded-lg text-[#E8D3C8] hover:bg-red-900/40 hover:text-red-400 transition-all"
             title={!isSidebarOpen ? 'Sair do Sistema' : ''}
           >
