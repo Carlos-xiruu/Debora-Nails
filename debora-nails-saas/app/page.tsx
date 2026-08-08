@@ -539,7 +539,7 @@ export default function LandingPage() {
             <div className="bg-[#1a0c0f] border border-[#DCAE96]/20 p-5 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] w-[280px] animate-in slide-in-from-bottom-8 duration-700 relative pointer-events-auto">
               <button onClick={() => setBubbleFechado(true)} className="absolute top-2 right-2 text-gray-500 hover:text-white transition-colors bg-[#0a0204] rounded-full p-1"><X size={14}/></button>
               <div className="flex items-center gap-3 mb-3">
-                <img src="/debora.card.png" className="w-12 h-12 rounded-full border border-[#DCAE96]/40 object-cover shrink-0" />
+                <img src="/debora.card.PNG" className="w-12 h-12 rounded-full border border-[#DCAE96]/40 object-cover shrink-0" />
                 <strong className="text-[#F8D1BE] text-lg font-serif">Oii! 👋🏼</strong>
               </div>
               <p className="text-xs text-gray-300 leading-relaxed font-light">Ficou com alguma dúvida ou não encontrou o horário ideal para o seu agendamento? Fale comigo pelo WhatsApp e vou te ajudar a encontrar a melhor opção para você. 💕</p>
