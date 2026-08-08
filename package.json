@@ -1,8 +1,0 @@
-{
-  "devDependencies": {
-    "@types/react": "^19.2.18"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.112.2"
-  }
-}
