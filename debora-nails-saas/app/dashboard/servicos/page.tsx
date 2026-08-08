@@ -1,0 +1,216 @@
+'use client'
+
+import { useState, useEffect } from 'react';
+import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+
+const imagensDisponiveis = [
+  '/01.jpg', '/02.jpg', '/03.jpg', 
+  '/make01.jpeg', '/make02.jpeg', '/make03.jpeg', '/make04.jpeg', 
+  '/vermelha.jpeg'
+];
+
+export default function ServicosPage() {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  
+  const [servicos, setServicos] = useState<any[]>([]);
+  const [imagensSelecionadas, setImagensSelecionadas] = useState<string[]>([]);
+  const [servicoEditando, setServicoEditando] = useState<any>(null);
+
+  useEffect(() => {
+    fetchServicos();
+  }, []);
+
+  const fetchServicos = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase.from('servicos').select('*').order('created_at', { ascending: false });
+    if (!error && data) setServicos(data);
+    setIsLoading(false);
+  };
+
+  const abrirModal = (servico: any = null) => {
+    setServicoEditando(servico);
+    setImagensSelecionadas(servico ? (servico.imagens || []) : []);
+    setIsModalOpen(true);
+  };
+
+  const handleSalvarServico = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    const formData = new FormData(e.target as HTMLFormElement);
+    
+    const precoCalc = parseFloat(formData.get('preco') as string);
+    const taxaSinal = parseInt(formData.get('taxa_sinal') as string);
+    
+    // Calcula o texto do sinal baseado na %
+    const valorSinal = precoCalc * (taxaSinal / 100);
+    const sinalCalc = taxaSinal > 0 ? `${taxaSinal}% (R$ ${valorSinal.toFixed(2).replace('.', ',')})` : 'Não exigido';
+
+    const dadosServico = {
+      nome: formData.get('nome') as string,
+      descricao: formData.get('desc') as string,
+      duracao: formData.get('duracao') as string,
+      preco: precoCalc,
+      taxa_sinal: taxaSinal,
+      sinal: sinalCalc,
+      imagens: imagensSelecionadas.length > 0 ? imagensSelecionadas : ['/01.jpg']
+    };
+
+    if (servicoEditando) {
+      const { data, error } = await supabase.from('servicos').update(dadosServico).eq('id', servicoEditando.id).select();
+      if (!error && data) {
+        setServicos(servicos.map(s => s.id === servicoEditando.id ? data[0] : s));
+        setIsModalOpen(false);
+      }
+    } else {
+      const novoServicoCompleto = { ...dadosServico, ativo: true };
+      const { data, error } = await supabase.from('servicos').insert([novoServicoCompleto]).select();
+      if (!error && data) {
+        setServicos([data[0], ...servicos]);
+        setIsModalOpen(false);
+      }
+    }
+    setIsSaving(false);
+  };
+
+  const toggleAtivo = async (id: string, ativoAtual: boolean) => {
+    setServicos(servicos.map(s => s.id === id ? { ...s, ativo: !ativoAtual } : s));
+    await supabase.from('servicos').update({ ativo: !ativoAtual }).eq('id', id);
+  };
+
+  const deletarServico = async (id: string) => {
+    if (!window.confirm('Excluir este serviço?')) return;
+    setServicos(servicos.filter(s => s.id !== id));
+    await supabase.from('servicos').delete().eq('id', id);
+  };
+
+  const toggleImagem = (img: string) => {
+    setImagensSelecionadas(prev => prev.includes(img) ? prev.filter(i => i !== img) : [...prev, img]);
+  };
+
+  return (
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="flex justify-between items-center mb-8">
+        <div>
+          <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><Sparkles className="text-[#C7977D]" size={28} /> Meus Serviços</h1>
+          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e configurações de sinais.</p>
+        </div>
+        <button onClick={() => abrirModal(null)} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-all">
+          <Plus size={20} /> Novo Serviço
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-20 text-[#C7977D]"><Loader2 className="animate-spin" size={40} /></div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {servicos.map(servico => {
+            const fotos = servico.imagens || [];
+            return (
+              <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
+                <div className="h-48 relative overflow-hidden bg-[#2D0A12]">
+                  {fotos.length > 0 ? (
+                    <img src={fotos[0]} alt={servico.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
+                  <div className="absolute top-4 right-4">
+                    {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
+                  </div>
+                </div>
+
+                <div className="p-6 relative z-10 -mt-6">
+                  <h3 className={`text-2xl font-serif mb-2 ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
+                  <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
+                  
+                  <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10">
+                    <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
+                    <span className="text-gray-600">|</span>
+                    <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
+                  </div>
+
+                  <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5">
+                    <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20">
+                    <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
+                    <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl"><Edit2 size={18} /></button>
+                    <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl"><Trash2 size={18} /></button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90vh]">
+            <div className="bg-[#2D0A12] px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+              <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Sparkles size={20}/> {servicoEditando ? 'Editar Serviço' : 'Novo Serviço'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+            </div>
+            <form onSubmit={handleSalvarServico} className="flex flex-col overflow-hidden">
+              <div className="p-8 overflow-y-auto custom-scrollbar space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm text-[#E8D3C8] mb-1">Nome do Serviço *</label>
+                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm text-[#E8D3C8] mb-1">Descrição</label>
+                    <textarea name="desc" rows={2} defaultValue={servicoEditando?.descricao} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none resize-none"></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[#E8D3C8] mb-1">Duração Média *</label>
+                    <select name="duracao" defaultValue={servicoEditando?.duracao || '1h'} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none appearance-none">
+                      <option value="1h">1 hora</option>
+                      <option value="1h 30m">1h 30m</option>
+                      <option value="2h">2 horas</option>
+                      <option value="2h 30m">2h 30m</option>
+                      <option value="3h">3 horas</option>
+                      <option value="3h 30m">3h 30m</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm text-[#E8D3C8] mb-1">Preço Total (R$) *</label>
+                    <input type="number" step="0.01" name="preco" defaultValue={servicoEditando?.preco} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none"/>
+                  </div>
+                  <div className="col-span-1 md:col-span-2">
+                    <label className="block text-sm text-[#E8D3C8] mb-2">Exigir pagamento antecipado (Sinal)</label>
+                    <div className="flex gap-2">
+                      {['0', '10', '20', '30', '40', '50'].map(taxa => (
+                        <label key={taxa} className="flex-1 cursor-pointer">
+                          <input type="radio" name="taxa_sinal" value={taxa} defaultChecked={(servicoEditando?.taxa_sinal?.toString() || '0') === taxa} className="peer sr-only" />
+                          <div className="py-2 text-center rounded-lg border border-[#DCAE96]/20 bg-[#2D0A12]/30 text-gray-400 peer-checked:bg-[#C7977D] peer-checked:text-[#120308] peer-checked:font-bold transition-all">
+                            {taxa}%
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-[#DCAE96]/20">
+                  <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Anexar Fotos</label>
+                  <div className="grid grid-cols-4 gap-3">
+                    {imagensDisponiveis.map((img) => (
+                      <div key={img} onClick={() => toggleImagem(img)} className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 ${imagensSelecionadas.includes(img) ? 'border-[#C7977D] scale-95' : 'border-transparent opacity-60'}`}>
+                        <img src={img} className="w-full h-full object-cover" />
+                        {imagensSelecionadas.includes(img) && <div className="absolute inset-0 bg-[#120308]/50 flex items-center justify-center"><CheckCircle2 size={28} className="text-[#F8D1BE]" /></div>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold">{isSaving ? <Loader2 className="animate-spin" size={24} /> : 'Salvar Álbum'}</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
