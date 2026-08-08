@@ -149,6 +149,7 @@ export default function LandingPage() {
   const gerarPagamentoMercadoPago = async () => {
     setIsProcessando(true);
     
+    // Salva na "memória" do navegador antes de sair da página
     localStorage.setItem('reserva_temp_debora', JSON.stringify({
       clienteDados,
       servicoEscolhido,
@@ -165,13 +166,15 @@ export default function LandingPage() {
           titulo: servicoEscolhido.nome,
           preco: valorTotalSinal,
           clienteNome: clienteDados.nome,
-          clienteTelefone: clienteDados.telefone
+          clienteTelefone: clienteDados.telefone,
+          metodoPagamento: metodoPagamento // <-- AVISAMOS A API AQUI!
         })
       });
 
       const data = await resposta.json();
 
       if (data.url_pagamento) {
+        // Redireciona a cliente REALMENTE para o Mercado Pago!
         window.location.href = data.url_pagamento;
       } else {
         alert("Ocorreu um erro ao gerar o link. Tente novamente.");
@@ -349,8 +352,8 @@ export default function LandingPage() {
             <span className="text-[#C7977D] text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-2"><Heart size={14}/> A Especialista</span>
             <h2 className="font-serif text-4xl text-white mb-5">Muito prazer, sou a <span className="italic text-[#DCAE96]">Débora.</span></h2>
             <div className="space-y-4 text-gray-300 text-base leading-relaxed font-light">
-              <p>Com mais de 6 anos de experiência dedicados a transformar a autoestima das mulheres, construí o meu espaço baseada em três pilares: <strong>Qualidade, durabilidade e uma experiência de luxo.</strong></p>
-              <p>Não entrego apenas "unhas feitas". Eu entrego uma verdadeira consultoria de beleza para as suas mãos. Utilizando as melhores fibras do mercado e técnicas internacionais de simetria, garanto um resultado com a espessura idêntica à de uma unha natural, sem abrir mão da resistência.</p>
+              <p>Por trás de cada detalhe, existe uma mulher que ama transformar beleza em autoestima</p>
+              <p>Há mais de 6 anos venho aperfeiçoando minhas técnicas, aprendendo, evoluindo e construindo um trabalho que carrega muito de quem eu sou: <strong>dedicação, delicadeza, perfeccionismo e amor pelo que faço</strong>.<br/>Para mim, cada cliente é única, e cada atendimento é uma oportunidade de fazer você se olhar no espelho e pensar: “uau, era exatamente isso que eu queria.” Mais do que unhas, eu entrego cuidado, confiança e uma experiência feita para você. </p>
             </div>
           </div>
         </div>
