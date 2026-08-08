@@ -404,7 +404,7 @@ export default function LandingPage() {
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-3 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
             <div className="rounded-2xl w-full aspect-square md:h-[250px] lg:h-[300px] overflow-hidden border border-[#3a2522] mt-0 md:mt-8 shadow-xl">
-               <img src="/cadeiras.PNG" alt="Interior do Ateliê" className="w-full h-full object-cover" />
+               <img src="/cadeiras.png" alt="Interior do Ateliê" className="w-full h-full object-cover" />
             </div>
             <div className="rounded-2xl w-full aspect-square md:h-[250px] lg:h-[300px] overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
                <video autoPlay loop muted playsInline className="w-full h-full object-cover">
