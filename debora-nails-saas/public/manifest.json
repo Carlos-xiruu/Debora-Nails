@@ -1,24 +1,21 @@
 {
-  "name": "Monitor VIP Debora",
-  "short_name": "Monitor VIP",
-  "description": "Tela de autoatendimento para clientes Debora Nails",
-  "start_url": "/monitor",
-  "display": "fullscreen",
-  "orientation": "landscape",
+  "name": "Debora Nails Pro",
+  "short_name": "Debora Nails",
+  "description": "Painel de controle e monitor do estúdio.",
+  "start_url": "/dashboard",
+  "display": "standalone",
   "background_color": "#120308",
   "theme_color": "#120308",
   "icons": [
     {
       "src": "/debora.jpg",
       "sizes": "192x192",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     },
     {
       "src": "/debora.jpg",
       "sizes": "512x512",
-      "type": "image/jpeg",
-      "purpose": "any maskable"
+      "type": "image/jpeg"
     }
   ]
 }
