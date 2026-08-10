@@ -1,17 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, MessageCircle, Coffee, Wifi, Wind, CarFront, Gem, Shield, Wand2, Palette, LogOut, Crown, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
 export default function LandingPage() {
+  const router = useRouter();
   const [servicos, setServicos] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); 
   const [servicoDetalhe, setServicoDetalhe] = useState<any>(null);
   
-  // STATUS DO USUÁRIO & FIDELIDADE VIP
   const [usuarioLogado, setUsuarioLogado] = useState<any>(null);
   const [dadosFidelidade, setDadosFidelidade] = useState({ atendimentos: 0, isVip: false });
   
@@ -25,6 +26,10 @@ export default function LandingPage() {
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
 
+  // NOVOS ESTADOS PARA O PIX NATIVO
+  const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
+  const [pixId, setPixId] = useState<string | null>(null);
+
   const [faqAberto, setFaqAberto] = useState<number | null>(null);
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
@@ -32,70 +37,56 @@ export default function LandingPage() {
   const proximosDias = Array.from({length: 10}).map((_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
   const horariosLivres = ['09:00', '10:30', '13:30', '15:00', '16:30'];
 
-  // 1. CARREGA SERVIÇOS & WHATSAPP TIMING (20 SEGUNDOS)
   useEffect(() => {
     const fetchServicos = async () => {
       const { data } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
       if (data) setServicos(data);
     };
     fetchServicos();
-
     const waTimer = setTimeout(() => setShowWaBubble(true), 20000); 
     return () => clearTimeout(waTimer);
   }, []);
 
-  // 2. VERIFICA SESSÃO, FIDELIDADE VIP E INTENÇÃO DE AGENDAMENTO
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
       if (session) {
+        const userRole = session.user.user_metadata?.role;
+        if (userRole === 'admin') { router.push('/dashboard'); return; } 
+        else if (userRole === 'monitor') { router.push('/monitor'); return; }
+
         setUsuarioLogado(session.user);
         setClienteDados(prev => ({...prev, nome: session.user.user_metadata?.nome_completo || prev.nome}));
         
-        // Verifica a quantidade de agendamentos no banco para status VIP
         const telefoneUser = session.user.user_metadata?.telefone;
         if (telefoneUser) {
           const { data: clienteBanco } = await supabase.from('clientes').select('atendimentos').eq('telefone', telefoneUser).single();
-          if (clienteBanco) {
-            setDadosFidelidade({
-              atendimentos: clienteBanco.atendimentos,
-              isVip: clienteBanco.atendimentos >= 10
-            });
-          }
+          if (clienteBanco) setDadosFidelidade({ atendimentos: clienteBanco.atendimentos, isVip: clienteBanco.atendimentos >= 10 });
         }
         
-        // Retoma o agendamento caso a cliente tenha logado após clicar em agendar
         const intencao = localStorage.getItem('intencao_agendamento');
         if (intencao) {
           localStorage.removeItem('intencao_agendamento');
-          if (intencao === 'geral') {
-            iniciarAgendamento(null, true);
-          } else {
-            try {
-              const servicoSalvo = JSON.parse(intencao);
-              iniciarAgendamento(servicoSalvo, true);
-            } catch (e) {
-              iniciarAgendamento(null, true);
-            }
+          if (intencao === 'geral') iniciarAgendamento(null, true);
+          else {
+            try { iniciarAgendamento(JSON.parse(intencao), true); } 
+            catch (e) { iniciarAgendamento(null, true); }
           }
         }
       }
     };
     verificarSessaoEIntencao();
-  }, []);
+  }, [router]);
 
-  // 3. LIDA COM O RETORNO DO MERCADO PAGO
+  // Lida com o retorno do Mercado Pago APENAS para pagamentos em Cartão
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const statusPagamento = params.get('pagamento');
 
     if (statusPagamento === 'sucesso') {
       const reservaSalva = localStorage.getItem('reserva_temp_debora');
-      
       if (reservaSalva) {
         const dados = JSON.parse(reservaSalva);
-        
         setServicoEscolhido(dados.servicoEscolhido);
         setDataEscolhida(new Date(dados.dataEscolhida));
         setHoraEscolhida(dados.horaEscolhida);
@@ -103,20 +94,18 @@ export default function LandingPage() {
         setMetodoPagamento(dados.metodoPagamento);
         
         salvarAgendamentoOficial(dados);
-        
         setStep(5);
         setIsModalOpen(true);
         localStorage.removeItem('reserva_temp_debora');
       }
-      
       window.history.replaceState({}, document.title, window.location.pathname);
     } else if (statusPagamento === 'erro') {
-      alert("O pagamento não foi concluído. Tente novamente.");
+      alert("O pagamento via cartão não foi concluído. Tente novamente.");
       window.history.replaceState({}, document.title, window.location.pathname);
     }
   }, []);
 
-  // 4. CRONÔMETRO DE CHECKOUT
+  // Cronômetro da Reserva
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 4 && tempoRestante > 0) {
@@ -129,7 +118,32 @@ export default function LandingPage() {
     return () => clearInterval(timer);
   }, [step, tempoRestante]);
 
-  // LOGOUT SEGURO
+  // VIGIA DO PIX NATIVO (Polling)
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixId && step === 4) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/checar-pagamento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: pixId })
+          });
+          const data = await res.json();
+          if (data.status === 'approved') {
+            clearInterval(interval);
+            const dados = { clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento };
+            await salvarAgendamentoOficial(dados);
+            setStep(5);
+          }
+        } catch (e) {
+           console.error("Erro ao checar PIX", e);
+        }
+      }, 5000); // Checa a cada 5 segundos
+    }
+    return () => clearInterval(interval);
+  }, [pixId, step, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento]);
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUsuarioLogado(null);
@@ -137,17 +151,16 @@ export default function LandingPage() {
     setClienteDados({ nome: '', telefone: '' });
   };
 
-  // FLUXO DE AGENDAMENTO BLINDADO
   const iniciarAgendamento = (servico: any = null, forceLogado = false) => {
-    // Se a usuária está logada OU ela escolheu entrar como convidada (forceLogado)
     if (usuarioLogado || forceLogado) {
       setServicoDetalhe(null);
       setServicoEscolhido(servico);
       setStep(servico ? 2 : 1);
       setIsModalOpen(true);
       setTempoRestante(300);
+      setQrCodePix(null);
+      setPixId(null);
     } else {
-      // Se não está logada, salva o que ela queria e abre o Modal VIP
       localStorage.setItem('intencao_agendamento', servico ? JSON.stringify(servico) : 'geral');
       setServicoDetalhe(null);
       setIsAuthModalOpen(true); 
@@ -158,13 +171,8 @@ export default function LandingPage() {
     setIsAuthModalOpen(false);
     const intencao = localStorage.getItem('intencao_agendamento');
     localStorage.removeItem('intencao_agendamento');
-    
     if (intencao && intencao !== 'geral') {
-      try { 
-        iniciarAgendamento(JSON.parse(intencao), true); 
-      } catch(e) { 
-        iniciarAgendamento(null, true); 
-      }
+      try { iniciarAgendamento(JSON.parse(intencao), true); } catch(e) { iniciarAgendamento(null, true); }
     } else {
       iniciarAgendamento(null, true);
     }
@@ -174,56 +182,69 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalSinal = metodoPagamento === 'cartao' ? calcularSinal() + calcularTaxaCartao(calcularSinal()) : calcularSinal();
 
-  // 5. CHAMA API DO MERCADO PAGO
-  const gerarPagamentoMercadoPago = async () => {
+  // HIBRIDO: PIX NATIVO vs CARTÃO VIA PREFERÊNCIA
+  const processarPagamento = async () => {
     setIsProcessando(true);
-    localStorage.setItem('reserva_temp_debora', JSON.stringify({
-      clienteDados,
-      servicoEscolhido,
-      dataEscolhida,
-      horaEscolhida,
-      metodoPagamento
-    }));
-
-    try {
-      const resposta = await fetch('/api/pagamento', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          titulo: servicoEscolhido.nome,
-          preco: valorTotalSinal,
-          clienteNome: clienteDados.nome,
-          clienteTelefone: clienteDados.telefone,
-          metodoPagamento: metodoPagamento
-        })
-      });
-
-      const data = await resposta.json();
-
-      if (data.url_pagamento) {
-        window.location.href = data.url_pagamento;
-      } else {
-        alert("Ocorreu um erro ao gerar o link. Tente novamente.");
+    
+    if (metodoPagamento === 'pix') {
+      // GERA PIX NATIVO
+      try {
+        const res = await fetch('/api/pagamento-monitor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ valor: valorTotalSinal, descricao: `Sinal Reserva - ${servicoEscolhido.nome}` })
+        });
+        const data = await res.json();
+        
+        if (data.id) {
+          setQrCodePix({ base64: data.qr_code_base64, copiaCola: data.qr_code });
+          setPixId(data.id);
+        } else {
+          alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
+        }
+      } catch (e) {
+        console.error("Erro PIX:", e);
+      } finally {
         setIsProcessando(false);
       }
-    } catch (erro) {
-      console.error(erro);
-      alert("Erro de conexão. Verifique sua internet.");
-      setIsProcessando(false);
+
+    } else {
+      // GERA PREFERÊNCIA PARA CARTÃO (REDIRECIONAMENTO)
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento }));
+      try {
+        const resposta = await fetch('/api/pagamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalSinal, clienteNome: clienteDados.nome })
+        });
+        const data = await resposta.json();
+        if (data.init_point) {
+          window.location.href = data.init_point;
+        } else {
+          alert("Ocorreu um erro ao gerar o link. Tente novamente.");
+          setIsProcessando(false);
+        }
+      } catch (erro) {
+        console.error(erro);
+        alert("Erro de conexão. Verifique sua internet.");
+        setIsProcessando(false);
+      }
     }
   };
 
-// 6. SALVA NO BANCO E DISPARA O WHATSAPP AUTOMÁTICO
+  // 6. SALVA NO BANCO E DISPARA O WHATSAPP AUTOMÁTICO
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
-      const { data: clienteExistente } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).single();
       
-      if (clienteExistente) {
-        cliente_id = clienteExistente.id;
+      // CORREÇÃO: Usar .limit(1) evita que o sistema trave caso você tenha cadastrado o mesmo telefone 2x nos testes
+      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
+      
+      if (clientesEncontrados && clientesEncontrados.length > 0) {
+        cliente_id = clientesEncontrados[0].id;
       } else {
-        const { data: novoCliente } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().single();
-        if (novoCliente) cliente_id = novoCliente.id;
+        const { data: novoCliente } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().limit(1);
+        if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
 
       if (cliente_id) {
@@ -238,7 +259,7 @@ export default function LandingPage() {
         }]);
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
-            ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
+            ? calcularSinal(dados.servicoEscolhido) + (calcularSinal(dados.servicoEscolhido) * 0.05)
             : calcularSinal(dados.servicoEscolhido);
 
         await supabase.from('transacoes').insert([{
@@ -248,26 +269,19 @@ export default function LandingPage() {
           categoria: 'Sinal'
         }]);
 
-        // ==========================================
-        // 🚀 DISPARO AUTOMÁTICO PARA O WHATSAPP DA CLIENTE
-        // ==========================================
         const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
         const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
 
-        try {
-          await fetch('http://localhost:3001/enviar-mensagem', {
+       try {
+          // Motor do WhatsApp rodando na nuvem 24/7
+          await fetch('https://debora-whatsapp-api.onrender.com/enviar-mensagem', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              telefone: dados.clienteDados.telefone,
-              mensagem: mensagemCliente
-            })
+            body: JSON.stringify({ telefone: dados.clienteDados.telefone, mensagem: mensagemCliente })
           });
-          console.log('Mensagem de confirmação enviada com sucesso!');
         } catch (errWhatsApp) {
-          console.error('Erro ao disparar WhatsApp automático:', errWhatsApp);
+          console.error('Erro ao disparar WhatsApp da nuvem:', errWhatsApp);
         }
-
       }
     } catch (e) {
       console.error("Erro ao salvar no Supabase após pagamento", e);
@@ -275,7 +289,6 @@ export default function LandingPage() {
   };
 
   const formatarTempo = (segundos: number) => `${Math.floor(segundos / 60).toString().padStart(2, '0')}:${(segundos % 60).toString().padStart(2, '0')}`;
-
   const rolarPara = (id: string) => {
     const elemento = document.getElementById(id);
     if (elemento) {
@@ -292,8 +305,7 @@ export default function LandingPage() {
       <div className="fixed inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(199, 151, 125, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.15) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
       <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#DCAE96]/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-      {/* NAVBAR OTIMIZADO P/ RESPONSIVIDADE E VIP */}
-      <nav className="fixed w-full top-0 z-40 bg-[#0a0204]/80 backdrop-blur-xl border-b border-[#3a2522] px-5 py-3 md:px-8 md:py-4 flex justify-between items-center shadow-lg">
+      <nav className="fixed w-full top-0 left-0 z-[100] bg-[#0a0204]/90 backdrop-blur-xl border-b border-[#3a2522] px-5 py-3 md:px-8 md:py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
           <img src="/debora.card.PNG" alt="Logo Debora Nails" fetchPriority="high" className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
           <div className="flex flex-col">
@@ -315,7 +327,6 @@ export default function LandingPage() {
               <Link href="/area-cliente" className="hidden md:flex items-center gap-1.5 text-[#C7977D] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider bg-[#180A0D] border border-[#3a2522] px-3 py-1.5 rounded-full">
                 {dadosFidelidade.isVip ? <Crown size={14} className="drop-shadow-[0_0_5px_#DCAE96]"/> : <User size={14}/>} Painel VIP
               </Link>
-              {/* No celular mostra só o ícone VIP e o botão de sair */}
               <Link href="/area-cliente" className="md:hidden text-[#C7977D] p-2 bg-[#180A0D] border border-[#3a2522] rounded-full">
                 {dadosFidelidade.isVip ? <Crown size={16}/> : <User size={16}/>}
               </Link>
@@ -333,8 +344,7 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* HERO SECTION */}
-      <header className="relative pt-36 pb-20 md:pt-48 md:pb-32 px-6 flex flex-col lg:flex-row items-center justify-between max-w-7xl mx-auto gap-12 z-10 overflow-visible">
+      <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 flex flex-col lg:flex-row items-center justify-between max-w-7xl mx-auto gap-12 z-10 overflow-visible">
         <div className="flex-1 text-center lg:text-left animate-in fade-in slide-in-from-left-8 duration-1000 fill-mode-both">
           <span className="inline-flex items-center gap-2 border border-[#C7977D]/30 bg-transparent px-5 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold text-[#DCAE96] mb-8">
             <Award size={14} /> Design & Durabilidade
@@ -367,7 +377,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* CARDS FLUTUANTES DESKTOP */}
         <div className="flex-1 relative w-full max-w-md h-[500px] hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300 fill-mode-both">
           <div className="absolute top-10 right-0 w-64 glass-card neon-border rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 hover:-translate-y-2 transition-transform duration-500">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)]">
@@ -392,7 +401,6 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* SEÇÃO: QUEM SOU EU */}
       <section id="sobre" className="py-20 px-6 relative z-10">
         <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
           <div className="w-full md:w-1/3 relative group">
@@ -413,7 +421,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SEÇÃO: SERVIÇOS (Otimizada c/ Semântica HTML5 'article') */}
       <section id="servicos" className="py-24 pl-6 md:pl-0 max-w-7xl mx-auto relative z-10">
         <div className="text-left md:text-center mb-12 md:px-6">
           <span className="glow-text text-sm font-bold uppercase tracking-widest">Nossos Serviços</span>
@@ -462,7 +469,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SEÇÃO: PORTFÓLIO E ARTE */}
       <section id="portfolio" className="py-20 px-6 bg-[#050102] border-y border-[#3a2522] relative z-10">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-16">
@@ -490,7 +496,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SEÇÃO: ESPAÇO */}
       <section id="espaco" className="py-24 px-6 relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
@@ -550,7 +555,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* SEÇÃO: FAQ */}
       <section className="py-20 px-6 max-w-3xl mx-auto relative z-10 border-t border-[#3a2522]">
         <div className="text-center mb-10">
           <span className="glow-text text-sm font-bold uppercase tracking-widest">FAQ</span>
@@ -577,7 +581,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* CALL TO ACTION FINAL */}
       <section className="py-24 px-6 relative z-10 border-t border-[#3a2522] bg-[#0a0204]">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="font-serif text-5xl md:text-6xl text-white mb-6">Tá esperando o quê?</h2>
@@ -588,7 +591,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* WHATSAPP FLUTUANTE */}
       {!bubbleFechado && (
         <div className="fixed bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
           {showWaBubble && (
@@ -608,7 +610,6 @@ export default function LandingPage() {
         </div>
       )}
       
-      {/* FOOTER */}
       <footer className="bg-[#050102] py-10 px-6 border-t border-[#3a2522] text-center md:text-left relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
           <div><span className="font-serif text-xl text-[#F8D1BE]">Debora Nails</span><p className="text-gray-500 text-xs mt-1">Qualidade e cuidado em cada detalhe.</p></div>
@@ -616,45 +617,25 @@ export default function LandingPage() {
         </div>
       </footer>
 
-      {/* ========================================================= */}
-      {/* MODAL 0: AUTENTICAÇÃO ANTES DE AGENDAR (VIP) */}
-      {/* ========================================================= */}
       {isAuthModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
           <div className="bg-[#0a0204] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 p-8 text-center relative">
             <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white bg-[#180A0D] p-2 rounded-full transition-colors"><X size={16} /></button>
-            
-            <div className="w-16 h-16 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(220,174,150,0.4)]">
-               <Sparkles size={28} className="text-[#120308]" />
-            </div>
-            
+            <div className="w-16 h-16 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(220,174,150,0.4)]"><Sparkles size={28} className="text-[#120308]" /></div>
             <h2 className="font-serif text-3xl text-white mb-3">Acesso VIP ✨</h2>
             <p className="text-gray-400 text-sm leading-relaxed mb-8 font-light">Para ter acesso exclusivo ao seu histórico de agendamentos e fidelidade, crie sua conta.</p>
-            
             <div className="flex flex-col gap-3">
-               <Link href="/login?modo=cadastro" className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3.5 rounded-full font-bold shadow-lg hover:scale-105 transition-transform text-sm">
-                 Criar Conta Rápida
-               </Link>
-               <Link href="/login" className="w-full bg-[#120308] border border-[#3a2522] text-white py-3.5 rounded-full font-bold hover:bg-[#180A0D] transition-colors text-sm">
-                 Fazer Login
-               </Link>
-               
+               <Link href="/login?modo=cadastro" className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3.5 rounded-full font-bold shadow-lg hover:scale-105 transition-transform text-sm">Criar Conta Rápida</Link>
+               <Link href="/login" className="w-full bg-[#120308] border border-[#3a2522] text-white py-3.5 rounded-full font-bold hover:bg-[#180A0D] transition-colors text-sm">Fazer Login</Link>
                <div className="w-full h-px bg-[#3a2522] my-2"></div>
-               
-               {/* BOTÃO MÁGICO DE CONVIDADO */}
-               <button onClick={continuarComoConvidada} className="w-full bg-transparent text-gray-400 py-2 rounded-full font-medium hover:text-white transition-colors text-xs underline underline-offset-4 mt-2">
-                 Continuar sem conta
-               </button>
+               <button onClick={continuarComoConvidada} className="w-full bg-transparent text-gray-400 py-2 rounded-full font-medium hover:text-white transition-colors text-xs underline underline-offset-4 mt-2">Continuar sem conta</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 1: DETALHES DO SERVIÇO */}
-      {/* ========================================================= */}
       {servicoDetalhe && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
           <div className="bg-[#120308] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] flex flex-col animate-in zoom-in-95 max-h-full">
             <div className="relative h-64 bg-[#2D0A12] shrink-0">
               <button onClick={() => setServicoDetalhe(null)} className="absolute top-4 right-4 z-20 bg-black/50 text-white rounded-full p-2 hover:bg-black transition-colors"><X size={20}/></button>
@@ -670,35 +651,27 @@ export default function LandingPage() {
                 {servicoDetalhe.taxa_sinal > 0 && <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider">Sinal {servicoDetalhe.taxa_sinal}%</span>}
               </div>
               <p className="text-gray-400 text-sm mb-6 leading-relaxed font-light">{servicoDetalhe.descricao}</p>
-              
               <div className="flex justify-between items-center border-t border-[#3a2522] pt-6 mt-auto">
                 <div>
                   <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-0.5">Valor Total</p>
                   <p className="text-xl font-bold text-[#F8D1BE]">R$ {servicoDetalhe.preco.toFixed(2).replace('.', ',')}</p>
                 </div>
-                <button onClick={() => iniciarAgendamento(servicoDetalhe)} className="bg-[#DCAE96] text-[#120308] px-6 py-2.5 rounded-full font-bold shadow-[0_0_15px_rgba(220,174,150,0.4)] hover:scale-105 transition-transform text-sm">
-                  Agendar
-                </button>
+                <button onClick={() => iniciarAgendamento(servicoDetalhe)} className="bg-[#DCAE96] text-[#120308] px-6 py-2.5 rounded-full font-bold shadow-[0_0_15px_rgba(220,174,150,0.4)] hover:scale-105 transition-transform text-sm">Agendar</button>
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* ========================================================= */}
-      {/* MODAL 2: CHECKOUT MERCADO PAGO E DADOS */}
-      {/* ========================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
-          <div className="bg-[#0a0204] border border-[#3a2522] rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-full animate-in zoom-in-95">
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
+          <div className="bg-[#0a0204] border border-[#3a2522] rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
             <div className="px-6 py-4 border-b border-[#3a2522] flex justify-between items-center shrink-0">
               <div className="flex items-center gap-3">
                 {step < 5 && <div className="bg-[#DCAE96] text-[#120308] w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">{step}</div>}
-                <h2 className="text-sm md:text-base font-serif text-white">
-                  {step === 1 ? 'Escolha o Serviço' : step === 2 ? 'Data e Hora' : step === 3 ? 'Seus Dados' : step === 4 ? 'Pagamento Seguro' : 'Pronto!'}
-                </h2>
+                <h2 className="text-sm md:text-base font-serif text-white">{step === 1 ? 'Escolha o Serviço' : step === 2 ? 'Data e Hora' : step === 3 ? 'Seus Dados' : step === 4 ? 'Pagamento Seguro' : 'Pronto!'}</h2>
               </div>
-              {step < 5 && <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} className="md:w-[18px] md:h-[18px]" /></button>}
+              {step < 5 && <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#120308]">
@@ -733,9 +706,7 @@ export default function LandingPage() {
                       <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider mb-3">Horários Livres</label>
                       <div className="grid grid-cols-3 gap-3">
                         {horariosLivres.map(hora => (
-                          <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>
-                            {hora}
-                          </button>
+                          <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
                         ))}
                       </div>
                     </div>
@@ -760,58 +731,78 @@ export default function LandingPage() {
                     <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Seu WhatsApp</label>
                     <input type="tel" value={clienteDados.telefone} onChange={e => setClienteDados({...clienteDados, telefone: e.target.value})} placeholder="(47) 99999-9999" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
-                  <button disabled={!clienteDados.nome || !clienteDados.telefone} onClick={() => { if (calcularSinal() > 0) setStep(4); else gerarPagamentoMercadoPago(); }} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
+                  <button disabled={!clienteDados.nome || !clienteDados.telefone} onClick={() => { if (calcularSinal() > 0) setStep(4); else processarPagamento(); }} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
                     {calcularSinal() > 0 ? 'Ir para Pagamento da Reserva' : 'Confirmar Agendamento'}
                   </button>
                 </div>
               )}
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-right-4">
-                  <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
-                    <div className="flex items-center gap-3">
-                      <AlertCircle className="text-red-400" size={20} />
-                      <div>
-                        <p className="text-white font-bold text-xs">Vaga reservada temporariamente!</p>
-                        <p className="text-red-300 text-[10px] mt-0.5">Pague o sinal para confirmar.</p>
+                  
+                  {qrCodePix ? (
+                    // TELA DO PIX NATIVO EMBUTIDO
+                    <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
+                      <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Escaneie para Pagar</h3>
+                      
+                      <div className="bg-white p-2 rounded-xl mb-4 shadow-[0_0_20px_rgba(0,177,234,0.3)]">
+                        <img src={`data:image/jpeg;base64,${qrCodePix.base64}`} alt="QR Code PIX" className="w-48 h-48" />
+                      </div>
+                      
+                      <p className="text-gray-400 text-xs mb-2">Ou use o código Copia e Cola:</p>
+                      <div className="w-full flex gap-2">
+                         <input type="text" readOnly value={qrCodePix.copiaCola} className="w-full bg-[#180A0D] border border-[#3a2522] rounded-lg px-3 py-2 text-[10px] text-gray-500 truncate" />
+                         <button onClick={() => {navigator.clipboard.writeText(qrCodePix.copiaCola); alert("PIX Copiado!");}} className="bg-[#3a2522] text-white px-3 rounded-lg text-xs font-bold hover:bg-[#DCAE96] hover:text-black transition-colors flex items-center gap-1 shrink-0"><Copy size={12}/> Copiar</button>
+                      </div>
+                      
+                      <div className="mt-6 flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
+                         <Loader2 className="animate-spin" size={14} /> Aguardando Pagamento...
                       </div>
                     </div>
-                    <div className="text-lg font-mono text-red-400 font-bold bg-[#120308] px-3 py-1 rounded-lg border border-red-500/30">
-                      {formatarTempo(tempoRestante)}
-                    </div>
-                  </div>
+                  ) : (
+                    // TELA DE ESCOLHA DE PAGAMENTO
+                    <>
+                      <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="text-red-400" size={20} />
+                          <div><p className="text-white font-bold text-xs">Vaga reservada temporariamente!</p><p className="text-red-300 text-[10px] mt-0.5">Pague o sinal para confirmar.</p></div>
+                        </div>
+                        <div className="text-lg font-mono text-red-400 font-bold bg-[#120308] px-3 py-1 rounded-lg border border-red-500/30">{formatarTempo(tempoRestante)}</div>
+                      </div>
 
-                  <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">
-                    <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do Serviço</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
-                    <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinal().toFixed(2).replace('.', ',')}</span></div>
-                  </div>
+                      <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">
+                        <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do Serviço</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
+                        <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinal().toFixed(2).replace('.', ',')}</span></div>
+                      </div>
 
-                  <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-3 font-bold uppercase tracking-wider">Forma de Pagamento</label>
-                  <div className="grid grid-cols-2 gap-3 mb-6">
-                    <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'pix' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
-                      <input type="radio" name="pagamento" value="pix" checked={metodoPagamento === 'pix'} onChange={() => setMetodoPagamento('pix')} className="sr-only" />
-                      <QrCode size={24} className={metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-gray-400'} />
-                      <span className={`font-bold text-sm ${metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-white'}`}>PIX</span>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full absolute top-2 right-2 font-bold">Sem taxa</span>
-                    </label>
-                    <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'cartao' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
-                      <input type="radio" name="pagamento" value="cartao" checked={metodoPagamento === 'cartao'} onChange={() => setMetodoPagamento('cartao')} className="sr-only" />
-                      <CreditCard size={24} className={metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-gray-400'} />
-                      <span className={`font-bold text-sm ${metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-white'}`}>Cartão</span>
-                      <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded absolute top-2 right-2">+5% taxa</span>
-                    </label>
-                  </div>
+                      <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-3 font-bold uppercase tracking-wider">Forma de Pagamento</label>
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'pix' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
+                          <input type="radio" name="pagamento" value="pix" checked={metodoPagamento === 'pix'} onChange={() => setMetodoPagamento('pix')} className="sr-only" />
+                          <QrCode size={24} className={metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-gray-400'} />
+                          <span className={`font-bold text-sm ${metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-white'}`}>PIX</span>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full absolute top-2 right-2 font-bold">Sem taxa</span>
+                        </label>
+                        <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'cartao' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
+                          <input type="radio" name="pagamento" value="cartao" checked={metodoPagamento === 'cartao'} onChange={() => setMetodoPagamento('cartao')} className="sr-only" />
+                          <CreditCard size={24} className={metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-gray-400'} />
+                          <span className={`font-bold text-sm ${metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-white'}`}>Cartão</span>
+                          <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded absolute top-2 right-2">+5% taxa</span>
+                        </label>
+                      </div>
 
-                  <div className="bg-[#180A0D] p-5 rounded-2xl border border-[#3a2522] flex justify-between items-center mb-6">
-                    <div>
-                      <p className="text-gray-400 text-xs mb-1">Total a pagar agora</p>
-                      <p className="text-2xl font-bold text-white">R$ {valorTotalSinal.toFixed(2).replace('.', ',')}</p>
-                    </div>
-                    {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularSinal()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
-                  </div>
+                      <div className="bg-[#180A0D] p-5 rounded-2xl border border-[#3a2522] flex justify-between items-center mb-6">
+                        <div>
+                          <p className="text-gray-400 text-xs mb-1">Total a pagar agora</p>
+                          <p className="text-2xl font-bold text-white">R$ {valorTotalSinal.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                        {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularSinal()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
+                      </div>
 
-                  <button onClick={gerarPagamentoMercadoPago} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
-                    {isProcessando ? <Loader2 className="animate-spin" size={20} /> : <><ShieldCheck size={18}/> Pagar Seguramente</>}
-                  </button>
+                      <button onClick={processarPagamento} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                        {isProcessando ? <Loader2 className="animate-spin" size={20} /> : <><ShieldCheck size={18}/> Pagar Seguramente</>}
+                      </button>
+                    </>
+                  )}
                   <p className="text-center text-[10px] text-gray-500 mt-3 flex items-center justify-center gap-1 font-medium"><ShieldCheck size={10}/> Processado pelo Mercado Pago</p>
                 </div>
               )}
@@ -837,23 +828,16 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* ESTILOS CSS INJETADOS */}
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap');
         body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0a0204; }
         .font-serif { font-family: 'Playfair Display', serif; }
         
-        .ambient-grid {
-            position: fixed; inset: 0; z-index: -1;
-            background-image: linear-gradient(rgba(199, 151, 125, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.08) 1px, transparent 1px);
-            background-size: 35px 35px;
-        }
-
+        .ambient-grid { position: fixed; inset: 0; z-index: -1; background-image: linear-gradient(rgba(199, 151, 125, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.08) 1px, transparent 1px); background-size: 35px 35px; }
         .glass-card { background: rgba(18, 3, 8, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
         .neon-border { border: 1px solid rgba(199, 151, 125, 0.5); box-shadow: 0 0 20px rgba(199, 151, 125, 0.1); }
         .neon-hover:hover { border-color: rgba(220, 174, 150, 0.6); box-shadow: 0 0 25px rgba(220, 174, 150, 0.2); transform: translateY(-3px); }
         .glow-text { background: linear-gradient(90deg, #F8D1BE, #C7977D); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 8px rgba(248, 209, 190, 0.4)); }
-
         .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(199, 151, 125, 0.4); border-radius: 10px; }

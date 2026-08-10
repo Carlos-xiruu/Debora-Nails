@@ -13,8 +13,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const router = useRouter();
   
-  // O menu começa fechado no celular e aberto no PC
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isNotificacaoOpen, setIsNotificacaoOpen] = useState(false); 
+  
+  // ESTADOS DO SINO INTELIGENTE
+  const [notificacoes, setNotificacoes] = useState<any[]>([]);
+  const [temNaoLida, setTemNaoLida] = useState(false);
+
   const [autorizado, setAutorizado] = useState(false);
   const [carregandoAuth, setCarregandoAuth] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
@@ -22,10 +27,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const EMAIL_ADMIN = 'debora199917silva@gmail.com';
 
   useEffect(() => {
-    // Abre a sidebar por padrão se for PC
     if (window.innerWidth > 768) setIsSidebarOpen(true);
 
-    // Captura o evento do navegador para permitir instalar o PWA
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -48,6 +51,43 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     checarAutenticacao();
   }, [router]);
 
+  // CANAL DE ESCUTA PARA NOTIFICAÇÕES EM TEMPO REAL
+  useEffect(() => {
+    const carregarNotificacoesIniciais = async () => {
+      // Busca os últimos 5 agendamentos para popular o sino inicialmente
+      const { data } = await supabase
+        .from('agendamentos')
+        .select(`id, inicio, clientes(nome), servicos(nome)`)
+        .order('created_at', { ascending: false })
+        .limit(5);
+        
+      if (data) setNotificacoes(data);
+    };
+
+    carregarNotificacoesIniciais();
+
+    // Fica vigiando o banco de dados. Se alguém agendar, o sino avisa!
+    const canalAgendamentos = supabase
+      .channel('notificacoes_agenda')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'agendamentos' }, async (payload) => {
+        
+        // Quando entra um novo agendamento, busca o nome do cliente e serviço para exibir
+        const { data: detalhes } = await supabase
+          .from('agendamentos')
+          .select(`id, inicio, clientes(nome), servicos(nome)`)
+          .eq('id', payload.new.id)
+          .single();
+
+        if (detalhes) {
+          setNotificacoes(prev => [detalhes, ...prev].slice(0, 10)); // Mantém as 10 mais recentes
+          setTemNaoLida(true); // Acende a bolinha vermelha
+        }
+      })
+      .subscribe();
+
+    return () => { supabase.removeChannel(canalAgendamentos); };
+  }, []);
+
   const handleInstallClick = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -59,6 +99,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.push('/login');
+  };
+
+  const marcarComoLidas = () => {
+    setTemNaoLida(false);
+    setIsNotificacaoOpen(false);
   };
 
   const menuItems = [
@@ -85,7 +130,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-[100dvh] bg-[#120308] text-white flex font-sans overflow-hidden">
       
-      {/* OVERLAY MOBILE (Fundo escuro quando menu está aberto no celular) */}
       {isSidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm"
@@ -93,7 +137,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
-      {/* SIDEBAR DE VIDRO */}
       <aside 
         className={`fixed inset-y-0 left-0 h-[100dvh] border-r border-[#DCAE96]/30 bg-[#2D0A12]/95 backdrop-blur-xl flex flex-col transition-transform duration-300 z-50 md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:w-20'
@@ -122,7 +165,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link 
                 key={item.name} 
                 href={item.path}
-                onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} // Fecha menu ao clicar no celular
+                onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} 
                 className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all duration-300 ${
                   isActive 
                     ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] shadow-[0_0_15px_rgba(248,209,190,0.4)] font-semibold' 
@@ -149,10 +192,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </aside>
 
-      {/* ÁREA PRINCIPAL */}
       <main className={`flex-1 flex flex-col h-[100dvh] overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         
-        {/* HEADER TOP (Visível especialmente no mobile para abrir o menu) */}
         <header className="h-16 md:h-20 shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 z-30 bg-[#120308] md:bg-transparent">
           <div className="flex items-center">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-[#E8D3C8] hover:text-white rounded-lg -ml-2">
@@ -160,17 +201,63 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </button>
           </div>
           
-          <div className="flex items-center gap-4">
-            {/* BOTÃO MÁGICO DO PWA */}
+          <div className="flex items-center gap-4 relative">
             {deferredPrompt && (
               <button onClick={handleInstallClick} className="flex items-center gap-2 bg-[#00B1EA] text-white px-4 py-2 rounded-full text-xs font-bold shadow-[0_0_15px_rgba(0,177,234,0.4)] animate-pulse">
                 <Download size={16} /> Instalar App
               </button>
             )}
-            <button className="relative p-2 text-[#F8D1BE] hover:scale-110 transition-transform">
-              <BellRing size={24} />
-              <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border border-[#120308]"></span>
-            </button>
+            
+            <div className="relative">
+              <button 
+                onClick={() => {
+                  setIsNotificacaoOpen(!isNotificacaoOpen);
+                  if (temNaoLida && isNotificacaoOpen) setTemNaoLida(false); 
+                }} 
+                className="relative p-2 text-[#F8D1BE] hover:scale-110 transition-transform"
+              >
+                <BellRing size={24} />
+                {temNaoLida && <span className="absolute top-1 right-1 w-3 h-3 bg-red-500 rounded-full border border-[#120308] animate-pulse"></span>}
+              </button>
+
+              {isNotificacaoOpen && (
+                <div className="absolute right-0 mt-3 w-80 bg-[#120308] border border-[#DCAE96]/30 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                  <div className="p-4 border-b border-[#DCAE96]/30 flex justify-between items-center bg-[#2D0A12]">
+                    <h3 className="font-medium text-white">Notificações</h3>
+                    <button onClick={marcarComoLidas} className="text-xs text-[#DCAE96] hover:text-white transition-colors">Marcar como lidas</button>
+                  </div>
+                  
+                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
+                    {notificacoes.length === 0 ? (
+                      <div className="p-6 text-center text-sm text-gray-500">
+                        <BellRing size={32} className="mx-auto mb-3 opacity-20" />
+                        Nenhuma notificação no momento.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-[#DCAE96]/10">
+                        {notificacoes.map((notif, index) => (
+                          <div key={index} className="p-4 hover:bg-[#2D0A12]/50 transition-colors flex items-start gap-3">
+                            <div className="w-8 h-8 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+                              <CalendarDays size={16} />
+                            </div>
+                            <div>
+                              <p className="text-sm text-white mb-0.5"><strong className="text-[#F8D1BE]">{notif.clientes?.nome}</strong> agendou um horário!</p>
+                              <p className="text-xs text-gray-400">{notif.servicos?.nome}</p>
+                              <p className="text-[10px] text-[#C7977D] mt-1">{new Date(notif.inicio).toLocaleDateString('pt-BR')} às {new Date(notif.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="p-3 border-t border-[#DCAE96]/30 bg-[#2D0A12] text-center">
+                    <Link href="/dashboard/agenda" onClick={() => setIsNotificacaoOpen(false)} className="text-xs text-[#F8D1BE] hover:underline">Ver agenda completa</Link>
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
         </header>
         

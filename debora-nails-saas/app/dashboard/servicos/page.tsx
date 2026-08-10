@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert } from 'lucide-react';
+import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert, Upload } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const imagensDisponiveis = [
@@ -14,6 +14,7 @@ export default function ServicosPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   
   const [servicos, setServicos] = useState<any[]>([]);
   const [imagensSelecionadas, setImagensSelecionadas] = useState<string[]>([]);
@@ -36,6 +37,39 @@ export default function ServicosPage() {
     setIsModalOpen(true);
   };
 
+  // NOVA FUNÇÃO: UPLOAD DE FOTO DIRETO DO CELULAR/PC PARA O SUPABASE STORAGE
+  const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const novasImagens: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Envia para o bucket 'servicos' do Supabase Storage
+      const { error: uploadError } = await supabase.storage.from('servicos').upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Erro no upload:", uploadError.message);
+        alert(`Erro ao enviar a imagem ${file.name}. Verifique se o bucket 'servicos' é público no Supabase.`);
+      } else {
+        // Pega a URL pública da imagem recém enviada
+        const { data } = supabase.storage.from('servicos').getPublicUrl(filePath);
+        if (data?.publicUrl) {
+          novasImagens.push(data.publicUrl);
+        }
+      }
+    }
+
+    setImagensSelecionadas(prev => [...prev, ...novasImagens]);
+    setIsUploading(false);
+  };
+
   const handleSalvarServico = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -44,7 +78,6 @@ export default function ServicosPage() {
     const precoCalc = parseFloat(formData.get('preco') as string);
     const taxaSinal = parseInt(formData.get('taxa_sinal') as string);
     
-    // Calcula o texto do sinal baseado na %
     const valorSinal = precoCalc * (taxaSinal / 100);
     const sinalCalc = taxaSinal > 0 ? `${taxaSinal}% (R$ ${valorSinal.toFixed(2).replace('.', ',')})` : 'Não exigido';
 
@@ -95,7 +128,7 @@ export default function ServicosPage() {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><Sparkles className="text-[#C7977D]" size={28} /> Meus Serviços</h1>
-          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e configurações de sinais.</p>
+          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e adicione fotos direto da sua galeria.</p>
         </div>
         <button onClick={() => abrirModal(null)} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-all">
           <Plus size={20} /> Novo Serviço
@@ -192,8 +225,37 @@ export default function ServicosPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* SEÇÃO DE FOTOS COM BOTÃO DE UPLOAD DO CELULAR */}
                 <div className="pt-4 border-t border-[#DCAE96]/20">
-                  <label className="block text-sm font-bold text-white mb-3 flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Anexar Fotos</label>
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Fotos do Serviço</label>
+                    
+                    {/* BOTÃO PARA UPAR DO CELULAR OU PC */}
+                    <label className="bg-[#C7977D] text-[#120308] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform">
+                      {isUploading ? <Loader2 className="animate-spin" size={14} /> : <><Upload size={14} /> Upar do Dispositivo</>}
+                      <input type="file" accept="image/*" multiple onChange={handleUploadFoto} className="hidden" />
+                    </label>
+                  </div>
+
+                  {/* MINIATURAS SELECIONADAS */}
+                  {imagensSelecionadas.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs text-[#E8D3C8] mb-2">Imagens vinculadas a este serviço:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {imagensSelecionadas.map((imgUrl, idx) => (
+                          <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#C7977D]">
+                            <img src={imgUrl} className="w-full h-full object-cover" />
+                            <button type="button" onClick={() => setImagensSelecionadas(imagensSelecionadas.filter(i => i !== imgUrl))} className="absolute top-0 right-0 bg-red-600 text-white p-0.5 rounded-bl">
+                              <X size={10} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="text-xs text-gray-400 mb-2">Ou escolha das imagens padrão:</p>
                   <div className="grid grid-cols-4 gap-3">
                     {imagensDisponiveis.map((img) => (
                       <div key={img} onClick={() => toggleImagem(img)} className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 ${imagensSelecionadas.includes(img) ? 'border-[#C7977D] scale-95' : 'border-transparent opacity-60'}`}>
@@ -205,7 +267,9 @@ export default function ServicosPage() {
                 </div>
               </div>
               <div className="px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
-                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold">{isSaving ? <Loader2 className="animate-spin" size={24} /> : 'Salvar Álbum'}</button>
+                <button type="submit" disabled={isSaving || isUploading} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold flex justify-center items-center gap-2">
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Serviço'}
+                </button>
               </div>
             </form>
           </div>
