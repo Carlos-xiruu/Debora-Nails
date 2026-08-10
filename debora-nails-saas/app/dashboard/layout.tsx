@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [carregandoAuth, setCarregandoAuth] = useState(true);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  const EMAIL_ADMIN = 'contato@deboranails.com.br';
+  const EMAIL_ADMIN = 'debora199917silva@gmail.com';
 
   useEffect(() => {
     // Abre a sidebar por padrão se for PC

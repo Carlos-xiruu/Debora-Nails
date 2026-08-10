@@ -6,6 +6,7 @@ import { supabase } from '../lib/supabase';
 
 export default function DashboardPage() {
   const [atendimentoEmAndamento, setAtendimentoEmAndamento] = useState(false);
+  const [sessaoMonitor, setSessaoMonitor] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   
   const [agendamentosHoje, setAgendamentosHoje] = useState<any[]>([]);
@@ -20,7 +21,10 @@ export default function DashboardPage() {
     setIsLoading(true);
     
     const { data: sessaoData } = await supabase.from('sessao_monitor').select('*').eq('id', 1).single();
-    if (sessaoData) setAtendimentoEmAndamento(sessaoData.ativo);
+    if (sessaoData) {
+      setAtendimentoEmAndamento(sessaoData.ativo);
+      setSessaoMonitor(sessaoData);
+    }
 
     const hoje = new Date();
     hoje.setHours(0, 0, 0, 0);
@@ -47,14 +51,14 @@ export default function DashboardPage() {
       if (pendentes.length > 0) {
         setProximoAgendamento(pendentes[0]);
       } else {
-        setProximoAgendamento(agendaData[agendaData.length - 1]);
+        setProximoAgendamento(null);
       }
     }
     
     setIsLoading(false);
   };
 
-  const iniciarAtendimento = async () => {
+ const iniciarAtendimento = async () => {
     if (!proximoAgendamento) return;
     setIsLoading(true);
     
@@ -62,7 +66,8 @@ export default function DashboardPage() {
       ativo: true,
       cliente_nome: proximoAgendamento.clientes.nome,
       servico_nome: proximoAgendamento.servicos.nome,
-      inicio: new Date().toISOString()
+      inicio: new Date().toISOString(),
+      status_pagamento: 'pendente' // <-- ADICIONE APENAS ESTA LINHA AQUI
     }).eq('id', 1);
 
     // Muda o status na Agenda
@@ -70,25 +75,27 @@ export default function DashboardPage() {
     
     setAtendimentoEmAndamento(true);
     setIsLoading(false);
+    fetchDadosHoje(); 
   };
 
   const encerrarAtendimento = async () => {
-    if (!proximoAgendamento) return;
     setIsLoading(true);
     
-    // 1. Desliga o Monitor
+    // 1. Desliga o Monitor sempre, resolvendo sessões travadas/testes
     await supabase.from('sessao_monitor').update({ ativo: false }).eq('id', 1);
 
-    // 2. Conclui a sessão na Agenda
-    await supabase.from('agendamentos').update({ tipo: 'concluido' }).eq('id', proximoAgendamento.id);
+    // 2. Conclui a sessão na Agenda APENAS SE houver um agendamento real e ele estiver em andamento
+    if (proximoAgendamento && proximoAgendamento.tipo === 'em_andamento') {
+      await supabase.from('agendamentos').update({ tipo: 'concluido' }).eq('id', proximoAgendamento.id);
 
-    // 3. REGISTRA NAS FINANÇAS E RELATÓRIOS!
-    await supabase.from('transacoes').insert([{
-      descricao: `Atendimento: ${proximoAgendamento.clientes.nome} - ${proximoAgendamento.servicos.nome}`,
-      tipo: 'entrada',
-      valor: proximoAgendamento.servicos.preco,
-      categoria: 'Atendimento'
-    }]);
+      // 3. REGISTRA NAS FINANÇAS E RELATÓRIOS
+      await supabase.from('transacoes').insert([{
+        descricao: `Atendimento: ${proximoAgendamento.clientes.nome} - ${proximoAgendamento.servicos.nome}`,
+        tipo: 'entrada',
+        valor: proximoAgendamento.servicos.preco,
+        categoria: 'Atendimento'
+      }]);
+    }
 
     setAtendimentoEmAndamento(false);
     fetchDadosHoje(); // Recarrega para atualizar o lucro
@@ -120,26 +127,34 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {proximoAgendamento ? (
+          {proximoAgendamento || atendimentoEmAndamento ? (
             <div className={`border p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6 ${atendimentoEmAndamento ? 'bg-gradient-to-br from-[#120308] to-[#0A1A12] border-emerald-500/50' : 'bg-[#120308] border-[#DCAE96]/30'}`}>
               <div>
                 <span className={`text-xs font-bold px-3 py-1 rounded-full uppercase border ${atendimentoEmAndamento ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/50' : 'bg-[#DCAE96]/10 text-[#F8D1BE] border-[#DCAE96]/30'}`}>
-                  {atendimentoEmAndamento || proximoAgendamento.tipo === 'em_andamento' ? 'Em Atendimento Agora' : 'Próxima Cliente'}
+                  {atendimentoEmAndamento || proximoAgendamento?.tipo === 'em_andamento' ? 'Em Atendimento Agora' : 'Próxima Cliente'}
                 </span>
-                <h2 className="font-serif text-3xl md:text-4xl text-white mt-5 mb-3">{proximoAgendamento.clientes.nome}</h2>
+                <h2 className="font-serif text-3xl md:text-4xl text-white mt-5 mb-3">
+                  {atendimentoEmAndamento && !proximoAgendamento ? sessaoMonitor?.cliente_nome : proximoAgendamento?.clientes?.nome}
+                </h2>
                 <div className="flex items-center gap-5 text-[#E8D3C8] text-sm">
-                  <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {new Date(proximoAgendamento.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span>
-                  <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {proximoAgendamento.servicos.nome}</span>
+                  {proximoAgendamento ? (
+                    <>
+                      <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {new Date(proximoAgendamento.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span>
+                      <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {proximoAgendamento.servicos.nome}</span>
+                    </>
+                  ) : (
+                    <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {sessaoMonitor?.servico_nome} (Finalize para liberar)</span>
+                  )}
                 </div>
               </div>
 
-              {!atendimentoEmAndamento && proximoAgendamento.tipo !== 'concluido' ? (
+              {atendimentoEmAndamento ? (
+                <button onClick={encerrarAtendimento} className="w-full md:w-auto bg-transparent border border-red-500 text-red-400 px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-3">
+                  <StopCircle size={24} /> {proximoAgendamento && proximoAgendamento.tipo === 'em_andamento' ? 'Encerrar & Faturar' : 'Parar Atendimento'}
+                </button>
+              ) : proximoAgendamento && proximoAgendamento.tipo !== 'concluido' ? (
                 <button onClick={iniciarAtendimento} className="w-full md:w-auto bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-3">
                   <Play size={20} fill="currentColor" /> Iniciar Atendimento
-                </button>
-              ) : proximoAgendamento.tipo !== 'concluido' ? (
-                <button onClick={encerrarAtendimento} className="w-full md:w-auto bg-transparent border border-red-500 text-red-400 px-8 py-4 rounded-xl font-bold flex items-center justify-center gap-3">
-                  <StopCircle size={24} /> Encerrar & Faturar
                 </button>
               ) : null}
             </div>

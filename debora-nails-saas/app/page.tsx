@@ -1,15 +1,19 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, MessageCircle, Coffee, Wifi, Wind, CarFront, Gem, Shield, Wand2, Palette } from 'lucide-react';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, MessageCircle, Coffee, Wifi, Wind, CarFront, Gem, Shield, Wand2, Palette, LogOut, Crown, User } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
 export default function LandingPage() {
   const [servicos, setServicos] = useState<any[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); // NOVO: Controle do Modal de Login VIP
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); 
   const [servicoDetalhe, setServicoDetalhe] = useState<any>(null);
+  
+  // STATUS DO USUÁRIO & FIDELIDADE VIP
+  const [usuarioLogado, setUsuarioLogado] = useState<any>(null);
+  const [dadosFidelidade, setDadosFidelidade] = useState({ atendimentos: 0, isVip: false });
   
   const [step, setStep] = useState(1);
   const [servicoEscolhido, setServicoEscolhido] = useState<any>(null);
@@ -28,7 +32,7 @@ export default function LandingPage() {
   const proximosDias = Array.from({length: 10}).map((_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
   const horariosLivres = ['09:00', '10:30', '13:30', '15:00', '16:30'];
 
-  // 1. CARREGA SERVIÇOS
+  // 1. CARREGA SERVIÇOS & WHATSAPP TIMING (20 SEGUNDOS)
   useEffect(() => {
     const fetchServicos = async () => {
       const { data } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
@@ -36,18 +40,32 @@ export default function LandingPage() {
     };
     fetchServicos();
 
-    const waTimer = setTimeout(() => setShowWaBubble(true), 5000);
+    const waTimer = setTimeout(() => setShowWaBubble(true), 20000); 
     return () => clearTimeout(waTimer);
   }, []);
 
-  // NOVO: Verifica se a cliente acabou de logar e tinha intenção de agendar
+  // 2. VERIFICA SESSÃO, FIDELIDADE VIP E INTENÇÃO DE AGENDAMENTO
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
       const { data: { session } } = await supabase.auth.getSession();
+      
       if (session) {
-        // Já preenche o nome da cliente automaticamente!
-        setClienteDados(prev => ({...prev, nome: session.user.user_metadata?.nome_completo || ''}));
+        setUsuarioLogado(session.user);
+        setClienteDados(prev => ({...prev, nome: session.user.user_metadata?.nome_completo || prev.nome}));
         
+        // Verifica a quantidade de agendamentos no banco para status VIP
+        const telefoneUser = session.user.user_metadata?.telefone;
+        if (telefoneUser) {
+          const { data: clienteBanco } = await supabase.from('clientes').select('atendimentos').eq('telefone', telefoneUser).single();
+          if (clienteBanco) {
+            setDadosFidelidade({
+              atendimentos: clienteBanco.atendimentos,
+              isVip: clienteBanco.atendimentos >= 10
+            });
+          }
+        }
+        
+        // Retoma o agendamento caso a cliente tenha logado após clicar em agendar
         const intencao = localStorage.getItem('intencao_agendamento');
         if (intencao) {
           localStorage.removeItem('intencao_agendamento');
@@ -67,7 +85,7 @@ export default function LandingPage() {
     verificarSessaoEIntencao();
   }, []);
 
-  // 2. LIDA COM O RETORNO DO MERCADO PAGO
+  // 3. LIDA COM O RETORNO DO MERCADO PAGO
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const statusPagamento = params.get('pagamento');
@@ -98,7 +116,7 @@ export default function LandingPage() {
     }
   }, []);
 
-  // 3. CRONÔMETRO
+  // 4. CRONÔMETRO DE CHECKOUT
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 4 && tempoRestante > 0) {
@@ -111,33 +129,44 @@ export default function LandingPage() {
     return () => clearInterval(timer);
   }, [step, tempoRestante]);
 
-  // Modificado: Agora verifica se está logada antes de abrir a agenda
-  const iniciarAgendamento = async (servico: any = null, bypassAuth = false) => {
-    let isLogged = bypassAuth;
-    
-    if (!isLogged) {
-      const { data: { session } } = await supabase.auth.getSession();
-      isLogged = !!session;
-      if (session) {
-        setClienteDados(prev => ({...prev, nome: session.user.user_metadata?.nome_completo || prev.nome}));
-      }
-    }
+  // LOGOUT SEGURO
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUsuarioLogado(null);
+    setDadosFidelidade({ atendimentos: 0, isVip: false });
+    setClienteDados({ nome: '', telefone: '' });
+  };
 
-    if (isLogged) {
+  // FLUXO DE AGENDAMENTO BLINDADO
+  const iniciarAgendamento = (servico: any = null, forceLogado = false) => {
+    // Se a usuária está logada OU ela escolheu entrar como convidada (forceLogado)
+    if (usuarioLogado || forceLogado) {
       setServicoDetalhe(null);
       setServicoEscolhido(servico);
       setStep(servico ? 2 : 1);
       setIsModalOpen(true);
       setTempoRestante(300);
     } else {
-      // Memoriza o que ela queria fazer
-      if (servico) {
-        localStorage.setItem('intencao_agendamento', JSON.stringify(servico));
-      } else {
-        localStorage.setItem('intencao_agendamento', 'geral');
-      }
+      // Se não está logada, salva o que ela queria e abre o Modal VIP
+      localStorage.setItem('intencao_agendamento', servico ? JSON.stringify(servico) : 'geral');
       setServicoDetalhe(null);
-      setIsAuthModalOpen(true); // Abre o Modal VIP de Cadastro
+      setIsAuthModalOpen(true); 
+    }
+  };
+
+  const continuarComoConvidada = () => {
+    setIsAuthModalOpen(false);
+    const intencao = localStorage.getItem('intencao_agendamento');
+    localStorage.removeItem('intencao_agendamento');
+    
+    if (intencao && intencao !== 'geral') {
+      try { 
+        iniciarAgendamento(JSON.parse(intencao), true); 
+      } catch(e) { 
+        iniciarAgendamento(null, true); 
+      }
+    } else {
+      iniciarAgendamento(null, true);
     }
   };
 
@@ -145,11 +174,9 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalSinal = metodoPagamento === 'cartao' ? calcularSinal() + calcularTaxaCartao(calcularSinal()) : calcularSinal();
 
-  // 4. CHAMA A API DO MERCADO PAGO QUE CRIAMOS
+  // 5. CHAMA API DO MERCADO PAGO
   const gerarPagamentoMercadoPago = async () => {
     setIsProcessando(true);
-    
-    // Salva na "memória" do navegador antes de sair da página
     localStorage.setItem('reserva_temp_debora', JSON.stringify({
       clienteDados,
       servicoEscolhido,
@@ -167,14 +194,13 @@ export default function LandingPage() {
           preco: valorTotalSinal,
           clienteNome: clienteDados.nome,
           clienteTelefone: clienteDados.telefone,
-          metodoPagamento: metodoPagamento // <-- AVISAMOS A API AQUI!
+          metodoPagamento: metodoPagamento
         })
       });
 
       const data = await resposta.json();
 
       if (data.url_pagamento) {
-        // Redireciona a cliente REALMENTE para o Mercado Pago!
         window.location.href = data.url_pagamento;
       } else {
         alert("Ocorreu um erro ao gerar o link. Tente novamente.");
@@ -187,7 +213,7 @@ export default function LandingPage() {
     }
   };
 
-  // 5. SALVA NO BANCO (Chamado automaticamente quando volta do MP com Sucesso)
+// 6. SALVA NO BANCO E DISPARA O WHATSAPP AUTOMÁTICO
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
@@ -212,8 +238,8 @@ export default function LandingPage() {
         }]);
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
-           ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
-           : calcularSinal(dados.servicoEscolhido);
+            ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
+            : calcularSinal(dados.servicoEscolhido);
 
         await supabase.from('transacoes').insert([{
           descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
@@ -221,6 +247,27 @@ export default function LandingPage() {
           valor: valorSinalPago, 
           categoria: 'Sinal'
         }]);
+
+        // ==========================================
+        // 🚀 DISPARO AUTOMÁTICO PARA O WHATSAPP DA CLIENTE
+        // ==========================================
+        const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
+        const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
+
+        try {
+          await fetch('http://localhost:3001/enviar-mensagem', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              telefone: dados.clienteDados.telefone,
+              mensagem: mensagemCliente
+            })
+          });
+          console.log('Mensagem de confirmação enviada com sucesso!');
+        } catch (errWhatsApp) {
+          console.error('Erro ao disparar WhatsApp automático:', errWhatsApp);
+        }
+
       }
     } catch (e) {
       console.error("Erro ao salvar no Supabase após pagamento", e);
@@ -239,25 +286,16 @@ export default function LandingPage() {
     }
   };
 
-  const getIconForService = (nome: string) => {
-    const n = nome.toLowerCase();
-    if (n.includes('fibra') || n.includes('alongamento')) return <Gem size={24} className="text-[#C7977D]" />;
-    if (n.includes('banho') || n.includes('blindagem')) return <Shield size={24} className="text-[#C7977D]" />;
-    if (n.includes('make') || n.includes('maquiagem')) return <Palette size={24} className="text-[#C7977D]" />;
-    return <Wand2 size={24} className="text-[#C7977D]" />;
-  };
-
   return (
-    <div className="min-h-screen bg-[#0a0204] text-white font-sans selection:bg-[#C7977D] selection:text-[#120308] relative overflow-x-hidden">
+    <main className="min-h-screen bg-[#0a0204] text-white font-sans selection:bg-[#C7977D] selection:text-[#120308] relative overflow-x-hidden">
       
-      {/* GRID DE FUNDO E LUZES AMBIENTES */}
       <div className="fixed inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(199, 151, 125, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.15) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
       <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#DCAE96]/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-      {/* NAVBAR */}
+      {/* NAVBAR OTIMIZADO P/ RESPONSIVIDADE E VIP */}
       <nav className="fixed w-full top-0 z-40 bg-[#0a0204]/80 backdrop-blur-xl border-b border-[#3a2522] px-5 py-3 md:px-8 md:py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-          <img src="/debora.card.PNG" alt="Logo" className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
+          <img src="/debora.card.PNG" alt="Logo Debora Nails" fetchPriority="high" className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
           <div className="flex flex-col">
             <span className="font-serif text-[18px] md:text-[22px] text-[#E8D3C8] leading-none mb-0.5">Debora Nails</span>
             <span className="text-[8px] md:text-[10px] text-gray-400 tracking-[0.15em] uppercase font-bold">Studio de Alto Padrão</span>
@@ -265,16 +303,32 @@ export default function LandingPage() {
         </div>
         
         <div className="hidden lg:flex items-center gap-2">
-          <button onClick={() => rolarPara('sobre')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">A Especialista</button>
+          <button onClick={() => rolarPara('sobre')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Quem sou eu?</button>
           <button onClick={() => rolarPara('servicos')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Serviços</button>
           <button onClick={() => rolarPara('portfolio')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Portfólio</button>
           <button onClick={() => rolarPara('espaco')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">O Espaço</button>
         </div>
 
-        <div className="flex items-center gap-5">
-          <Link href="/login" className="text-xs font-medium text-gray-500 hover:text-[#C7977D] transition-colors hidden md:block">Login</Link>
-          <button onClick={() => iniciarAgendamento()} className="bg-[#DCAE96] text-[#2D0A12] px-6 py-2.5 rounded-full text-sm font-bold shadow-[0_0_15px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform">
-            Agendar Agora
+        <div className="flex items-center gap-3 md:gap-5">
+          {usuarioLogado ? (
+            <div className="flex items-center gap-2 md:gap-4 md:border-r border-[#3a2522] md:pr-5">
+              <Link href="/area-cliente" className="hidden md:flex items-center gap-1.5 text-[#C7977D] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider bg-[#180A0D] border border-[#3a2522] px-3 py-1.5 rounded-full">
+                {dadosFidelidade.isVip ? <Crown size={14} className="drop-shadow-[0_0_5px_#DCAE96]"/> : <User size={14}/>} Painel VIP
+              </Link>
+              {/* No celular mostra só o ícone VIP e o botão de sair */}
+              <Link href="/area-cliente" className="md:hidden text-[#C7977D] p-2 bg-[#180A0D] border border-[#3a2522] rounded-full">
+                {dadosFidelidade.isVip ? <Crown size={16}/> : <User size={16}/>}
+              </Link>
+              <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition-colors p-2 bg-[#180A0D] rounded-full border border-[#3a2522]" title="Sair da Conta">
+                <LogOut size={16} className="md:w-4 md:h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="text-xs font-medium text-gray-500 hover:text-[#C7977D] transition-colors border-r border-[#3a2522] pr-3 md:pr-5">Login</Link>
+          )}
+
+          <button onClick={() => iniciarAgendamento()} className="bg-[#DCAE96] text-[#2D0A12] px-4 md:px-6 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold shadow-[0_0_15px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform">
+            Agendar
           </button>
         </div>
       </nav>
@@ -317,7 +371,7 @@ export default function LandingPage() {
         <div className="flex-1 relative w-full max-w-md h-[500px] hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300 fill-mode-both">
           <div className="absolute top-10 right-0 w-64 glass-card neon-border rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 hover:-translate-y-2 transition-transform duration-500">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)]">
-              <img src="/debora.jpg" alt="Débora" className="w-full h-full object-cover" />
+              <img src="/debora.jpg" alt="Débora" fetchPriority="high" className="w-full h-full object-cover" />
             </div>
             <strong className="text-[#F8D1BE] text-xl font-serif mb-1">Debora Nails Studio</strong>
             <span className="text-gray-400 text-xs uppercase tracking-widest mb-5">Beauty & Nail Design</span>
@@ -342,7 +396,7 @@ export default function LandingPage() {
       <section id="sobre" className="py-20 px-6 relative z-10">
         <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
           <div className="w-full md:w-1/3 relative group">
-            <img src="/debora.jpg" alt="Débora Silva" className="w-full rounded-2xl relative z-10 border border-[#DCAE96]/20 object-cover aspect-square md:aspect-[4/5]" />
+            <img src="/debora.jpg" alt="Débora Silva" loading="lazy" decoding="async" className="w-full rounded-2xl relative z-10 border border-[#DCAE96]/20 object-cover aspect-square md:aspect-[4/5]" />
             <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
               <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
               <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
@@ -350,16 +404,16 @@ export default function LandingPage() {
           </div>
           <div className="w-full md:w-2/3">
             <span className="text-[#C7977D] text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-2"><Heart size={14}/> A Especialista</span>
-            <h2 className="font-serif text-4xl text-white mb-5">Muito prazer, sou a <span className="italic text-[#DCAE96]">Débora.</span></h2>
+            <h2 className="font-serif text-4xl text-white mb-5">Muito prazer, sou a <span className="italic text-[#DCAE96]">Debora.</span></h2>
             <div className="space-y-4 text-gray-300 text-base leading-relaxed font-light">
-              <p>Por trás de cada detalhe, existe uma mulher que ama transformar beleza em autoestima</p>
+              <p>Por trás de cada detalhe, existe uma mulher que ama transformar beleza em autoestima.</p>
               <p>Há mais de 6 anos venho aperfeiçoando minhas técnicas, aprendendo, evoluindo e construindo um trabalho que carrega muito de quem eu sou: <strong>dedicação, delicadeza, perfeccionismo e amor pelo que faço</strong>.<br/>Para mim, cada cliente é única, e cada atendimento é uma oportunidade de fazer você se olhar no espelho e pensar: “uau, era exatamente isso que eu queria.” Mais do que unhas, eu entrego cuidado, confiança e uma experiência feita para você. </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* SEÇÃO: SERVIÇOS */}
+      {/* SEÇÃO: SERVIÇOS (Otimizada c/ Semântica HTML5 'article') */}
       <section id="servicos" className="py-24 pl-6 md:pl-0 max-w-7xl mx-auto relative z-10">
         <div className="text-left md:text-center mb-12 md:px-6">
           <span className="glow-text text-sm font-bold uppercase tracking-widest">Nossos Serviços</span>
@@ -371,13 +425,13 @@ export default function LandingPage() {
             <div className="w-full py-10 text-center"><Loader2 className="animate-spin text-[#C7977D] mx-auto" size={40} /></div>
           ) : (
             servicos.map((serv) => (
-              <div 
+              <article 
                 key={serv.id} 
                 onClick={() => setServicoDetalhe(serv)} 
                 className="shrink-0 w-[300px] md:w-[350px] snap-center h-[420px] rounded-3xl overflow-hidden relative cursor-pointer neon-hover transition-all duration-300 group border border-[#3a2522] shadow-xl"
               >
                 {serv.imagens && serv.imagens.length > 0 ? (
-                  <img src={serv.imagens[0]} alt={serv.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <img src={serv.imagens[0]} alt={serv.nome} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
                 ) : (
                   <div className="w-full h-full bg-[#120308] flex items-center justify-center"><Sparkles size={40} className="text-[#C7977D] opacity-30" /></div>
                 )}
@@ -402,7 +456,7 @@ export default function LandingPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </article>
             ))
           )}
         </div>
@@ -419,18 +473,18 @@ export default function LandingPage() {
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Nails Design</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
             {['/01.jpg', '/vermelha.jpeg', '/02.jpg'].map((img, i) => (
-              <div key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer">
-                <img src={img} alt="Trabalho Debora" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              </div>
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer">
+                <img src={img} alt="Trabalho Debora Nails" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              </article>
             ))}
           </div>
 
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Maquiagem Profissional</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             {['/make01.jpeg', '/make02.jpeg', '/make03.jpeg', '/make04.jpeg'].map((img, i) => (
-              <div key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer">
-                <img src={img} alt="Maquiagem Profissional" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
-              </div>
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer">
+                <img src={img} alt="Maquiagem Profissional" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              </article>
             ))}
           </div>
         </div>
@@ -439,11 +493,10 @@ export default function LandingPage() {
       {/* SEÇÃO: ESPAÇO */}
       <section id="espaco" className="py-24 px-6 relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group">
-               <img src="/cadeiras.png" alt="Interior do Ateliê" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+               <img src="/cadeiras.png" alt="Interior do Ateliê" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
                <video autoPlay loop muted playsInline className="w-full h-full object-cover">
@@ -451,7 +504,7 @@ export default function LandingPage() {
                </video>
             </div>
             <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group">
-               <img src="/mesa.png" alt="Detalhe do Ateliê" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+               <img src="/mesa.png" alt="Detalhe do Ateliê" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
           </div>
 
@@ -511,7 +564,7 @@ export default function LandingPage() {
             { q: "Quanto tempo dura a esmaltação em gel?", a: "De 15 a 20 dias, dependendo do cuidado prestado. Para o Banho de gel, de 21 a 25 dias." },
             { q: "Quais as formas de pagamento aceitas?", a: "Aceitamos pagamentos via PIX, cartão de crédito, débito e dinheiro." },
           ].map((faq, index) => (
-            <div key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
+            <article key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
               <button onClick={() => setFaqAberto(faqAberto === index ? null : index)} className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors">
                 {faq.q}
                 <ChevronDown className={`transition-transform duration-300 shrink-0 ml-4 ${faqAberto === index ? 'rotate-180 text-[#C7977D]' : 'text-gray-500'}`} />
@@ -519,7 +572,7 @@ export default function LandingPage() {
               <div className={`px-4 md:px-6 overflow-hidden transition-all duration-300 ${faqAberto === index ? 'max-h-40 pb-4 md:pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
                 <p className="text-gray-400 text-sm md:text-base leading-relaxed font-light">{faq.a}</p>
               </div>
-            </div>
+            </article>
           ))}
         </div>
       </section>
@@ -528,7 +581,7 @@ export default function LandingPage() {
       <section className="py-24 px-6 relative z-10 border-t border-[#3a2522] bg-[#0a0204]">
         <div className="max-w-4xl mx-auto text-center">
           <h2 className="font-serif text-5xl md:text-6xl text-white mb-6">Tá esperando o quê?</h2>
-          <p className="text-xl text-[#E8D3C8] mb-10 font-light px-4">Suas unhas merecem esse nível de luxo e durabilidade. As vagas da semana são limitadas, então não deixe para depois o autocuidado que você precisa hoje.</p>
+          <p className="text-xl text-[#E8D3C8] mb-10 font-light px-4">Suas unhas merecem esse nível de qualidade e durabilidade. As vagas da semana são limitadas, então não deixe para depois o autocuidado que você precisa hoje.</p>
           <button onClick={() => iniciarAgendamento()} className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-8 py-4 md:px-12 md:py-5 rounded-full font-bold text-base md:text-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform shadow-[0_0_40px_rgba(220,174,150,0.4)] mx-auto animate-pulse" style={{ animationDuration: '3s' }}>
             <CalendarDays size={20} className="md:w-6 md:h-6" /> Garantir Meu Horário
           </button>
@@ -555,19 +608,11 @@ export default function LandingPage() {
         </div>
       )}
       
-      {bubbleFechado && (
-        <div className="fixed bottom-6 right-4 md:right-6 z-50">
-          <a href="https://wa.me/5547996987519" target="_blank" className="w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-[0_0_20px_rgba(37,211,102,0.4)] hover:scale-110 transition-all cursor-pointer">
-             <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.88-.653-1.474-1.46-1.647-1.757-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
-          </a>
-        </div>
-      )}
-
       {/* FOOTER */}
       <footer className="bg-[#050102] py-10 px-6 border-t border-[#3a2522] text-center md:text-left relative z-10">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-          <div><span className="font-serif text-xl text-[#F8D1BE]">Débora Nails</span><p className="text-gray-500 text-xs mt-1">Luxo e cuidado em cada detalhe.</p></div>
-          <div className="text-gray-500 text-xs md:text-center"><p>© 2026 Débora Nails.</p><p>Todos os direitos reservados.</p></div>
+          <div><span className="font-serif text-xl text-[#F8D1BE]">Debora Nails</span><p className="text-gray-500 text-xs mt-1">Qualidade e cuidado em cada detalhe.</p></div>
+          <div className="text-gray-500 text-xs md:text-center"><p>© 2026 Debora Nails.</p><p>Todos os direitos reservados.</p></div>
         </div>
       </footer>
 
@@ -584,22 +629,29 @@ export default function LandingPage() {
             </div>
             
             <h2 className="font-serif text-3xl text-white mb-3">Acesso VIP ✨</h2>
-            <p className="text-gray-400 text-sm leading-relaxed mb-8 font-light">Para garantir seu horário e ter acesso exclusivo ao seu histórico, crie sua conta em 1 minuto.</p>
+            <p className="text-gray-400 text-sm leading-relaxed mb-8 font-light">Para ter acesso exclusivo ao seu histórico de agendamentos e fidelidade, crie sua conta.</p>
             
             <div className="flex flex-col gap-3">
-               <Link href="/login" className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3.5 rounded-full font-bold shadow-lg hover:scale-105 transition-transform text-sm">
+               <Link href="/login?modo=cadastro" className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3.5 rounded-full font-bold shadow-lg hover:scale-105 transition-transform text-sm">
                  Criar Conta Rápida
                </Link>
                <Link href="/login" className="w-full bg-[#120308] border border-[#3a2522] text-white py-3.5 rounded-full font-bold hover:bg-[#180A0D] transition-colors text-sm">
-                 Já tenho uma conta
+                 Fazer Login
                </Link>
+               
+               <div className="w-full h-px bg-[#3a2522] my-2"></div>
+               
+               {/* BOTÃO MÁGICO DE CONVIDADO */}
+               <button onClick={continuarComoConvidada} className="w-full bg-transparent text-gray-400 py-2 rounded-full font-medium hover:text-white transition-colors text-xs underline underline-offset-4 mt-2">
+                 Continuar sem conta
+               </button>
             </div>
           </div>
         </div>
       )}
 
       {/* ========================================================= */}
-      {/* MODAL 1: DETALHES DO SERVIÇO (ABRE ANTES DE AGENDAR) */}
+      {/* MODAL 1: DETALHES DO SERVIÇO */}
       {/* ========================================================= */}
       {servicoDetalhe && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
@@ -702,11 +754,11 @@ export default function LandingPage() {
                   </div>
                   <div>
                     <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Nome Completo</label>
-                    <input type="text" value={clienteDados.nome} onChange={e => setClienteDados({...clienteDados, nome: e.target.value})} placeholder="Como gosta de ser chamada?" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                    <input type="text" value={clienteDados.nome} onChange={e => setClienteDados({...clienteDados, nome: e.target.value})} placeholder="Como gosta de ser chamada?" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
                   <div>
                     <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Seu WhatsApp</label>
-                    <input type="tel" value={clienteDados.telefone} onChange={e => setClienteDados({...clienteDados, telefone: e.target.value})} placeholder="(47) 99999-9999" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                    <input type="tel" value={clienteDados.telefone} onChange={e => setClienteDados({...clienteDados, telefone: e.target.value})} placeholder="(47) 99999-9999" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
                   <button disabled={!clienteDados.nome || !clienteDados.telefone} onClick={() => { if (calcularSinal() > 0) setStep(4); else gerarPagamentoMercadoPago(); }} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
                     {calcularSinal() > 0 ? 'Ir para Pagamento da Reserva' : 'Confirmar Agendamento'}
@@ -808,6 +860,6 @@ export default function LandingPage() {
         .hide-scroll::-webkit-scrollbar { display: none; }
         .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
-    </div>
+    </main>
   );
 }

@@ -80,7 +80,7 @@ export default function ClientesPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       
-      {/* CABEÇALHO (Igual ao seu print, com o botão Novo) */}
+      {/* CABEÇALHO */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3">
@@ -90,8 +90,8 @@ export default function ClientesPage() {
           <p className="text-[#E8D3C8]">Histórico, comportamentos e gestão de bloqueios.</p>
         </div>
         
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <div className="relative w-full md:w-64">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto">
+          <div className="relative w-full sm:w-64">
             <Search className="absolute left-3 top-2.5 text-gray-500" size={18} />
             <input 
               type="text" 
@@ -103,7 +103,7 @@ export default function ClientesPage() {
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
-            className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-5 py-2.5 rounded-lg font-bold flex items-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)] whitespace-nowrap shrink-0"
+            className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-5 py-2.5 rounded-lg font-bold flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)] whitespace-nowrap shrink-0"
           >
             <Plus size={20} /> Novo
           </button>
@@ -123,24 +123,26 @@ export default function ClientesPage() {
             clientesFiltrados.map(cliente => (
               <div key={cliente.id} className={`bg-[#120308]/60 backdrop-blur-md border p-6 rounded-2xl shadow-lg transition-all ${cliente.bloqueado ? 'border-red-900/50 opacity-75' : 'border-[#DCAE96]/20'}`}>
                 
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className={`text-xl font-serif leading-tight ${cliente.bloqueado ? 'text-red-400 line-through' : 'text-white'}`}>
+                <div className="flex justify-between items-start gap-3 mb-4">
+                  <div className="min-w-0 flex-1">
+                    <h3 className={`text-xl font-serif leading-tight break-words ${cliente.bloqueado ? 'text-red-400 line-through' : 'text-white'}`}>
                       {cliente.nome}
                     </h3>
                     <p className="text-[#E8D3C8] text-sm mt-1">{cliente.telefone}</p>
                   </div>
                   
-                  {/* Selos Dinâmicos: Atenção, VIP, Bloqueada */}
-                  {!cliente.bloqueado && cliente.faltas >= 2 && (
-                    <span className="bg-orange-500/20 text-orange-400 border border-orange-500/50 text-xs px-2 py-1 rounded-md font-medium">Atenção</span>
-                  )}
-                  {!cliente.bloqueado && cliente.atendimentos >= 10 && (
-                    <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 text-xs px-2 py-1 rounded-md font-medium">VIP</span>
-                  )}
-                  {cliente.bloqueado && (
-                    <span className="bg-red-500/20 text-red-400 border border-red-500/50 text-xs px-2 py-1 rounded-md font-medium">Bloqueada</span>
-                  )}
+                  {/* Selos Dinâmicos: Agrupados para não estourar o limite do card */}
+                  <div className="flex flex-col items-end gap-1.5 shrink-0">
+                    {!cliente.bloqueado && cliente.faltas >= 2 && (
+                      <span className="bg-orange-500/20 text-orange-400 border border-orange-500/50 text-xs px-2 py-1 rounded-md font-medium whitespace-nowrap">Atenção</span>
+                    )}
+                    {!cliente.bloqueado && cliente.atendimentos >= 10 && (
+                      <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 text-xs px-2 py-1 rounded-md font-medium whitespace-nowrap">VIP</span>
+                    )}
+                    {cliente.bloqueado && (
+                      <span className="bg-red-500/20 text-red-400 border border-red-500/50 text-xs px-2 py-1 rounded-md font-medium whitespace-nowrap">Bloqueada</span>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -156,8 +158,8 @@ export default function ClientesPage() {
 
                 <div className="mb-6">
                   <p className="text-xs text-gray-400 mb-2">Perfil de Atendimento:</p>
-                  <span className="inline-flex items-center gap-1.5 bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-1.5 rounded-lg">
-                    <MessageCircle size={14}/> {cliente.comportamento}
+                  <span className="inline-flex items-start gap-1.5 bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-1.5 rounded-lg whitespace-normal break-words">
+                    <MessageCircle size={14} className="shrink-0 mt-0.5"/> {cliente.comportamento}
                   </span>
                 </div>
 
@@ -167,7 +169,7 @@ export default function ClientesPage() {
                   </button>
                   <button 
                     onClick={() => toggleBloqueio(cliente.id, cliente.bloqueado)}
-                    className={`p-2.5 rounded-lg border transition-colors flex items-center justify-center ${cliente.bloqueado ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'bg-transparent text-gray-500 border-[#DCAE96]/30 hover:border-red-500/50 hover:text-red-500'}`}
+                    className={`p-2.5 rounded-lg border transition-colors flex items-center justify-center shrink-0 ${cliente.bloqueado ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'bg-transparent text-gray-500 border-[#DCAE96]/30 hover:border-red-500/50 hover:text-red-500'}`}
                     title={cliente.bloqueado ? "Desbloquear" : "Bloquear Cliente"}
                   >
                     <Ban size={18} />

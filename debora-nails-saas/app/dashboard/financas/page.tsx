@@ -90,7 +90,7 @@ export default function FinancasPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-4 mb-8">
         <div>
           <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3">
             <Wallet className="text-[#C7977D]" size={28} />
@@ -101,14 +101,14 @@ export default function FinancasPage() {
         
         <button 
           onClick={() => setIsModalOpen(true)}
-          className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)] shrink-0"
+          className="w-full sm:w-auto bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)] shrink-0"
         >
           <Plus size={20} /> Lançamento
         </button>
       </div>
 
       {/* CARDS DE RESUMO AVANÇADOS COM REPASSE */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
         <div className="bg-[#120308]/60 backdrop-blur-md border border-emerald-500/20 p-6 rounded-2xl shadow-lg relative overflow-hidden">
           <div className="absolute top-0 right-0 p-4 opacity-10"><ArrowUpRight size={64} className="text-emerald-400" /></div>
@@ -160,28 +160,28 @@ export default function FinancasPage() {
               const dataFormatada = new Date(t.data_pagamento).toLocaleDateString('pt-BR');
 
               return (
-                <div key={t.id} className="bg-[#120308]/80 border border-[#DCAE96]/10 p-4 rounded-xl flex flex-col md:flex-row justify-between items-center gap-4 hover:border-[#DCAE96]/30 transition-colors">
+                <div key={t.id} className="bg-[#120308]/80 border border-[#DCAE96]/10 p-4 rounded-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-[#DCAE96]/30 transition-colors">
                   
-                  <div className="flex items-center gap-4 w-full md:w-auto">
-                    <div className={`p-3 rounded-lg ${isEntrada ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                  <div className="flex items-center gap-4 w-full md:w-auto min-w-0">
+                    <div className={`p-3 rounded-lg shrink-0 ${isEntrada ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                       {isEntrada ? <TrendingUp size={20} /> : <TrendingDown size={20} />}
                     </div>
-                    <div>
-                      <h3 className="text-white font-medium">{t.descricao}</h3>
-                      <div className="flex items-center gap-3 text-xs text-gray-400 mt-1">
-                        <span className={`px-2 py-0.5 rounded border ${isSinal ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-[#2D0A12] border-[#DCAE96]/10'}`}>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-white font-medium break-words">{t.descricao}</h3>
+                      <div className="flex flex-wrap items-center gap-3 text-xs text-gray-400 mt-1">
+                        <span className={`px-2 py-0.5 rounded border whitespace-nowrap ${isSinal ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' : 'bg-[#2D0A12] border-[#DCAE96]/10'}`}>
                           {t.categoria}
                         </span>
-                        <span className="flex items-center gap-1"><Calendar size={12}/> {dataFormatada}</span>
+                        <span className="flex items-center gap-1 shrink-0"><Calendar size={12}/> {dataFormatada}</span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6 w-full md:w-auto justify-between md:justify-end">
+                  <div className="flex items-center justify-between w-full md:w-auto gap-6 shrink-0 mt-2 md:mt-0 pt-2 md:pt-0 border-t border-[#DCAE96]/10 md:border-none">
                     <p className={`font-bold text-lg ${isEntrada ? 'text-emerald-400' : 'text-red-400'}`}>
                       {isEntrada ? '+' : '-'} {formatarMoeda(t.valor)}
                     </p>
-                    <button onClick={() => deletarTransacao(t.id)} className="text-gray-500 hover:text-red-400 transition-colors p-2">
+                    <button onClick={() => deletarTransacao(t.id)} className="text-gray-500 hover:text-red-400 transition-colors p-2 shrink-0">
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -217,21 +217,21 @@ export default function FinancasPage() {
                 </div>
                 <div>
                   <label className="block text-sm text-[#E8D3C8] mb-1">Descrição *</label>
-                  <input type="text" name="descricao" required placeholder="Ex: Compra de Esmaltes" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                  <input type="text" name="descricao" required placeholder="Ex: Compra de Esmaltes" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm text-[#E8D3C8] mb-1">Valor (R$) *</label>
-                    <input type="number" step="0.01" name="valor" required placeholder="0.00" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                    <input type="number" step="0.01" name="valor" required placeholder="0.00" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
                   <div>
                     <label className="block text-sm text-[#E8D3C8] mb-1">Data *</label>
-                    <input type="date" name="data" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                    <input type="date" name="data" required defaultValue={new Date().toISOString().split('T')[0]} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
                 </div>
                 <div>
                   <label className="block text-sm text-[#E8D3C8] mb-1">Categoria</label>
-                  <select name="categoria" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE] appearance-none">
+                  <select name="categoria" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-base sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none">
                     <option value="Sinal">Recebimento de Sinal</option>
                     <option value="Atendimento">Pagamento Final (Atendimento)</option>
                     <option value="Produtos">Produtos / Insumos</option>

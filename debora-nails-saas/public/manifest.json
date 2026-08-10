@@ -1,21 +1,22 @@
 {
   "name": "Debora Nails Pro",
   "short_name": "Debora Nails",
-  "description": "Painel de controle e monitor do estúdio.",
-  "start_url": "/dashboard",
+  "description": "Painel de controle e monitor VIP do estúdio.",
+  "start_url": "/",
   "display": "standalone",
-  "background_color": "#120308",
-  "theme_color": "#120308",
+  "orientation": "any",
+  "background_color": "#0A0205",
+  "theme_color": "#0A0205",
   "icons": [
     {
-      "src": "/debora.jpg",
+      "src": "/logo.PNG",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png"
     },
     {
-      "src": "/debora.jpg",
+      "src": "/logo.PNG",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png"
     }
   ]
 }

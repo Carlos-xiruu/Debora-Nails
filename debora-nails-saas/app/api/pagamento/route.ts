@@ -36,7 +36,7 @@ export async function POST(request: Request) {
             id: 'sinal_reserva',
             title: `Sinal Exclusivo: ${titulo}`,
             quantity: 1,
-            unit_price: Number(preco)
+            unit_price: Number(Number(preco).toFixed(2))
           }
         ],
         payer: {

@@ -1,3 +1,4 @@
+import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
 
@@ -13,16 +14,26 @@ const playfair = Playfair_Display({
   display: 'swap',
 });
 
-export const metadata = {
+// AQUI RESOLVEMOS O AVISO AMARELO E O ZOOM DO iPHONE
+export const viewport: Viewport = {
+  themeColor: '#0A0205',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1, // Impede o zoom forçado no iOS ao clicar em inputs
+};
+
+export const metadata: Metadata = {
   title: 'Debora Nails | Alongamentos de Alto Padrão & Maquiagem',
   description: 'Design, durabilidade e sofisticação para as suas unhas e produções exclusivas em Jaraguá do Sul.',
   manifest: '/manifest.json',
-  themeColor: '#120308',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Monitor VIP',
+    title: 'Debora Nails',
   },
+  formatDetection: {
+    telephone: false, // Impede o iOS de deixar números de telefone azuis
+  }
 };
 
 export default function RootLayout({

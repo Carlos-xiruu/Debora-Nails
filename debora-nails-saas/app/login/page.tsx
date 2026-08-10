@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react';
-import { Mail, Lock, Loader2, ArrowRight, Sparkles, User, ShieldCheck } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mail, Lock, Loader2, ArrowRight, Sparkles, User, ShieldCheck, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import Link from 'next/link';
 
@@ -10,8 +10,18 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [nome, setNome] = useState('');
+  const [telefone, setTelefone] = useState(''); // NOVO: Estado para o telefone
   const [isLoading, setIsLoading] = useState(false);
-  const [mensagem, setMensagem] = useState({ texto: '', tipo: '' }); // tipo: 'erro' ou 'sucesso'
+  const [mensagem, setMensagem] = useState({ texto: '', tipo: '' });
+
+  // LÊ A URL PARA SABER SE A CLIENTE CLICOU EM "CRIAR CONTA"
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const modoUrl = params.get('modo');
+    if (modoUrl === 'cadastro' || modoUrl === 'recuperar') {
+      setModo(modoUrl);
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,19 +38,26 @@ export default function LoginPage() {
       } 
       
       else if (modo === 'cadastro') {
+        // NOVO: Salvando o telefone junto com o nome nos metadados do Supabase
         const { data, error } = await supabase.auth.signUp({
           email,
           password: senha,
-          options: { data: { nome_completo: nome } }
+          options: { 
+            data: { 
+              nome_completo: nome,
+              telefone: telefone // A mágica da conexão dos dados antigos acontece aqui!
+            } 
+          }
         });
         if (error) throw error;
-        setMensagem({ texto: 'Conta criada! Verifique seu e-mail para confirmar.', tipo: 'sucesso' });
+        setMensagem({ texto: 'Conta criada com sucesso! Faça seu login abaixo.', tipo: 'sucesso' });
         setModo('login');
+        setSenha(''); 
       } 
       
       else if (modo === 'recuperar') {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/login?recuperar=true`,
+          redirectTo: `${window.location.origin}/login?modo=recuperar`,
         });
         if (error) throw error;
         setMensagem({ texto: 'Instruções de recuperação enviadas para o seu e-mail.', tipo: 'sucesso' });
@@ -88,13 +105,24 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="space-y-4">
           
           {modo === 'cadastro' && (
-            <div>
-              <label className="block text-xs text-[#E8D3C8] mb-1.5 font-bold uppercase tracking-wider">Nome Completo</label>
-              <div className="relative">
-                <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C7977D]/60" />
-                <input type="text" required value={nome} onChange={e => setNome(e.target.value)} className="w-full bg-[#0a0204] border border-[#3a2522] rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors" placeholder="Como gosta de ser chamada?" />
+            <>
+              <div>
+                <label className="block text-xs text-[#E8D3C8] mb-1.5 font-bold uppercase tracking-wider">Nome Completo</label>
+                <div className="relative">
+                  <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C7977D]/60" />
+                  <input type="text" required value={nome} onChange={e => setNome(e.target.value)} className="w-full bg-[#0a0204] border border-[#3a2522] rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors" placeholder="Como gosta de ser chamada?" />
+                </div>
               </div>
-            </div>
+              
+              {/* NOVO CAMPO: TELEFONE */}
+              <div>
+                <label className="block text-xs text-[#E8D3C8] mb-1.5 font-bold uppercase tracking-wider">WhatsApp</label>
+                <div className="relative">
+                  <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C7977D]/60" />
+                  <input type="tel" required value={telefone} onChange={e => setTelefone(e.target.value)} className="w-full bg-[#0a0204] border border-[#3a2522] rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors" placeholder="(47) 99999-9999" />
+                </div>
+              </div>
+            </>
           )}
 
           <div>
@@ -115,21 +143,21 @@ export default function LoginPage() {
               </div>
               <div className="relative">
                 <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#C7977D]/60" />
-                <input type="password" required value={senha} onChange={e => setSenha(e.target.value)} className="w-full bg-[#0a0204] border border-[#3a2522] rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors" placeholder="••••••••" />
+                <input type="password" required value={senha} onChange={e => setSenha(e.target.value)} className="w-full bg-[#0a0204] border border-[#3a2522] rounded-2xl pl-12 pr-4 py-4 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors" placeholder={modo === 'cadastro' ? 'Mínimo de 6 caracteres' : '••••••••'} />
               </div>
             </div>
           )}
 
           <button type="submit" disabled={isLoading} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-4 rounded-full font-bold mt-4 shadow-[0_0_20px_rgba(220,174,150,0.3)] hover:scale-[1.02] transition-transform flex items-center justify-center gap-2">
             {isLoading ? <Loader2 className="animate-spin" size={20} /> : (
-              <>{modo === 'login' ? 'Entrar' : modo === 'cadastro' ? 'Criar Conta' : 'Enviar Link de Recuperação'} <ArrowRight size={18} /></>
+              <>{modo === 'login' ? 'Entrar' : modo === 'cadastro' ? 'Criar Conta VIP' : 'Enviar Link de Recuperação'} <ArrowRight size={18} /></>
             )}
           </button>
         </form>
 
         <div className="mt-8 text-center border-t border-[#3a2522] pt-6">
           {modo === 'login' ? (
-            <p className="text-sm text-gray-400">Primeira vez aqui? <button onClick={() => setModo('cadastro')} className="text-[#F8D1BE] font-bold hover:underline">Criar uma conta</button></p>
+            <p className="text-sm text-gray-400">Primeira vez aqui? <button onClick={() => setModo('cadastro')} className="text-[#F8D1BE] font-bold hover:underline">Criar uma conta VIP</button></p>
           ) : (
             <p className="text-sm text-gray-400">Já tem uma conta? <button onClick={() => setModo('login')} className="text-[#F8D1BE] font-bold hover:underline">Fazer login</button></p>
           )}
