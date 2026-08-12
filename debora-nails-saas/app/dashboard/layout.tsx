@@ -8,7 +8,7 @@ import {
   BellRing, LogOut, Menu, Sparkles, BarChart3, Loader2, X, Download,
   Clock
 } from 'lucide-react';
-import { supabase } from '../lib/supabase'; // Caminho padronizado
+import { supabase } from '../lib/supabase';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -17,7 +17,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificacaoOpen, setIsNotificacaoOpen] = useState(false); 
   
-  // ESTADOS DO SINO INTELIGENTE
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [temNaoLida, setTemNaoLida] = useState(false);
 
@@ -52,7 +51,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     checarAutenticacao();
   }, [router]);
 
-  // CANAL DE ESCUTA PARA NOTIFICAÇÕES EM TEMPO REAL
   useEffect(() => {
     const carregarNotificacoesIniciais = async () => {
       const { data } = await supabase
@@ -77,8 +75,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           .single();
 
         if (detalhes) {
-          setNotificacoes(prev => [detalhes, ...prev].slice(0, 10)); // Mantém as 10 mais recentes
-          setTemNaoLida(true); // Acende a bolinha vermelha
+          setNotificacoes(prev => [detalhes, ...prev].slice(0, 10)); 
+          setTemNaoLida(true); 
         }
       })
       .subscribe();
@@ -135,8 +133,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         />
       )}
 
+      {/* 🛡️ CORREÇÃO 1: Adicionado pt-[env(safe-area-inset-top)] e pb-[env(safe-area-inset-bottom)] no Menu Lateral */}
       <aside 
-        className={`fixed inset-y-0 left-0 h-[100dvh] border-r border-[#DCAE96]/20 bg-[#2D0A12]/95 backdrop-blur-xl flex flex-col transition-transform duration-300 z-50 md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] border-r border-[#DCAE96]/20 bg-[#2D0A12]/95 backdrop-blur-xl flex flex-col transition-transform duration-300 z-50 md:translate-x-0 ${
           isSidebarOpen ? 'translate-x-0 w-64 shadow-2xl' : '-translate-x-full w-64 md:w-20'
         }`}
       >
@@ -192,7 +191,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       <main className={`flex-1 flex flex-col h-[100dvh] overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         
-        <header className="h-16 md:h-20 shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 z-30 bg-[#120308]/90 backdrop-blur-md md:bg-transparent">
+        {/* 🛡️ CORREÇÃO 2: Adicionado pt-[env(safe-area-inset-top)] no Cabeçalho e ajustado a altura dele dinamicamente */}
+        <header className="pt-[env(safe-area-inset-top)] h-[calc(4rem+env(safe-area-inset-top))] md:h-[calc(5rem+env(safe-area-inset-top))] shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 z-30 bg-[#120308]/90 backdrop-blur-md md:bg-transparent">
           <div className="flex items-center">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-[#E8D3C8] hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 rounded-lg -ml-2 transition-colors">
               <Menu size={28} />
@@ -259,7 +259,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-2 md:pt-2 pb-24 md:pb-8 custom-scrollbar relative z-10">
+        {/* 🛡️ CORREÇÃO 3: Adicionado pb-[calc(1.5rem+env(safe-area-inset-bottom))] para empurrar o conteúdo final pra cima da barrinha do iPhone */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-2 md:pt-2 pb-[calc(1.5rem+env(safe-area-inset-bottom))] custom-scrollbar relative z-10">
           {children}
         </div>
       </main>
