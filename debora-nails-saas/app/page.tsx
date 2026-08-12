@@ -417,7 +417,10 @@ export default function LandingPage() {
         try {
           await fetch('https://evil-rules-carry.loca.lt/enviar-mensagem', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+              'Content-Type': 'application/json',
+              'Bypass-Tunnel-Reminder': 'true' 
+            },
             body: JSON.stringify({ telefone: dados.clienteDados.telefone, mensagem: mensagemCliente })
           });
         } catch (errWhatsApp) {
