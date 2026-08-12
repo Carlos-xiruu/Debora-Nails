@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { CalendarDays, Plus, Clock, User, Sparkles, Loader2, X, CheckCircle2, Settings, UserPlus, Save, Edit, Ban, Trash2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase'; 
 
 const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
 
@@ -44,7 +44,7 @@ export default function AgendaPage() {
   const fetchDados = async () => {
     setIsLoading(true);
     
-    const { data: configData, error: configError } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
+    const { data: configData } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
     if (configData) {
       setConfiguracoes({
         disponibilidade: Object.keys(configData.disponibilidade).length > 0 ? configData.disponibilidade : DISPONIBILIDADE_PADRAO,
@@ -79,7 +79,6 @@ export default function AgendaPage() {
     return `${h}:${m}`;
   };
 
-  // NOVA MATEMÁTICA À PROVA DE BALAS PARA EXTRAIR OS MINUTOS ("40m", "1h", "1h 30m")
   const extrairMinutosDuracao = (duracaoStr: string) => {
     if (!duracaoStr) return 60;
     let total = 0;
@@ -105,7 +104,7 @@ export default function AgendaPage() {
   if (regraDoDia?.ativo) {
     const aberturaMin = converterParaMinutos(regraDoDia.abertura);
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
-    const passoIntervalo = 30; // Verifica vagas de 30 em 30 min.
+    const passoIntervalo = 30; 
 
     for (let minutoAtual = aberturaMin; minutoAtual < fechamentoMin; minutoAtual += passoIntervalo) {
       const horaCheck = converterParaHoraStr(minutoAtual);
@@ -141,7 +140,7 @@ export default function AgendaPage() {
 
   bloqueiosDoDia.forEach((b: any) => {
     timelineItems.push({
-      id: `bloqueio-${b.inicio}`,
+      id: `bloqueio-${b.id}`,
       inicio: new Date(`${dataFiltro}T${b.inicio}:00-03:00`).toISOString(),
       isLivre: false,
       isBloqueio: true,
@@ -160,21 +159,54 @@ export default function AgendaPage() {
     return true;
   });
 
+  // 🛡️ A FUNÇÃO DE CRIAR AGENDAMENTO AGORA ESTÁ BLINDADA
   const handleCriarAgendamento = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     const formData = new FormData(e.target as HTMLFormElement);
     
     const horaEscolhida = formData.get('hora') as string;
+    const dataEscolhida = formData.get('data') as string;
     const servicoId = formData.get('servico_id') as string;
     const servicoInfo = servicos.find(s => s.id === servicoId);
     
     const duracaoMins = extrairMinutosDuracao(servicoInfo?.duracao);
+    const inicioMins = converterParaMinutos(horaEscolhida);
+    const fimAtendimentoMin = inicioMins + duracaoMins;
+    
+    // Verifica se extrapola o fechamento
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
-    const fimAtendimentoMin = converterParaMinutos(horaEscolhida) + duracaoMins;
-
     if (fimAtendimentoMin > fechamentoMin) {
       alert(`Erro: O serviço demora ${servicoInfo.duracao}. Se começar às ${horaEscolhida}, passará do horário de fechamento (${regraDoDia.fechamento}).`);
+      setIsSaving(false); return;
+    }
+
+    // Verifica sobreposição com Bloqueios Manuais
+    const conflitoBloqueio = configuracoes.bloqueios.some((b: any) => {
+        if (b.data !== dataEscolhida) return false;
+        const bInicio = converterParaMinutos(b.inicio);
+        const bFim = converterParaMinutos(b.fim);
+        return (inicioMins < bFim) && (fimAtendimentoMin > bInicio);
+    });
+
+    if (conflitoBloqueio) {
+        alert("🚨 O horário deste serviço conflita com um bloqueio manual na agenda!");
+        setIsSaving(false); return;
+    }
+
+    const dataInicio = new Date(`${dataEscolhida}T${horaEscolhida}:00-03:00`);
+    const dataFim = new Date(dataInicio); 
+    dataFim.setMinutes(dataFim.getMinutes() + duracaoMins); 
+
+    // Verifica sobreposição no Banco de Dados (Race Condition)
+    const { data: conflitoDb } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .lt('inicio', dataFim.toISOString())
+      .gt('fim', dataInicio.toISOString());
+
+    if (conflitoDb && conflitoDb.length > 0) {
+      alert("🚨 Este horário acabou de ser ocupado ou conflita com outro atendimento! Escolha outro horário.");
       setIsSaving(false); return;
     }
 
@@ -185,23 +217,21 @@ export default function AgendaPage() {
         .insert([{ nome: formData.get('nome_nova'), telefone: formData.get('telefone_nova'), status: 'Novo' }])
         .select().single();
 
-      if (erroCliente) { alert(`ERRO REAL (Banco): Não foi possível criar cliente. ${erroCliente.message}`); setIsSaving(false); return; }
+      if (erroCliente) { alert(`ERRO: Não foi possível criar cliente. ${erroCliente.message}`); setIsSaving(false); return; }
       cliente_id = novoClienteData.id;
     }
-
-    const dataInicio = new Date(`${formData.get('data')}T${horaEscolhida}:00-03:00`);
-    const dataFim = new Date(dataInicio); 
-    dataFim.setMinutes(dataFim.getMinutes() + duracaoMins); 
 
     const { error: erroAgenda } = await supabase.from('agendamentos').insert([{
       cliente_id: cliente_id, servico_id: servicoId, tipo: 'agendado', status_pagamento: formData.get('status_pagamento') as string, inicio: dataInicio.toISOString(), fim: dataFim.toISOString()
     }]);
 
-    if (erroAgenda) { alert(`ERRO REAL (Banco): Falha ao agendar. ${erroAgenda.message}`); } 
-    else { await fetchDados(); setIsModalOpen(false); }
+    if (erroAgenda) { alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); } 
+    else { await fetchDados(); setIsModalOpen(false); alert("Agendamento criado com sucesso!"); }
+    
     setIsSaving(false);
   };
 
+  // 🛡️ A EDIÇÃO AGORA VERIFICA CONFLITOS IGNORANDO A SI MESMA
   const handleEditarAgendamento = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -211,15 +241,44 @@ export default function AgendaPage() {
     const novaHora = formData.get('hora') as string;
     const duracaoMins = extrairMinutosDuracao(agendamentoEditando.servicos.duracao);
     
+    const inicioMins = converterParaMinutos(novaHora);
+    const fimAtendimentoMin = inicioMins + duracaoMins;
+    
     const dataInicio = new Date(`${novaData}T${novaHora}:00-03:00`);
     const dataFim = new Date(dataInicio); 
     dataFim.setMinutes(dataFim.getMinutes() + duracaoMins); 
+
+    // Verifica bloqueios locais
+    const conflitoBloqueio = configuracoes.bloqueios.some((b: any) => {
+        if (b.data !== novaData) return false;
+        const bInicio = converterParaMinutos(b.inicio);
+        const bFim = converterParaMinutos(b.fim);
+        return (inicioMins < bFim) && (fimAtendimentoMin > bInicio);
+    });
+
+    if (conflitoBloqueio) {
+        alert("🚨 A remarcação conflita com um bloqueio manual!");
+        setIsSaving(false); return;
+    }
+
+    // Verifica conflito no banco (ignorando o agendamento atual)
+    const { data: conflitoDb } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .neq('id', agendamentoEditando.id)
+      .lt('inicio', dataFim.toISOString())
+      .gt('fim', dataInicio.toISOString());
+
+    if (conflitoDb && conflitoDb.length > 0) {
+      alert("🚨 O novo horário escolhido choca com outro agendamento já existente!");
+      setIsSaving(false); return;
+    }
 
     const { error } = await supabase.from('agendamentos').update({
       inicio: dataInicio.toISOString(), fim: dataFim.toISOString(), status_pagamento: formData.get('status_pagamento') as string
     }).eq('id', agendamentoEditando.id);
 
-    if (error) { alert(`ERRO REAL: ${error.message}`); } 
+    if (error) { alert(`ERRO: ${error.message}`); } 
     else { await fetchDados(); setAgendamentoEditando(null); alert('Horário remarcado com sucesso!'); }
     setIsSaving(false);
   };
@@ -235,7 +294,7 @@ export default function AgendaPage() {
     });
 
     if (error) {
-      alert(`ERRO REAL (Banco): Não foi possível salvar as configurações. Detalhe: ${error.message}`);
+      alert(`ERRO: Não foi possível salvar as configurações. Detalhe: ${error.message}`);
     } else {
       alert("Configurações salvas e aplicadas em tempo real!");
       setIsDisponibilidadeOpen(false);
@@ -374,22 +433,22 @@ export default function AgendaPage() {
         )}
       </div>
 
-      {/* MODAL CONFIGURAÇÃO (DISPONIBILIDADE INDIVIDUAL E BLOQUEIOS) */}
+      {/* MODAL CONFIGURAÇÃO (DISPONIBILIDADE E BLOQUEIOS) */}
       {isDisponibilidadeOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300">
-            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Settings size={20}/> Configurar Agenda</h2>
               <button onClick={() => setIsDisponibilidadeOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
             </div>
             
-            <div className="flex bg-[#180A0D] border-b border-[#DCAE96]/20 p-2 gap-2">
+            <div className="flex bg-[#180A0D] border-b border-[#DCAE96]/20 p-2 gap-2 shrink-0">
               <button onClick={() => setAbaConfig('horarios')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${abaConfig === 'horarios' ? 'bg-[#2D0A12] text-[#F8D1BE] border border-[#DCAE96]/30' : 'text-gray-500 hover:text-gray-300'}`}>Dias de Trabalho</button>
               <button onClick={() => setAbaConfig('bloqueios')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${abaConfig === 'bloqueios' ? 'bg-[#2D0A12] text-[#F8D1BE] border border-[#DCAE96]/30' : 'text-gray-500 hover:text-gray-300'}`}>Bloqueios Específicos</button>
             </div>
 
-            <form onSubmit={handleSalvarDisponibilidade}>
-              <div className="p-6 md:p-8 space-y-6 max-h-[50vh] overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSalvarDisponibilidade} className="flex flex-col overflow-hidden">
+              <div className="p-6 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
                 
                 {abaConfig === 'horarios' && (
                   <div className="space-y-4">
@@ -403,9 +462,9 @@ export default function AgendaPage() {
                             <span className={`font-bold w-24 ${configDia.ativo ? 'text-white' : 'text-gray-500'}`}>{nomeDia}</span>
                           </label>
                           <div className="flex items-center gap-2">
-                            <input type="time" disabled={!configDia.ativo} value={configDia.abertura} onChange={(e) => atualizarDia(index, 'abertura', e.target.value)} className="bg-[#120308] border border-[#DCAE96]/20 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 color-scheme-dark"/>
+                            <input type="time" required disabled={!configDia.ativo} value={configDia.abertura} onChange={(e) => atualizarDia(index, 'abertura', e.target.value)} className="bg-[#120308] border border-[#DCAE96]/20 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 color-scheme-dark"/>
                             <span className="text-gray-500 text-xs">até</span>
-                            <input type="time" disabled={!configDia.ativo} value={configDia.fechamento} onChange={(e) => atualizarDia(index, 'fechamento', e.target.value)} className="bg-[#120308] border border-[#DCAE96]/20 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 color-scheme-dark"/>
+                            <input type="time" required disabled={!configDia.ativo} value={configDia.fechamento} onChange={(e) => atualizarDia(index, 'fechamento', e.target.value)} className="bg-[#120308] border border-[#DCAE96]/20 rounded-lg px-3 py-2 text-sm text-white disabled:opacity-50 color-scheme-dark"/>
                           </div>
                         </div>
                       );
@@ -418,10 +477,10 @@ export default function AgendaPage() {
                     <div className="bg-[#2D0A12]/40 border border-[#DCAE96]/30 p-5 rounded-xl">
                       <h3 className="text-[#F8D1BE] font-bold text-sm mb-3">Adicionar Novo Bloqueio</h3>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
-                        <div className="col-span-2 sm:col-span-1"><label className="text-[10px] text-gray-400">Data</label><input type="date" id="bloqueio_data" defaultValue={dataFiltro} className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
-                        <div><label className="text-[10px] text-gray-400">Início</label><input type="time" id="bloqueio_inicio" className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
-                        <div><label className="text-[10px] text-gray-400">Fim</label><input type="time" id="bloqueio_fim" className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
-                        <div className="col-span-2 sm:col-span-4"><label className="text-[10px] text-gray-400">Motivo (Ex: Almoço)</label><input type="text" id="bloqueio_motivo" className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white"/></div>
+                        <div className="col-span-2 sm:col-span-1"><label className="text-[10px] text-gray-400">Data</label><input type="date" id="bloqueio_data" required defaultValue={dataFiltro} className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
+                        <div><label className="text-[10px] text-gray-400">Início</label><input type="time" id="bloqueio_inicio" required className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
+                        <div><label className="text-[10px] text-gray-400">Fim</label><input type="time" id="bloqueio_fim" required className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white color-scheme-dark"/></div>
+                        <div className="col-span-2 sm:col-span-4"><label className="text-[10px] text-gray-400">Motivo (Ex: Almoço)</label><input type="text" id="bloqueio_motivo" required placeholder="Motivo da ausência" className="w-full bg-[#120308] border border-[#DCAE96]/20 rounded px-2 py-1.5 text-xs text-white"/></div>
                       </div>
                       <button type="button" onClick={adicionarBloqueio} className="w-full bg-[#DCAE96]/20 text-[#F8D1BE] border border-[#DCAE96]/40 py-2 rounded-lg text-xs font-bold hover:bg-[#DCAE96]/40">Bloquear Horário</button>
                     </div>
@@ -445,7 +504,7 @@ export default function AgendaPage() {
                   </div>
                 )}
               </div>
-              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20">
+              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
                 <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform flex justify-center items-center gap-2">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20}/> Salvar Definitivamente no Banco</>}
                 </button>
@@ -458,43 +517,43 @@ export default function AgendaPage() {
       {/* MODAL NOVO AGENDAMENTO MANUAL */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-lg overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300">
-            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-lg overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><CalendarDays size={20}/> Agendar Horário</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
             </div>
-            <form onSubmit={handleCriarAgendamento}>
-              <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleCriarAgendamento} className="flex flex-col overflow-hidden">
+              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
                 <div className="flex bg-[#2D0A12] p-1 rounded-xl border border-[#DCAE96]/20">
                   <button type="button" onClick={() => setAbaCliente('existente')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${abaCliente === 'existente' ? 'bg-[#DCAE96]/20 text-[#F8D1BE]' : 'text-gray-400'}`}>Cadastrada</button>
                   <button type="button" onClick={() => setAbaCliente('nova')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${abaCliente === 'nova' ? 'bg-[#DCAE96]/20 text-[#F8D1BE]' : 'text-gray-400'}`}>Nova Cliente</button>
                 </div>
                 {abaCliente === 'existente' ? (
-                  <select name="cliente_id" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white">
+                  <select name="cliente_id" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none">
                     <option value="">Selecione uma cliente...</option>
                     {clientes.map(c => <option key={c.id} value={c.id}>{c.nome} - {c.telefone}</option>)}
                   </select>
                 ) : (
                   <div className="grid grid-cols-2 gap-4">
-                    <input type="text" name="nome_nova" required placeholder="Nome Ex: Julia" className="col-span-2 bg-[#120308] border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white"/>
-                    <input type="tel" name="telefone_nova" required placeholder="WhatsApp" className="col-span-2 bg-[#120308] border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white"/>
+                    <input type="text" name="nome_nova" required placeholder="Nome Ex: Julia" className="col-span-2 bg-[#120308] border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none"/>
+                    <input type="tel" name="telefone_nova" required placeholder="WhatsApp Ex: 47999999999" className="col-span-2 bg-[#120308] border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none"/>
                   </div>
                 )}
-                <select name="servico_id" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white">
+                <select name="servico_id" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none">
                   <option value="">Selecione um serviço...</option>
                   {servicos.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.duracao})</option>)}
                 </select>
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="date" name="data" defaultValue={dataFiltro} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark"/>
-                  <input type="time" name="hora" defaultValue={horaModal} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark"/>
+                  <input type="date" name="data" defaultValue={dataFiltro} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
+                  <input type="time" name="hora" defaultValue={horaModal} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
                 </div>
-                <select name="status_pagamento" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white">
+                <select name="status_pagamento" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none">
                   <option value="pendente">Pendente (Cobrar no final)</option>
                   <option value="pago">Já foi Pago (Adiantado)</option>
                 </select>
               </div>
-              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20">
-                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold flex justify-center items-center gap-2">
+              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20}/> Salvar na Agenda</>}
                 </button>
               </div>
@@ -503,6 +562,7 @@ export default function AgendaPage() {
         </div>
       )}
 
+      {/* MODAL DETALHES */}
       {detalhesAgendamento && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
           <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95">
@@ -515,7 +575,7 @@ export default function AgendaPage() {
               <div className="border-t border-[#DCAE96]/10 pt-4"><p className="text-xs text-gray-400">Serviço</p><p className="text-lg font-bold text-white">{detalhesAgendamento.servicos?.nome}</p></div>
               {detalhesAgendamento.tipo === 'agendado' && (
                 <div className="pt-4 border-t border-[#DCAE96]/10">
-                  <button onClick={() => { setAgendamentoEditando(detalhesAgendamento); setDetalhesAgendamento(null); }} className="w-full bg-[#2D0A12] border border-[#DCAE96]/30 text-[#F8D1BE] py-3 rounded-xl font-bold flex justify-center gap-2"><Edit size={16}/> Editar / Remarcar</button>
+                  <button onClick={() => { setAgendamentoEditando(detalhesAgendamento); setDetalhesAgendamento(null); }} className="w-full bg-[#2D0A12] border border-[#DCAE96]/30 text-[#F8D1BE] py-3 rounded-xl font-bold flex justify-center gap-2 hover:bg-[#DCAE96]/10 transition-colors"><Edit size={16}/> Editar / Remarcar</button>
                 </div>
               )}
             </div>
@@ -523,6 +583,7 @@ export default function AgendaPage() {
         </div>
       )}
 
+      {/* MODAL EDIÇÃO/REMARCAÇÃO */}
       {agendamentoEditando && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
           <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95">
@@ -532,12 +593,23 @@ export default function AgendaPage() {
             </div>
             <form onSubmit={handleEditarAgendamento}>
               <div className="p-6 space-y-5">
-                <input type="date" name="data" defaultValue={new Date(agendamentoEditando.inicio).toISOString().split('T')[0]} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark"/>
-                <input type="time" name="hora" defaultValue={new Date(agendamentoEditando.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark"/>
-                <select name="status_pagamento" defaultValue={agendamentoEditando.status_pagamento || 'pendente'} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white"><option value="pendente">Pendente</option><option value="pago">Pago</option></select>
+                <label className="block">
+                  <span className="text-xs text-gray-400">Nova Data</span>
+                  <input type="date" name="data" defaultValue={new Date(agendamentoEditando.inicio).toISOString().split('T')[0]} required className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-400">Novo Horário</span>
+                  <input type="time" name="hora" defaultValue={new Date(agendamentoEditando.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})} required className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
+                </label>
+                <label className="block">
+                  <span className="text-xs text-gray-400">Status do Pagamento</span>
+                  <select name="status_pagamento" defaultValue={agendamentoEditando.status_pagamento || 'pendente'} className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:border-[#F8D1BE] outline-none"><option value="pendente">Pendente</option><option value="pago">Pago</option></select>
+                </label>
               </div>
               <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20">
-                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold">{isSaving ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Salvar Alterações'}</button>
+                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform">
+                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20}/> Salvar Alterações</>}
+                </button>
               </div>
             </form>
           </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, Users, Award, CalendarCheck, Loader2, ArrowUpRight, ArrowDownRight, Target, Percent } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase } from '../../lib/supabase'; // Caminho de importação padronizado
 
 export default function RelatoriosPage() {
   const [isLoading, setIsLoading] = useState(true);
@@ -28,35 +28,45 @@ export default function RelatoriosPage() {
     setIsLoading(true);
 
     try {
+      // 1. Dados de Clientes (Global)
       const { data: clientes } = await supabase.from('clientes').select('atendimentos');
       const totalCli = clientes?.length || 0;
       const vips = clientes?.filter(c => c.atendimentos >= 10).length || 0;
 
+      // 2. Trava de Fuso Horário para o Mês Atual (Evita puxar dia 31 do mês anterior por causa do UTC)
       const hoje = new Date();
-      const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1).toISOString();
+      const ano = hoje.getFullYear();
+      const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+      const primeiroDiaMes = `${ano}-${mes}-01T00:00:00-03:00`;
       
+      // 3. Busca transações apenas do mês atual
       const { data: transacoes } = await supabase
         .from('transacoes')
         .select('tipo, valor, categoria')
         .gte('data_pagamento', primeiroDiaMes);
 
       const receitas = transacoes?.filter(t => t.tipo === 'entrada').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      const sinais = transacoes?.filter(t => t.tipo === 'entrada' && t.categoria === 'Sinal').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      const servicos = transacoes?.filter(t => t.tipo === 'entrada' && t.categoria === 'Atendimento').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       const despesas = transacoes?.filter(t => t.tipo === 'saida').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       
-      // Cálculo dos 35% de repasse
-      const repasse = (sinais + servicos) * 0.35;
+      const sinais = transacoes?.filter(t => t.tipo === 'entrada' && t.categoria === 'Sinal').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const servicos = transacoes?.filter(t => t.tipo === 'entrada' && t.categoria === 'Atendimento').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      
+      // 4. Lógica Contábil Sincronizada com Finanças (Sem dupla dedução de repasse)
+      const repasseTotalDevido = (sinais + servicos) * 0.35;
+      const repasseJaPago = transacoes?.filter(t => t.tipo === 'saida' && t.categoria === 'Repasse Ateliê').reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const repassePendente = Math.max(0, repasseTotalDevido - repasseJaPago);
       
       // Lucro Real (Bolso)
-      const lucro = receitas - repasse - despesas;
+      const lucro = receitas - despesas - repassePendente;
       
       // Margem baseada no faturamento bruto
       const margem = receitas > 0 ? Math.round((lucro / receitas) * 100) : 0;
 
+      // 5. Conta agendamentos APENAS do mês atual
       const { count: totalAgendamentos } = await supabase
         .from('agendamentos')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .gte('inicio', primeiroDiaMes);
 
       setMetricas({
         totalClientes: totalCli,
@@ -64,7 +74,7 @@ export default function RelatoriosPage() {
         receitaBruta: receitas,
         sinaisMes: sinais,
         servicosMes: servicos,
-        repasseMes: repasse,
+        repasseMes: repasseTotalDevido, // Mostra o total que deve ser repassado das vendas do mês
         despesaMes: despesas,
         lucroReal: lucro,
         totalAgendamentos: totalAgendamentos || 0,
@@ -125,7 +135,7 @@ export default function RelatoriosPage() {
             </div>
             <div className="bg-[#120308]/60 border border-[#DCAE96]/20 p-6 rounded-2xl shadow-lg">
               <div className="flex justify-between items-start mb-4">
-                <h3 className="text-[#E8D3C8] font-medium text-sm">Agendamentos Totais</h3>
+                <h3 className="text-[#E8D3C8] font-medium text-sm">Agendamentos (Mês)</h3>
                 <CalendarCheck className="text-[#C7977D]" size={18} />
               </div>
               <p className="text-3xl font-bold text-white">{metricas.totalAgendamentos}</p>
@@ -147,8 +157,8 @@ export default function RelatoriosPage() {
                     <span className="text-white font-bold">{formatarMoeda(metricas.receitaBruta)}</span>
                   </div>
                   <div className="w-full bg-[#120308] rounded-full h-3 border border-[#DCAE96]/10 flex overflow-hidden">
-                    <div className="bg-indigo-400 h-full" style={{ width: `${pctSinais}%` }} title="Sinais"></div>
-                    <div className="bg-emerald-400 h-full" style={{ width: `${pctServicos}%` }} title="Pagamentos Finais"></div>
+                    <div className="bg-indigo-400 h-full transition-all duration-1000" style={{ width: `${pctSinais}%` }} title="Sinais"></div>
+                    <div className="bg-emerald-400 h-full transition-all duration-1000" style={{ width: `${pctServicos}%` }} title="Pagamentos Finais"></div>
                   </div>
                   <div className="flex justify-between text-xs mt-2 text-gray-400">
                     <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-400"></span> Sinais ({formatarMoeda(metricas.sinaisMes)})</span>
@@ -158,14 +168,14 @@ export default function RelatoriosPage() {
 
                 <div className="pt-2">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-orange-400 font-medium flex items-center gap-1"><Percent size={14}/> Repasse Ateliê (35%)</span>
+                    <span className="text-orange-400 font-medium flex items-center gap-1"><Percent size={14}/> Repasse Ateliê Devido (35%)</span>
                     <span className="text-white font-bold text-orange-400">- {formatarMoeda(metricas.repasseMes)}</span>
                   </div>
                 </div>
 
                 <div className="pt-2">
                   <div className="flex justify-between text-sm mb-2">
-                    <span className="text-red-400 font-medium flex items-center gap-1"><ArrowDownRight size={14}/> Minhas Despesas</span>
+                    <span className="text-red-400 font-medium flex items-center gap-1"><ArrowDownRight size={14}/> Minhas Despesas (Total)</span>
                     <span className="text-white font-bold text-red-400">- {formatarMoeda(metricas.despesaMes)}</span>
                   </div>
                 </div>

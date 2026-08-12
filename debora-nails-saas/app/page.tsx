@@ -45,7 +45,7 @@ export default function LandingPage() {
   // ESTADOS DO PIX NATIVO
   const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
   const [pixId, setPixId] = useState<string | null>(null);
-  const [pixManualFallback, setPixManualFallback] = useState(false); // Plano B
+  const [pixManualFallback, setPixManualFallback] = useState(false);
 
   const [faqAberto, setFaqAberto] = useState<number | null>(null);
   const [showWaBubble, setShowWaBubble] = useState(false);
@@ -83,11 +83,9 @@ export default function LandingPage() {
 
   useEffect(() => {
     const fetchDadosGerais = async () => {
-      // Puxa os Serviços Ativos
       const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
       if (servs) setServicos(servs);
 
-      // Puxa o Cérebro da Agenda (Configurações)
       const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
       if (config) {
         setConfiguracoes({
@@ -98,7 +96,6 @@ export default function LandingPage() {
         });
       }
 
-      // Puxa os Agendamentos a partir de hoje
       const hojeStr = formatarDataLocalStr(new Date());
       const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`);
       if (agends) setAgendamentos(agends);
@@ -109,13 +106,11 @@ export default function LandingPage() {
     return () => clearTimeout(waTimer);
   }, []);
 
-  // GERA OS DIAS DISPONÍVEIS NO CARROSSEL IGNORANDO OS DESATIVADOS
   useEffect(() => {
     if (!configuracoes) return;
     const dias = [];
     let d = new Date();
     let count = 0;
-    // Pega os próximos 14 dias úteis de acordo com a configuração
     while (count < 14) {
       d.setDate(d.getDate() + 1);
       const diaDaSemana = d.getDay();
@@ -128,7 +123,6 @@ export default function LandingPage() {
     setDiasDisponiveis(dias);
   }, [configuracoes]);
 
-  // RECALCULA OS HORÁRIOS LIVRES QUANDO A CLIENTE ESCOLHE UM DIA OU UM SERVIÇO
   useEffect(() => {
     if (!dataEscolhida || !servicoEscolhido || !configuracoes) return;
 
@@ -143,7 +137,7 @@ export default function LandingPage() {
     const aberturaMin = converterParaMinutos(regraDoDia.abertura);
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
     const duracaoServicoMin = extrairMinutosDuracao(servicoEscolhido.duracao);
-    const passoIntervalo = 30; // Verifica vagas de 30 em 30 min
+    const passoIntervalo = 30;
 
     const agendsDoDia = agendamentos.filter(a => new Date(a.inicio).toISOString().split('T')[0] === dataStr);
     const blocksDoDia = configuracoes.bloqueios.filter((b: any) => b.data === dataStr);
@@ -158,7 +152,7 @@ export default function LandingPage() {
         const dFim = new Date(a.fim);
         const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes();
         const minFim = dFim.getHours() * 60 + dFim.getMinutes();
-        return (minAtual < minFim) && (fimMin > minInicio); // Lógica cruzada de sobreposição
+        return (minAtual < minFim) && (fimMin > minInicio);
       });
 
       const conflitoBloqueio = blocksDoDia.some((b: any) => {
@@ -173,12 +167,12 @@ export default function LandingPage() {
     }
 
     setHorariosLivres(slotsLivres);
-    setHoraEscolhida(''); // Reseta a hora se ela mudar de dia
+    setHoraEscolhida('');
   }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
 
 
   // ========================================================
-  // LÓGICA DE SESSÃO E PAGAMENTOS (MANTIDA)
+  // LÓGICA DE SESSÃO E PAGAMENTOS
   // ========================================================
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
@@ -212,7 +206,6 @@ export default function LandingPage() {
   }, [router]);
 
  useEffect(() => {
-    // Atraso tático de 500ms para garantir que a URL já carregou por completo antes de ler
     setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const statusPagamento = params.get('pagamento');
@@ -322,6 +315,29 @@ export default function LandingPage() {
   const processarPagamento = async () => {
     setIsProcessando(true);
     
+    // 🛡️ TRAVA 1: VERIFICA SE A VAGA AINDA EXISTE ANTES DE GERAR COBRANÇA!
+    if (dataEscolhida && servicoEscolhido && horaEscolhida) {
+      const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
+      const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
+      const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
+      const fimDate = new Date(inicioDate);
+      fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+
+      const { data: vagaOcupada } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .lt('inicio', fimDate.toISOString())
+        .gt('fim', inicioDate.toISOString());
+
+      if (vagaOcupada && vagaOcupada.length > 0) {
+        alert("Poxa! 😢 Alguém acabou de reservar esse horário enquanto você preenchia os dados. Por favor, escolha outro horário.");
+        setIsProcessando(false);
+        setIsModalOpen(false);
+        setStep(1); 
+        return; 
+      }
+    }
+    
     if (metodoPagamento === 'pix') {
       try {
         const res = await fetch('/api/pagamento-monitor', {
@@ -335,7 +351,6 @@ export default function LandingPage() {
           setQrCodePix({ base64: data.qr_code_base64, copiaCola: data.qr_code });
           setPixId(data.id);
         } else {
-          // SE O MERCADO PAGO FALHAR, ATIVA O PLANO B (PIX MANUAL DA DÉBORA)
           if (configuracoes?.chave_pix) {
             setPixManualFallback(true);
           } else {
@@ -400,7 +415,18 @@ export default function LandingPage() {
         const fimDate = new Date(inicioDate);
         fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-        // Retiramos o status_pagamento. Se der qualquer erro estrutural, ele vai apitar!
+        // 🛡️ TRAVA 2: VERIFICAÇÃO FINAL ANTES DO INSERT (Impede clonagem exata)
+        const { data: conflitoFinal } = await supabase
+          .from('agendamentos')
+          .select('id')
+          .lt('inicio', fimDate.toISOString())
+          .gt('fim', inicioDate.toISOString());
+
+        if (conflitoFinal && conflitoFinal.length > 0) {
+           alert("🚨 Ocorreu um conflito de horário no momento exato da reserva. Entre em contato com o suporte para verificarmos o estorno ou remanejamento da vaga.");
+           return; 
+        }
+
         const { error: errAgendamento } = await supabase.from('agendamentos').insert([{
           cliente_id: cliente_id, 
           servico_id: dados.servicoEscolhido.id, 
@@ -411,7 +437,7 @@ export default function LandingPage() {
 
         if (errAgendamento) {
           alert("🚨 Erro ao salvar na Agenda (Supabase): " + errAgendamento.message);
-          return; // Para o código aqui se a agenda falhar
+          return; 
         }
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
@@ -429,7 +455,6 @@ export default function LandingPage() {
         const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
 
         try {
-          // 👇 Agora o seu site chama a nossa API interna, e ela faz o trabalho sujo sem ser bloqueada!
           await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -870,7 +895,8 @@ export default function LandingPage() {
                            <p className="text-xs text-red-400">Nenhum horário livre suficiente para este serviço no dia selecionado.</p>
                          </div>
                       ) : (
-                        <div className="grid grid-cols-3 gap-3">
+                        // 👇 AQUI APLICAMOS A BLINDAGEM RESPONSIVA!
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {horariosLivres.map(hora => (
                             <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
                           ))}

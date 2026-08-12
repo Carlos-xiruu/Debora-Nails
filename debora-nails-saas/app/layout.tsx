@@ -33,13 +33,32 @@ export const metadata: Metadata = {
   },
   formatDetection: {
     telephone: false,
-  }
+  },
+  // 👇 ADICIONADO: OpenGraph para o link virar um "Cartão de Visitas" no WhatsApp
+  openGraph: {
+    title: 'Debora Nails | Studio de Alto Padrão',
+    description: 'Design, durabilidade e sofisticação. Agende sua experiência exclusiva.',
+    url: 'https://deboranails.com.br', 
+    images: [
+      {
+        url: '/metadados.png', // O WhatsApp vai puxar essa foto para mostrar no preview!
+        width: 800,
+        height: 800,
+        alt: 'Debora Silva - Nail Designer',
+      },
+    ],
+    locale: 'pt_BR',
+    type: 'website',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${jakarta.variable} ${playfair.variable}`}>
-      <body>{children}</body>
+      {/* 👇 ADICIONADO: Fundo nativo para evitar a tela branca no carregamento + suavização de fonte */}
+      <body className="bg-[#0A0205] text-white antialiased">
+        {children}
+      </body>
     </html>
   );
 }
