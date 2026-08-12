@@ -1,0 +1,14 @@
+{
+  "name": "Debora Nails Admin",
+  "short_name": "Painel Débora",
+  "description": "Gerenciamento do estúdio.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#120308",
+  "theme_color": "#120308",
+  "icons": [
+    { "src": "/logo.PNG", "sizes": "192x192", "type": "image/png" },
+    { "src": "/logo.PNG", "sizes": "512x512", "type": "image/png" }
+  ]
+}

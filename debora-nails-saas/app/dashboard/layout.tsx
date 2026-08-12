@@ -8,6 +8,7 @@ import {
   BellRing, LogOut, Menu, Sparkles, BarChart3, Loader2, X, Download
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+manifest: '/manifest-dashboard.json'; // O PADRÃO É O DAS CLIENTES
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

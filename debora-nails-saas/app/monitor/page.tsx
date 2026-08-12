@@ -23,15 +23,11 @@ export default function MonitorPage() {
   const [servicosDb, setServicosDb] = useState<any[]>([]);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
-  // -----------------------------------------------------
-  // NOVA INTELIGÊNCIA DO CARROSSEL (FOTOS + CARD QUEM SOU EU)
-  // -----------------------------------------------------
   const [imagemAtualIndex, setImagemAtualIndex] = useState(0);
   
-  // Isso aqui em breve virá do Supabase! Por enquanto está preparado.
   const slides = [
     { bg: '/01.jpg', tipo: 'intro' },
-    { bg: '/debora.jpg', tipo: 'sobre' }, // Este slide aciona o "Quem Sou Eu"
+    { bg: '/debora.jpg', tipo: 'sobre' }, 
     { bg: '/02.jpg', tipo: 'intro' },
     { bg: '/make01.jpeg', tipo: 'intro' },
     { bg: '/vermelha.jpeg', tipo: 'intro' }
@@ -140,7 +136,7 @@ export default function MonitorPage() {
   useEffect(() => {
     let carrossel: NodeJS.Timeout;
     if (!atendimentoAtivo) {
-      carrossel = setInterval(() => setImagemAtualIndex((prev) => (prev + 1) % slides.length), 8000); // 8 Segundos
+      carrossel = setInterval(() => setImagemAtualIndex((prev) => (prev + 1) % slides.length), 8000);
     }
     return () => clearInterval(carrossel);
   }, [atendimentoAtivo, slides.length]);
@@ -268,7 +264,7 @@ export default function MonitorPage() {
   const valorRestante = precoTotal - (precoTotal * (taxaSinal / 100));
 
   return (
-    <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-row overflow-hidden font-sans select-none relative">
+    <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       <button onClick={ativarTelaCheia} className="absolute top-2 left-2 z-50 p-2 text-[#C7977D] opacity-20 hover:opacity-100 bg-black/40 rounded-full transition-opacity"><Maximize size={16} /></button>
       
       {deferredPrompt && (
@@ -277,11 +273,9 @@ export default function MonitorPage() {
         </button>
       )}
 
-      {/* ============================================== */}
-      {/* MODO DESCANSO OTIMIZADO (SEM A PALAVRA "LUXO") */}
-      {/* ============================================== */}
+      {/* MODO DESCANSO OTIMIZADO */}
       {!atendimentoAtivo && (
-        <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden">
+        <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           {slides.map((slide, idx) => (
              <div key={idx} className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[2000ms]" style={{ backgroundImage: `url('${slide.bg}')`, opacity: idx === imagemAtualIndex ? 0.5 : 0, transform: idx === imagemAtualIndex ? 'scale(1.03)' : 'scale(1)', transition: 'opacity 2s ease-in-out, transform 10s ease-out' }} />
           ))}
@@ -301,17 +295,15 @@ export default function MonitorPage() {
             </div>
           </header>
 
-          <main className="flex-1 flex flex-col items-center justify-center text-center z-30 px-4">
-            
-            {/* CONTEÚDO DINÂMICO (Alterna entre a frase e o "Quem sou eu") */}
+          <main className="flex-1 flex flex-col items-center justify-center text-center z-30 px-4 overflow-y-auto custom-scrollbar w-full">
             {slides[imagemAtualIndex].tipo === 'intro' ? (
-              <div className="animate-in zoom-in-95 duration-700 fade-in">
+              <div className="animate-in zoom-in-95 duration-700 fade-in my-auto py-4">
                 <div className="flex items-center justify-center gap-4 mb-4">
                   <div className="w-12 md:w-20 h-[1px] bg-gradient-to-r from-transparent to-[#C7977D]/80"></div>
                   <Sparkles size={24} className="text-[#C7977D] opacity-90 animate-pulse" />
                   <div className="w-12 md:w-20 h-[1px] bg-gradient-to-l from-transparent to-[#C7977D]/80"></div>
                 </div>
-                <h1 className="font-serif text-4xl md:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
+                <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
                   Cuidado em cada <span className="text-[#F8D1BE] italic">detalhe</span>.
                 </h1>
                 <p className="text-sm md:text-lg text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
@@ -319,10 +311,10 @@ export default function MonitorPage() {
                 </p>
               </div>
             ) : (
-              <div className="bg-[#120308]/60 backdrop-blur-xl border border-[#DCAE96]/30 p-6 md:p-8 rounded-[32px] max-w-xl mx-auto shadow-[0_0_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom-8 duration-700 fade-in">
-                <img src="/debora.jpg" className="w-16 h-16 md:w-20 md:h-20 mx-auto rounded-full object-cover border border-[#C7977D] mb-4 shadow-lg" alt="Débora" />
-                <h2 className="font-serif text-2xl md:text-3xl text-[#F8D1BE] mb-2 drop-shadow-md">Muito prazer, sou a Débora.</h2>
-                <p className="text-xs md:text-sm text-gray-300 leading-relaxed font-light mb-5 px-4">
+              <div className="bg-[#120308]/60 backdrop-blur-xl border border-[#DCAE96]/30 p-4 sm:p-6 md:p-8 rounded-[32px] max-w-xl mx-auto shadow-[0_0_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom-8 duration-700 fade-in my-auto">
+                <img src="/debora.jpg" className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full object-cover border border-[#C7977D] mb-3 shadow-lg" alt="Débora" />
+                <h2 className="font-serif text-xl sm:text-3xl text-[#F8D1BE] mb-2 drop-shadow-md">Muito prazer, sou a Débora.</h2>
+                <p className="text-xs md:text-sm text-gray-300 leading-relaxed font-light mb-4 px-4">
                   Há mais de 6 anos venho transformando a autoestima de mulheres através de um trabalho feito com muita dedicação e amor. Para mim, a beleza mora na simplicidade de se sentir bem e confiante consigo mesma.
                 </p>
                 <span className="inline-flex items-center gap-1.5 border border-[#C7977D]/50 text-[#C7977D] bg-black/40 text-[9px] uppercase tracking-widest px-4 py-1.5 rounded-full font-bold">
@@ -330,10 +322,9 @@ export default function MonitorPage() {
                 </span>
               </div>
             )}
-
           </main>
 
-          <footer className="w-full p-6 z-30 flex justify-center gap-2 shrink-0">
+          <footer className="w-full p-4 z-30 flex justify-center gap-2 shrink-0">
             {slides.map((_, idx) => (
               <div key={idx} className={`h-1 rounded-full transition-all duration-500 ${idx === imagemAtualIndex ? 'w-8 bg-[#F8D1BE] shadow-[0_0_10px_#F8D1BE]' : 'w-3 bg-white/20'}`}></div>
             ))}
@@ -341,11 +332,9 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* ============================================== */}
       {/* MODO SESSÃO VIP ATIVA */}
-      {/* ============================================== */}
       {atendimentoAtivo && sessaoData && (
-        <div className="absolute inset-0 z-40 flex flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh]">
+        <div className="absolute inset-0 z-40 flex flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
           
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
           
@@ -392,16 +381,16 @@ export default function MonitorPage() {
               
               {abaAtiva === 'inicio' && (
                 <div className="min-h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700">
-                  <div className="mb-2 sm:mb-4 shrink-0">
+                  <div className="mb-2 shrink-0">
                     <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white mb-0.5 leading-tight drop-shadow-lg">
                       {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                     </h1>
                     <p className="text-[10px] sm:text-xs text-[#E8D3C8] font-light opacity-80">Relaxe e aproveite o seu momento.</p>
                   </div>
 
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 min-h-0">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full">
                     
-                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-5 rounded-2xl shadow-xl flex flex-col justify-between min-h-[140px]">
+                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col justify-between min-h-[140px]">
                       <div>
                         <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
                         <h2 className="font-serif text-base sm:text-xl text-white leading-tight drop-shadow-md">{sessaoData.servico_nome}</h2>
@@ -413,9 +402,9 @@ export default function MonitorPage() {
                     </div>
 
                     {dadosServicoSessao && (
-                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-5 rounded-2xl shadow-xl flex flex-col justify-between min-h-[140px]">
+                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col justify-between min-h-[140px]">
                         <div>
-                          <div className="flex justify-between items-center mb-2 sm:mb-3 border-b border-[#DCAE96]/10 pb-1.5 sm:pb-2">
+                          <div className="flex justify-between items-center mb-2 border-b border-[#DCAE96]/10 pb-1.5 sm:pb-2">
                             <h3 className="font-serif text-sm sm:text-lg text-white">Resumo</h3>
                             {statusPagamento === 'pago' && <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.5 sm:py-1 rounded border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 size={10}/> Pago</span>}
                           </div>
@@ -439,7 +428,7 @@ export default function MonitorPage() {
                         </div>
 
                         {statusPagamento === 'pendente' && (
-                          <div className="mt-2 sm:mt-3 bg-black/40 border border-[#DCAE96]/20 rounded-xl p-2 sm:p-3 flex items-center gap-2 sm:gap-3 shadow-inner">
+                          <div className="mt-2 bg-black/40 border border-[#DCAE96]/20 rounded-xl p-2 sm:p-3 flex items-center gap-2 sm:gap-3 shadow-inner">
                             {isGerandoPix ? (
                               <div className="flex flex-col items-center justify-center w-full py-1 sm:py-2">
                                 <Loader2 className="animate-spin text-[#C7977D] mb-1" size={16} />
@@ -464,7 +453,7 @@ export default function MonitorPage() {
                         )}
 
                         {statusPagamento === 'pago' && (
-                          <div className="mt-2 sm:mt-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2 sm:p-4 flex flex-col items-center justify-center shadow-inner text-center">
+                          <div className="mt-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2 sm:p-4 flex flex-col items-center justify-center shadow-inner text-center">
                              <CheckCircle2 className="text-emerald-400 mb-0.5 sm:mb-1" size={20} />
                              <p className="text-emerald-400 text-xs sm:text-sm font-bold">Pagamento Confirmado!</p>
                              <p className="text-gray-400 text-[8px] sm:text-[10px] mt-0.5 sm:mt-1">Aguarde a finalização.</p>
@@ -535,7 +524,7 @@ export default function MonitorPage() {
                         <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Escolha os detalhes para a próxima produção.</p>
                       </div>
                       
-                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 flex-1 min-h-0 bg-[#120308]/60 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl">
+                      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full bg-[#120308]/60 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl">
                         <div className="w-full sm:w-1/2 flex flex-col gap-2 sm:gap-3 sm:pr-4 sm:border-r border-[#DCAE96]/10">
                           <div>
                             <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">1. Qual o serviço?</label>

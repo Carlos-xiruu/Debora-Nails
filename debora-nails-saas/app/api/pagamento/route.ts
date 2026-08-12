@@ -1,66 +1,54 @@
 import { NextResponse } from 'next/server';
-import { MercadoPagoConfig, Preference } from 'mercadopago';
+import { Preference, MercadoPagoConfig } from 'mercadopago';
 
 export async function POST(request: Request) {
   try {
+    const token = process.env.MERCADOPAGO_ACCESS_TOKEN || process.env.MP_ACCESS_TOKEN || '';
+    
+    if (!token) {
+      console.error("ERRO: Nenhum Token do Mercado Pago foi encontrado!");
+      return NextResponse.json({ error: 'Token ausente' }, { status: 500 });
+    }
+
+    const client = new MercadoPagoConfig({ accessToken: token });
     const body = await request.json();
-    const { titulo, preco, clienteNome, clienteTelefone, metodoPagamento } = body;
-
-    if (!process.env.MERCADOPAGO_ACCESS_TOKEN) {
-      return NextResponse.json({ error: 'Chave não configurada' }, { status: 500 });
-    }
-
-    const client = new MercadoPagoConfig({ accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN });
     const preference = new Preference(client);
-    const DOMINIO_OFICIAL = 'https://deboranails.com.br';
 
-    const excludedTypes = [
-      { id: 'ticket' },
-      { id: 'atm' }
-    ];
-
-    // Variável para forçar o PIX como padrão absoluto
-    let defaultMethodId = undefined;
-
-    if (metodoPagamento === 'pix') {
-      excludedTypes.push({ id: 'credit_card' }, { id: 'debit_card' });
-      defaultMethodId = 'pix'; // Força o PIX a ser a primeira e única coisa na tela
-    } else if (metodoPagamento === 'cartao') {
-      excludedTypes.push({ id: 'bank_transfer' });
-    }
+    //  o seu domínio oficial com HTTPS
+    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://deboranails.com.br';
 
     const result = await preference.create({
       body: {
         items: [
           {
-            id: 'sinal_reserva',
-            title: `Sinal Exclusivo: ${titulo}`,
+            id: 'sinal',
+            title: `Reserva: ${body.titulo}`,
             quantity: 1,
-            unit_price: Number(Number(preco).toFixed(2))
+            unit_price: Number(body.preco)
           }
         ],
-        payer: {
-          name: clienteNome,
-          email: 'atendimento@deboranails.com.br', 
-        },
-        payment_methods: {
-          excluded_payment_types: excludedTypes,
-          default_payment_method_id: defaultMethodId, // Aplica a regra do PIX aqui
-          installments: 1
-        },
         back_urls: {
-          success: `${DOMINIO_OFICIAL}/?pagamento=sucesso`,
-          failure: `${DOMINIO_OFICIAL}/?pagamento=erro`,
-          pending: `${DOMINIO_OFICIAL}/?pagamento=pendente`
+          success: `${baseUrl}/?pagamento=sucesso`,
+          failure: `${baseUrl}/?pagamento=erro`,
+          pending: `${baseUrl}/?pagamento=pendente`
         },
+        //  Como o link agora é seguro (https), o Mercado Pago aceita devolver a cliente sozinho!
         auto_return: 'approved',
+        payment_methods: {
+          excluded_payment_types: [
+            { id: 'ticket' }, 
+            { id: 'bank_transfer' } 
+          ],
+          installments: 12
+        }
       }
     });
 
-    return NextResponse.json({ url_pagamento: result.init_point });
-
+    return NextResponse.json({ init_point: result.init_point });
+    
   } catch (error) {
-    console.error('Erro Interno no Mercado Pago:', error);
-    return NextResponse.json({ error: 'Erro ao gerar o pagamento' }, { status: 500 });
+    console.error("=== ERRO REAL DO MERCADO PAGO ===");
+    console.error(error);
+    return NextResponse.json({ error: 'Erro ao gerar link de pagamento' }, { status: 500 });
   }
 }

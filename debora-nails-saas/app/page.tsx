@@ -2,9 +2,19 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy } from 'lucide-react';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
+
+const DISPONIBILIDADE_PADRAO = {
+  0: { ativo: false, abertura: '08:00', fechamento: '12:00' },
+  1: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+  2: { ativo: true, abertura: '09:00', fechamento: '19:00' },
+  3: { ativo: true, abertura: '08:00', fechamento: '17:00' },
+  4: { ativo: true, abertura: '10:00', fechamento: '20:00' },
+  5: { ativo: true, abertura: '08:00', fechamento: '18:00' },
+  6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
+};
 
 export default function LandingPage() {
   const router = useRouter();
@@ -26,27 +36,150 @@ export default function LandingPage() {
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
 
-  // NOVOS ESTADOS PARA O PIX NATIVO
+  // NOVOS ESTADOS PARA O CÉREBRO DA AGENDA
+  const [agendamentos, setAgendamentos] = useState<any[]>([]);
+  const [configuracoes, setConfiguracoes] = useState<any>(null);
+  const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
+  const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
+
+  // ESTADOS DO PIX NATIVO
   const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
   const [pixId, setPixId] = useState<string | null>(null);
+  const [pixManualFallback, setPixManualFallback] = useState(false); // Plano B
 
   const [faqAberto, setFaqAberto] = useState<number | null>(null);
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
 
-  const proximosDias = Array.from({length: 10}).map((_, i) => { const d = new Date(); d.setDate(d.getDate() + i + 1); return d; });
-  const horariosLivres = ['09:00', '10:30', '13:30', '15:00', '16:30'];
+  // ========================================================
+  // MATEMÁTICA DE HORÁRIOS (MESMA INTELIGÊNCIA DO DASHBOARD)
+  // ========================================================
+  const converterParaMinutos = (horaStr: string) => {
+    if (!horaStr) return 0;
+    const [h, m] = horaStr.split(':').map(Number);
+    return h * 60 + m;
+  };
+
+  const converterParaHoraStr = (minutos: number) => {
+    const h = Math.floor(minutos / 60).toString().padStart(2, '0');
+    const m = (minutos % 60).toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  const extrairMinutosDuracao = (duracaoStr: string) => {
+    if (!duracaoStr) return 60;
+    let total = 0;
+    const str = duracaoStr.toLowerCase().trim();
+    const horasMatch = str.match(/(\d+)\s*h/);
+    if (horasMatch) total += parseInt(horasMatch[1]) * 60;
+    const minMatch = str.match(/(\d+)\s*m/);
+    if (minMatch) total += parseInt(minMatch[1]);
+    return total > 0 ? total : 60;
+  };
+
+  const formatarDataLocalStr = (d: Date) => {
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
 
   useEffect(() => {
-    const fetchServicos = async () => {
-      const { data } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
-      if (data) setServicos(data);
+    const fetchDadosGerais = async () => {
+      // Puxa os Serviços Ativos
+      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
+      if (servs) setServicos(servs);
+
+      // Puxa o Cérebro da Agenda (Configurações)
+      const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
+      if (config) {
+        setConfiguracoes({
+          disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO,
+          bloqueios: config.bloqueios || [],
+          chave_pix: config.chave_pix,
+          tipo_chave_pix: config.tipo_chave_pix
+        });
+      }
+
+      // Puxa os Agendamentos a partir de hoje
+      const hojeStr = formatarDataLocalStr(new Date());
+      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`);
+      if (agends) setAgendamentos(agends);
     };
-    fetchServicos();
+
+    fetchDadosGerais();
     const waTimer = setTimeout(() => setShowWaBubble(true), 20000); 
     return () => clearTimeout(waTimer);
   }, []);
 
+  // GERA OS DIAS DISPONÍVEIS NO CARROSSEL IGNORANDO OS DESATIVADOS
+  useEffect(() => {
+    if (!configuracoes) return;
+    const dias = [];
+    let d = new Date();
+    let count = 0;
+    // Pega os próximos 14 dias úteis de acordo com a configuração
+    while (count < 14) {
+      d.setDate(d.getDate() + 1);
+      const diaDaSemana = d.getDay();
+      const regra = configuracoes.disponibilidade[diaDaSemana];
+      if (regra && regra.ativo) {
+        dias.push(new Date(d));
+        count++;
+      }
+    }
+    setDiasDisponiveis(dias);
+  }, [configuracoes]);
+
+  // RECALCULA OS HORÁRIOS LIVRES QUANDO A CLIENTE ESCOLHE UM DIA OU UM SERVIÇO
+  useEffect(() => {
+    if (!dataEscolhida || !servicoEscolhido || !configuracoes) return;
+
+    const dataStr = formatarDataLocalStr(dataEscolhida);
+    const diaDaSemana = dataEscolhida.getDay();
+    const regraDoDia = configuracoes.disponibilidade[diaDaSemana];
+
+    if (!regraDoDia || !regraDoDia.ativo) {
+      setHorariosLivres([]); return;
+    }
+
+    const aberturaMin = converterParaMinutos(regraDoDia.abertura);
+    const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
+    const duracaoServicoMin = extrairMinutosDuracao(servicoEscolhido.duracao);
+    const passoIntervalo = 30; // Verifica vagas de 30 em 30 min
+
+    const agendsDoDia = agendamentos.filter(a => new Date(a.inicio).toISOString().split('T')[0] === dataStr);
+    const blocksDoDia = configuracoes.bloqueios.filter((b: any) => b.data === dataStr);
+
+    const slotsLivres = [];
+
+    for (let minAtual = aberturaMin; minAtual <= (fechamentoMin - duracaoServicoMin); minAtual += passoIntervalo) {
+      const fimMin = minAtual + duracaoServicoMin;
+
+      const conflitoAgendamento = agendsDoDia.some(a => {
+        const dInicio = new Date(a.inicio);
+        const dFim = new Date(a.fim);
+        const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes();
+        const minFim = dFim.getHours() * 60 + dFim.getMinutes();
+        return (minAtual < minFim) && (fimMin > minInicio); // Lógica cruzada de sobreposição
+      });
+
+      const conflitoBloqueio = blocksDoDia.some((b: any) => {
+        const minInicio = converterParaMinutos(b.inicio);
+        const minFim = converterParaMinutos(b.fim);
+        return (minAtual < minFim) && (fimMin > minInicio);
+      });
+
+      if (!conflitoAgendamento && !conflitoBloqueio) {
+        slotsLivres.push(converterParaHoraStr(minAtual));
+      }
+    }
+
+    setHorariosLivres(slotsLivres);
+    setHoraEscolhida(''); // Reseta a hora se ela mudar de dia
+  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
+
+
+  // ========================================================
+  // LÓGICA DE SESSÃO E PAGAMENTOS (MANTIDA)
+  // ========================================================
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -78,34 +211,38 @@ export default function LandingPage() {
     verificarSessaoEIntencao();
   }, [router]);
 
-  // Lida com o retorno do Mercado Pago APENAS para pagamentos em Cartão
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const statusPagamento = params.get('pagamento');
+ useEffect(() => {
+    // Atraso tático de 500ms para garantir que a URL já carregou por completo antes de ler
+    setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const statusPagamento = params.get('pagamento');
 
-    if (statusPagamento === 'sucesso') {
-      const reservaSalva = localStorage.getItem('reserva_temp_debora');
-      if (reservaSalva) {
-        const dados = JSON.parse(reservaSalva);
-        setServicoEscolhido(dados.servicoEscolhido);
-        setDataEscolhida(new Date(dados.dataEscolhida));
-        setHoraEscolhida(dados.horaEscolhida);
-        setClienteDados(dados.clienteDados);
-        setMetodoPagamento(dados.metodoPagamento);
+      if (statusPagamento === 'sucesso') {
+        const reservaSalva = localStorage.getItem('reserva_temp_debora');
+        if (reservaSalva) {
+          const dados = JSON.parse(reservaSalva);
+          
+          setServicoEscolhido(dados.servicoEscolhido);
+          setDataEscolhida(new Date(dados.dataEscolhida));
+          setHoraEscolhida(dados.horaEscolhida);
+          setClienteDados(dados.clienteDados);
+          setMetodoPagamento(dados.metodoPagamento);
+          
+          salvarAgendamentoOficial(dados);
+          
+          setStep(5);
+          setIsModalOpen(true);
+          localStorage.removeItem('reserva_temp_debora');
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
         
-        salvarAgendamentoOficial(dados);
-        setStep(5);
-        setIsModalOpen(true);
-        localStorage.removeItem('reserva_temp_debora');
+      } else if (statusPagamento === 'erro') {
+        alert("O pagamento via cartão foi recusado pelo banco. Tente novamente.");
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
-      window.history.replaceState({}, document.title, window.location.pathname);
-    } else if (statusPagamento === 'erro') {
-      alert("O pagamento via cartão não foi concluído. Tente novamente.");
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
+    }, 500); 
   }, []);
 
-  // Cronômetro da Reserva
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 4 && tempoRestante > 0) {
@@ -118,10 +255,9 @@ export default function LandingPage() {
     return () => clearInterval(timer);
   }, [step, tempoRestante]);
 
-  // VIGIA DO PIX NATIVO (Polling)
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (pixId && step === 4) {
+    if (pixId && step === 4 && !pixManualFallback) {
       interval = setInterval(async () => {
         try {
           const res = await fetch('/api/checar-pagamento', {
@@ -139,10 +275,10 @@ export default function LandingPage() {
         } catch (e) {
            console.error("Erro ao checar PIX", e);
         }
-      }, 5000); // Checa a cada 5 segundos
+      }, 5000);
     }
     return () => clearInterval(interval);
-  }, [pixId, step, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento]);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -160,6 +296,7 @@ export default function LandingPage() {
       setTempoRestante(300);
       setQrCodePix(null);
       setPixId(null);
+      setPixManualFallback(false);
     } else {
       localStorage.setItem('intencao_agendamento', servico ? JSON.stringify(servico) : 'geral');
       setServicoDetalhe(null);
@@ -182,12 +319,10 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalSinal = metodoPagamento === 'cartao' ? calcularSinal() + calcularTaxaCartao(calcularSinal()) : calcularSinal();
 
-  // HIBRIDO: PIX NATIVO vs CARTÃO VIA PREFERÊNCIA
   const processarPagamento = async () => {
     setIsProcessando(true);
     
     if (metodoPagamento === 'pix') {
-      // GERA PIX NATIVO
       try {
         const res = await fetch('/api/pagamento-monitor', {
           method: 'POST',
@@ -200,16 +335,25 @@ export default function LandingPage() {
           setQrCodePix({ base64: data.qr_code_base64, copiaCola: data.qr_code });
           setPixId(data.id);
         } else {
-          alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
+          // SE O MERCADO PAGO FALHAR, ATIVA O PLANO B (PIX MANUAL DA DÉBORA)
+          if (configuracoes?.chave_pix) {
+            setPixManualFallback(true);
+          } else {
+            alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
+          }
         }
       } catch (e) {
         console.error("Erro PIX:", e);
+        if (configuracoes?.chave_pix) {
+          setPixManualFallback(true);
+        } else {
+          alert("Ocorreu um erro ao processar. Tente novamente.");
+        }
       } finally {
         setIsProcessando(false);
       }
 
     } else {
-      // GERA PREFERÊNCIA PARA CARTÃO (REDIRECIONAMENTO)
       localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento }));
       try {
         const resposta = await fetch('/api/pagamento', {
@@ -232,12 +376,10 @@ export default function LandingPage() {
     }
   };
 
-  // 6. SALVA NO BANCO E DISPARA O WHATSAPP AUTOMÁTICO
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
       
-      // CORREÇÃO: Usar .limit(1) evita que o sistema trave caso você tenha cadastrado o mesmo telefone 2x nos testes
       const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
       
       if (clientesEncontrados && clientesEncontrados.length > 0) {
@@ -248,18 +390,18 @@ export default function LandingPage() {
       }
 
       if (cliente_id) {
-        const ano = new Date(dados.dataEscolhida).getFullYear();
-        const mes = String(new Date(dados.dataEscolhida).getMonth() + 1).padStart(2, '0');
-        const dia = String(new Date(dados.dataEscolhida).getDate()).padStart(2, '0');
-        const inicioDate = new Date(`${ano}-${mes}-${dia}T${dados.horaEscolhida}:00-03:00`);
-        const fimDate = new Date(inicioDate.getTime() + 2 * 60 * 60 * 1000);
+        const dataFiltroBase = formatarDataLocalStr(new Date(dados.dataEscolhida));
+        const inicioDate = new Date(`${dataFiltroBase}T${dados.horaEscolhida}:00-03:00`);
+        const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
+        const fimDate = new Date(inicioDate);
+        fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
         await supabase.from('agendamentos').insert([{
           cliente_id: cliente_id, servico_id: dados.servicoEscolhido.id, tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString(), status_pagamento: 'pago'
         }]);
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
-            ? calcularSinal(dados.servicoEscolhido) + (calcularSinal(dados.servicoEscolhido) * 0.05)
+            ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
             : calcularSinal(dados.servicoEscolhido);
 
         await supabase.from('transacoes').insert([{
@@ -272,9 +414,8 @@ export default function LandingPage() {
         const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
         const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
 
-       try {
-          // Motor do WhatsApp rodando na nuvem 24/7
-          await fetch('https://debora-whatsapp-api.onrender.com/enviar-mensagem', {
+        try {
+          await fetch('https://evil-rules-carry.loca.lt/enviar-mensagem', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: dados.clienteDados.telefone, mensagem: mensagemCliente })
@@ -692,23 +833,34 @@ export default function LandingPage() {
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                   <div>
                     <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider mb-3">Dias Disponíveis</label>
-                    <div className="flex gap-2 overflow-x-auto hide-scroll pb-2">
-                      {proximosDias.map((data, idx) => (
-                        <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 py-3 rounded-xl flex flex-col items-center justify-center transition-all border ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96] text-[#120308] border-transparent font-bold shadow-lg' : 'glass-card text-gray-400 border-[#3a2522] hover:border-[#DCAE96]/50'}`}>
-                          <span className="text-[9px] uppercase mb-1">{data.toLocaleDateString('pt-BR', { weekday: 'short' })}</span>
-                          <span className="text-lg font-serif">{data.getDate()}</span>
-                        </button>
-                      ))}
-                    </div>
+                    {diasDisponiveis.length === 0 ? (
+                      <p className="text-xs text-red-400">Nenhuma data disponível na agenda no momento.</p>
+                    ) : (
+                      <div className="flex gap-2 overflow-x-auto hide-scroll pb-2">
+                        {diasDisponiveis.map((data, idx) => (
+                          <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 py-3 rounded-xl flex flex-col items-center justify-center transition-all border ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96] text-[#120308] border-transparent font-bold shadow-lg' : 'glass-card text-gray-400 border-[#3a2522] hover:border-[#DCAE96]/50'}`}>
+                            <span className="text-[9px] uppercase mb-1">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
+                            <span className="text-lg font-serif">{data.getDate()}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {dataEscolhida && (
                     <div className="animate-in fade-in slide-in-from-bottom-4">
                       <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider mb-3">Horários Livres</label>
-                      <div className="grid grid-cols-3 gap-3">
-                        {horariosLivres.map(hora => (
-                          <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
-                        ))}
-                      </div>
+                      {horariosLivres.length === 0 ? (
+                         <div className="bg-[#180A0D] border border-red-500/20 p-4 rounded-xl text-center">
+                           <Ban size={24} className="text-red-400/50 mx-auto mb-2" />
+                           <p className="text-xs text-red-400">Nenhum horário livre suficiente para este serviço no dia selecionado.</p>
+                         </div>
+                      ) : (
+                        <div className="grid grid-cols-3 gap-3">
+                          {horariosLivres.map(hora => (
+                            <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                   <button disabled={!dataEscolhida || !horaEscolhida} onClick={() => setStep(3)} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">Continuar</button>
@@ -739,8 +891,28 @@ export default function LandingPage() {
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-right-4">
                   
-                  {qrCodePix ? (
-                    // TELA DO PIX NATIVO EMBUTIDO
+                  {pixManualFallback ? (
+                    // PLANO B: CHAVE PIX DIRETO DO BANCO DE DADOS
+                    <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
+                      <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Pague com a Chave PIX</h3>
+                      
+                      <p className="text-gray-400 text-xs text-center mb-4">Envie o valor do sinal para a chave abaixo e clique em confirmar.</p>
+                      
+                      <div className="w-full bg-[#180A0D] border border-[#3a2522] p-4 rounded-xl mb-6">
+                        <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Chave ({configuracoes?.tipo_chave_pix || 'PIX'})</p>
+                        <div className="flex gap-2 items-center">
+                          <input type="text" readOnly value={configuracoes?.chave_pix || ''} className="flex-1 bg-transparent border-none text-white text-sm outline-none truncate font-mono" />
+                          <button onClick={() => {navigator.clipboard.writeText(configuracoes?.chave_pix || ''); alert("Chave copiada!");}} className="bg-[#3a2522] text-white p-2 rounded-lg hover:bg-[#DCAE96] hover:text-black transition-colors shrink-0"><Copy size={14}/></button>
+                        </div>
+                      </div>
+                      
+                      <button onClick={() => { processarPagamento(); setStep(5); }} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                        <CheckCircle2 size={18}/> Já realizei o pagamento
+                      </button>
+                    </div>
+
+                  ) : qrCodePix ? (
+                    // TELA DO PIX NATIVO AUTOMÁTICO
                     <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
                       <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Escaneie para Pagar</h3>
                       
@@ -803,7 +975,7 @@ export default function LandingPage() {
                       </button>
                     </>
                   )}
-                  <p className="text-center text-[10px] text-gray-500 mt-3 flex items-center justify-center gap-1 font-medium"><ShieldCheck size={10}/> Processado pelo Mercado Pago</p>
+                  {!pixManualFallback && <p className="text-center text-[10px] text-gray-500 mt-3 flex items-center justify-center gap-1 font-medium"><ShieldCheck size={10}/> Processado pelo Mercado Pago</p>}
                 </div>
               )}
               {step === 5 && (

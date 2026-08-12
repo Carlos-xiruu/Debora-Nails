@@ -37,7 +37,6 @@ export default function ServicosPage() {
     setIsModalOpen(true);
   };
 
-  // NOVA FUNÇÃO: UPLOAD DE FOTO DIRETO DO CELULAR/PC PARA O SUPABASE STORAGE
   const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -51,14 +50,12 @@ export default function ServicosPage() {
       const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
       const filePath = `${fileName}`;
 
-      // Envia para o bucket 'servicos' do Supabase Storage
       const { error: uploadError } = await supabase.storage.from('servicos').upload(filePath, file);
 
       if (uploadError) {
         console.error("Erro no upload:", uploadError.message);
         alert(`Erro ao enviar a imagem ${file.name}. Verifique se o bucket 'servicos' é público no Supabase.`);
       } else {
-        // Pega a URL pública da imagem recém enviada
         const { data } = supabase.storage.from('servicos').getPublicUrl(filePath);
         if (data?.publicUrl) {
           novasImagens.push(data.publicUrl);
@@ -196,17 +193,13 @@ export default function ServicosPage() {
                     <label className="block text-sm text-[#E8D3C8] mb-1">Descrição</label>
                     <textarea name="desc" rows={2} defaultValue={servicoEditando?.descricao} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none resize-none"></textarea>
                   </div>
+                  
+                  {/* NOVO CAMPO LIVRE DE DURAÇÃO */}
                   <div>
                     <label className="block text-sm text-[#E8D3C8] mb-1">Duração Média *</label>
-                    <select name="duracao" defaultValue={servicoEditando?.duracao || '1h'} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none appearance-none">
-                      <option value="1h">1 hora</option>
-                      <option value="1h 30m">1h 30m</option>
-                      <option value="2h">2 horas</option>
-                      <option value="2h 30m">2h 30m</option>
-                      <option value="3h">3 horas</option>
-                      <option value="3h 30m">3h 30m</option>
-                    </select>
+                    <input type="text" name="duracao" defaultValue={servicoEditando?.duracao || ''} placeholder="Ex: 40m, 1h, 1h 30m" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
+                  
                   <div>
                     <label className="block text-sm text-[#E8D3C8] mb-1">Preço Total (R$) *</label>
                     <input type="number" step="0.01" name="preco" defaultValue={servicoEditando?.preco} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:outline-none"/>
@@ -226,19 +219,16 @@ export default function ServicosPage() {
                   </div>
                 </div>
 
-                {/* SEÇÃO DE FOTOS COM BOTÃO DE UPLOAD DO CELULAR */}
                 <div className="pt-4 border-t border-[#DCAE96]/20">
                   <div className="flex justify-between items-center mb-3">
                     <label className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Fotos do Serviço</label>
                     
-                    {/* BOTÃO PARA UPAR DO CELULAR OU PC */}
                     <label className="bg-[#C7977D] text-[#120308] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform">
                       {isUploading ? <Loader2 className="animate-spin" size={14} /> : <><Upload size={14} /> Upar do Dispositivo</>}
                       <input type="file" accept="image/*" multiple onChange={handleUploadFoto} className="hidden" />
                     </label>
                   </div>
 
-                  {/* MINIATURAS SELECIONADAS */}
                   {imagensSelecionadas.length > 0 && (
                     <div className="mb-4">
                       <p className="text-xs text-[#E8D3C8] mb-2">Imagens vinculadas a este serviço:</p>
