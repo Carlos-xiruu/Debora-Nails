@@ -130,7 +130,13 @@ export default function MonitorPage() {
       if (servicos) setServicosDb(servicos);
 
       const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
-      if (config) setConfiguracoes({ disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO, bloqueios: config.bloqueios || [] });
+      if (config) {
+        setConfiguracoes({ 
+          disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO, 
+          bloqueios: config.bloqueios || [],
+          mensagem_confirmacao: config.mensagem_confirmacao // 👈 LENDO DO BANCO AQUI
+        });
+      }
 
       const hojeStr = formatarDataLocalStr(new Date());
       const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`);
@@ -261,7 +267,6 @@ export default function MonitorPage() {
 
   useEffect(() => {
     const gerarPixFinal = async () => {
-      // TRAVA CORRIGIDA: Se o valor restante > 0, ignora falso status 'pago' e força a cobrança.
       if (!dadosServicoSessao || !sessaoData || qrCodeImagem || isGerandoPix) return;
       if (valorRestante <= 0 || statusPagamento === 'pago') return;
       
@@ -412,10 +417,16 @@ export default function MonitorPage() {
         }]);
       }
 
-      // DISPARA O WHATSAPP DE CONFIRMAÇÃO
+      // 🛡️ DISPARA O WHATSAPP DE CONFIRMAÇÃO DINÂMICO
       if (clienteData.telefone) {
         const dataFormatada = inicioDate.toLocaleDateString('pt-BR');
-        const mensagemCliente = `Oii, ${sessaoData.cliente_nome.split(' ')[0]}! 💕 Passando para confirmar seu retorno de *${servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${horaEscolhida}*. ${valorSinal > 0 ? 'Seu sinal já foi recebido!' : ''} Te esperamos! ✨`;
+        
+        // Puxa o texto base do painel (ou usa um padrão caso não encontre)
+        const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu retorno.";
+        const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
+        
+        const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
+        
         try {
           await fetch('/api/whatsapp', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },

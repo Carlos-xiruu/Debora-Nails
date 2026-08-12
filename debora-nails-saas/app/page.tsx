@@ -92,7 +92,8 @@ export default function LandingPage() {
           disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO,
           bloqueios: config.bloqueios || [],
           chave_pix: config.chave_pix,
-          tipo_chave_pix: config.tipo_chave_pix
+          tipo_chave_pix: config.tipo_chave_pix,
+          mensagem_confirmacao: config.mensagem_confirmacao
         });
       }
 
@@ -452,7 +453,11 @@ export default function LandingPage() {
         }]);
 
         const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
-        const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
+        
+        // 👈 A MÁGICA AQUI: Puxa o texto do painel e anexa os detalhes da reserva embaixo
+        const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu agendamento.";
+        
+        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\n👤 Cliente: ${dados.clienteDados.nome}\n💅 Serviço: *${dados.servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${dados.horaEscolhida}*\n\nTe esperamos no Debora Nails Studio! ✨`;
 
         try {
           await fetch('/api/whatsapp', {
