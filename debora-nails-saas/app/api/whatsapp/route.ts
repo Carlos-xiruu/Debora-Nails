@@ -6,7 +6,7 @@ export async function POST(request: Request) {
 
     // Como quem faz o fetch agora é o servidor, o bloqueio do Navegador não existe mais!
     // 👇 COLOQUE O SEU LINK DO LOCALTUNNEL AQUI:
-    const response = await fetch('https://evil-rules-carry.loca.lt/enviar-mensagem', {
+    const response = await fetch('https://empty-times-care.loca.lt/enviar-mensagem', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
