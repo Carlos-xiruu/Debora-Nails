@@ -1,14 +1,21 @@
 {
-  "name": "Debora Nails Admin",
-  "short_name": "Painel Débora",
-  "description": "Gerenciamento do estúdio.",
+  "name": "Admin Debora Nails",
+  "short_name": "Admin",
+  "description": "Painel de Gestão da Débora",
   "start_url": "/dashboard",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#120308",
-  "theme_color": "#120308",
+  "background_color": "#0A0205",
+  "theme_color": "#0A0205",
   "icons": [
-    { "src": "/logo.PNG", "sizes": "192x192", "type": "image/png" },
-    { "src": "/logo.PNG", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "/debora.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/debora.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
   ]
 }
