@@ -380,12 +380,16 @@ export default function LandingPage() {
     try {
       let cliente_id;
       
-      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
+      const { data: clientesEncontrados, error: errBusca } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
       
       if (clientesEncontrados && clientesEncontrados.length > 0) {
         cliente_id = clientesEncontrados[0].id;
       } else {
-        const { data: novoCliente } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().limit(1);
+        const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().limit(1);
+        if (errCli) {
+          alert("🚨 Erro ao salvar Cliente: " + errCli.message);
+          return;
+        }
         if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
 
@@ -396,15 +400,25 @@ export default function LandingPage() {
         const fimDate = new Date(inicioDate);
         fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-        await supabase.from('agendamentos').insert([{
-          cliente_id: cliente_id, servico_id: dados.servicoEscolhido.id, tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString(), status_pagamento: 'pago'
+        // Retiramos o status_pagamento. Se der qualquer erro estrutural, ele vai apitar!
+        const { error: errAgendamento } = await supabase.from('agendamentos').insert([{
+          cliente_id: cliente_id, 
+          servico_id: dados.servicoEscolhido.id, 
+          tipo: 'agendado', 
+          inicio: inicioDate.toISOString(), 
+          fim: fimDate.toISOString()
         }]);
+
+        if (errAgendamento) {
+          alert("🚨 Erro ao salvar na Agenda (Supabase): " + errAgendamento.message);
+          return; // Para o código aqui se a agenda falhar
+        }
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
             ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
             : calcularSinal(dados.servicoEscolhido);
 
-        await supabase.from('transacoes').insert([{
+        const { error: errTransacao } = await supabase.from('transacoes').insert([{
           descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
           tipo: 'entrada', 
           valor: valorSinalPago, 
@@ -415,20 +429,18 @@ export default function LandingPage() {
         const mensagemCliente = `Oii, ${dados.clienteDados.nome}! 💕 Passando para confirmar seu agendamento de *${dados.servicoEscolhido.nome}* para o dia *${dataFormatada}* às *${dados.horaEscolhida}*. Seu sinal foi recebido com sucesso e sua vaga está garantida no Debora Nails Studio! Te esperamos lá! ✨`;
 
         try {
-          await fetch('https://evil-rules-carry.loca.lt/enviar-mensagem', {
+          // 👇 Agora o seu site chama a nossa API interna, e ela faz o trabalho sujo sem ser bloqueada!
+          await fetch('/api/whatsapp', {
             method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Bypass-Tunnel-Reminder': 'true' 
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: dados.clienteDados.telefone, mensagem: mensagemCliente })
           });
         } catch (errWhatsApp) {
-          console.error('Erro ao disparar WhatsApp da nuvem:', errWhatsApp);
+          console.error('Erro ao chamar API do WhatsApp:', errWhatsApp);
         }
       }
     } catch (e) {
-      console.error("Erro ao salvar no Supabase após pagamento", e);
+      console.error("Erro geral na função de salvamento", e);
     }
   };
 
