@@ -590,7 +590,7 @@ export default function LandingPage() {
       <section id="sobre" className="py-20 px-6 relative z-10">
         <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
           <div className="w-full md:w-1/3 relative group">
-            <img src="/debora.jpg" alt="Débora Silva" loading="lazy" decoding="async" className="w-full rounded-2xl relative z-10 border border-[#DCAE96]/20 object-cover aspect-square md:aspect-[4/5]" />
+            <img src="/fotonova.jpeg" alt="Debora Silva" loading="lazy" decoding="async" className="w-full rounded-2xl relative z-10 border border-[#DCAE96]/20 object-cover aspect-square md:aspect-[4/5]" />
             <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
               <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
               <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
@@ -664,7 +664,7 @@ export default function LandingPage() {
 
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Nails Design</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
-            {['/01.jpg', '/vermelha.jpeg', '/02.jpg'].map((img, i) => (
+            {['/01.jpg', '/vermelha.jpeg', '/02.jpg','nude-branca.jpeg','pontinho-preto.jpeg','delicada.jpeg','branca-nude.jpeg','roxa.jpeg','nude-dourada.jpeg'].map((img, i) => (
               <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer">
                 <img src={img} alt="Trabalho Debora Nails" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
@@ -673,7 +673,7 @@ export default function LandingPage() {
 
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Maquiagem Profissional</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {['/make01.jpeg', '/make02.jpeg', '/make03.jpeg', '/make04.jpeg'].map((img, i) => (
+            {['/make01.jpeg','/make-cadeira.jpg', '/make02.jpeg', '/make03.jpeg','make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
               <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer">
                 <img src={img} alt="Maquiagem Profissional" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
