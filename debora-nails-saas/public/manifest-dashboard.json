@@ -8,12 +8,12 @@
   "theme_color": "#0A0205",
   "icons": [
     {
-      "src": "/debora.jpg",
+      "src": "/logo.PNG",
       "sizes": "192x192",
       "type": "image/jpeg"
     },
     {
-      "src": "/debora.jpg",
+      "src": "/logo.PNG",
       "sizes": "512x512",
       "type": "image/jpeg"
     }
