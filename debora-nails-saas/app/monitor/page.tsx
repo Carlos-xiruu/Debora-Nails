@@ -36,12 +36,16 @@ export default function MonitorPage() {
 
   const [imagemAtualIndex, setImagemAtualIndex] = useState(0);
   
+  // 🛡️ SLIDES ATUALIZADOS COM O VÍDEO VERTICAL (Tríptico)
   const slides = [
+    { bg: '/trabalho.mp4', tipo: 'video' }, 
     { bg: '/01.jpg', tipo: 'intro' },
     { bg: '/debora.jpg', tipo: 'sobre' }, 
     { bg: '/02.jpg', tipo: 'intro' },
     { bg: '/make01.jpeg', tipo: 'intro' },
-    { bg: '/vermelha.jpeg', tipo: 'intro' }
+    { bg: '/vermelha.jpeg', tipo: 'intro' },
+    { bg: '/branca-nude.jpeg', tipo: 'intro' },
+    { bg: '/nude-dourada.jpeg', tipo: 'intro' }
   ];
 
   // ESTADOS DO NOVO CÉREBRO DE AGENDAMENTO
@@ -134,7 +138,7 @@ export default function MonitorPage() {
         setConfiguracoes({ 
           disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO, 
           bloqueios: config.bloqueios || [],
-          mensagem_confirmacao: config.mensagem_confirmacao // 👈 LENDO DO BANCO AQUI
+          mensagem_confirmacao: config.mensagem_confirmacao
         });
       }
 
@@ -249,10 +253,11 @@ export default function MonitorPage() {
     return () => clearInterval(cronometro);
   }, [atendimentoAtivo, sessaoData]);
 
+  // ROTATIVIDADE DOS SLIDES (AGORA COM TEMPO MAIOR PARA O VÍDEO RENDER BEM)
   useEffect(() => {
     let carrossel: NodeJS.Timeout;
     if (!atendimentoAtivo) {
-      carrossel = setInterval(() => setImagemAtualIndex((prev) => (prev + 1) % slides.length), 8000);
+      carrossel = setInterval(() => setImagemAtualIndex((prev) => (prev + 1) % slides.length), 10000); // 10 segundos por slide
     }
     return () => clearInterval(carrossel);
   }, [atendimentoAtivo, slides.length]);
@@ -336,7 +341,6 @@ export default function MonitorPage() {
     const fimDate = new Date(inicioDate);
     fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-    // BLINDAGEM CONTRA DUPLA RESERVA
     const { data: vagaOcupada } = await supabase.from('agendamentos').select('id')
       .lt('inicio', fimDate.toISOString()).gt('fim', inicioDate.toISOString());
 
@@ -350,7 +354,6 @@ export default function MonitorPage() {
     const valorSinal = servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100);
 
     if (valorSinal > 0) {
-      // Gera o PIX do SINAL do Retorno
       try {
         const res = await fetch('/api/pagamento-monitor', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -360,17 +363,15 @@ export default function MonitorPage() {
         if (data.id) {
           setQrCodeAgendamento(data.qr_code_base64);
           setPixIdAgendamento(data.id);
-          setEtapaAgendamento(2); // Vai pra tela do QR Code do Sinal
+          setEtapaAgendamento(2); 
         }
       } catch (e) { alert("Erro ao gerar QR Code de reserva."); }
     } else {
-      // Sem sinal, agenda direto
       salvarAgendamentoRetornoBD(inicioDate, fimDate, 0);
     }
     setIsProcessandoAgendamento(false);
   };
 
-  // LOOP VERIFICADOR DO PIX DO SINAL DO RETORNO
   useEffect(() => {
     let intervaloRetorno: NodeJS.Timeout;
     if (pixIdAgendamento && etapaAgendamento === 2) {
@@ -401,7 +402,6 @@ export default function MonitorPage() {
   }, [pixIdAgendamento, etapaAgendamento, servicoEscolhido, dataEscolhida, horaEscolhida]);
 
   const salvarAgendamentoRetornoBD = async (inicioDate: Date, fimDate: Date, valorSinal: number) => {
-    // Puxa o cliente real baseado na sessão
     const { data: clienteData } = await supabase.from('clientes').select('id, telefone').eq('nome', sessaoData.cliente_nome).limit(1).single();
     
     if (clienteData) {
@@ -417,14 +417,10 @@ export default function MonitorPage() {
         }]);
       }
 
-      // 🛡️ DISPARA O WHATSAPP DE CONFIRMAÇÃO DINÂMICO
       if (clienteData.telefone) {
         const dataFormatada = inicioDate.toLocaleDateString('pt-BR');
-        
-        // Puxa o texto base do painel (ou usa um padrão caso não encontre)
         const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu retorno.";
         const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
-        
         const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
         
         try {
@@ -436,7 +432,7 @@ export default function MonitorPage() {
       }
     }
     
-    setEtapaAgendamento(3); // Vai pra tela de Sucesso
+    setEtapaAgendamento(3); 
     setTimeout(() => { setActiveTab('inicio'); setEtapaAgendamento(1); }, 5000);
   };
 
@@ -460,14 +456,36 @@ export default function MonitorPage() {
       {/* MODO DESCANSO */}
       {!atendimentoAtivo && (
         <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-          {slides.map((slide, idx) => (
-             <div key={idx} className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[2000ms]" style={{ backgroundImage: `url('${slide.bg}')`, opacity: idx === imagemAtualIndex ? 0.5 : 0, transform: idx === imagemAtualIndex ? 'scale(1.03)' : 'scale(1)', transition: 'opacity 2s ease-in-out, transform 10s ease-out' }} />
-          ))}
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0205] via-[#0A0205]/40 to-[#0A0205]/90 z-10"></div>
+          
+          {/* RENDERIZADOR DE SLIDES (IMAGENS E VÍDEOS VERTICAIS) */}
+          {slides.map((slide, idx) => {
+            if (slide.tipo === 'video') {
+              return (
+                <div key={idx} className="absolute inset-0 flex gap-2 sm:gap-4 p-2 sm:p-4" style={{ opacity: idx === imagemAtualIndex ? 0.4 : 0, transition: 'opacity 2s ease-in-out' }}>
+                  {/* Tríptico: 3 Colunas exibindo o vídeo vertical preenchendo a tela */}
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl">
+                    <video src={slide.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden sm:block">
+                    <video src={slide.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden md:block">
+                    <video src={slide.bg} autoPlay loop muted playsInline className="w-full h-full object-cover" />
+                  </div>
+                </div>
+              );
+            }
+            return (
+              <div key={idx} className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[2000ms]" style={{ backgroundImage: `url('${slide.bg}')`, opacity: idx === imagemAtualIndex ? 0.4 : 0, transform: idx === imagemAtualIndex ? 'scale(1.03)' : 'scale(1)', transition: 'opacity 2s ease-in-out, transform 10s ease-out' }} />
+            );
+          })}
+          
+          {/* EFEITO FUMÊ GERAL */}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0205] via-[#0A0205]/40 to-[#0A0205]/90 z-10 pointer-events-none"></div>
           
           <header className="w-full p-4 md:px-8 flex justify-between items-center z-30 shrink-0">
             <div className="flex items-center gap-3 pl-8">
-              <img src="/debora.jpg" className="h-10 w-10 rounded-full object-cover border border-[#C7977D]" alt="Débora Silva" />
+              <img src="/fotonova.jpeg" className="h-10 w-10 rounded-full object-cover border border-[#C7977D]" alt="Débora Silva" />
               <div className="flex flex-col">
                 <span className="font-serif text-[#F8D1BE] text-xl leading-tight drop-shadow-md">Debora Nails</span>
                 <span className="text-[#E8D3C8] text-[9px] tracking-[0.2em] uppercase font-bold opacity-80">Studio de Alto Padrão</span>
@@ -480,32 +498,31 @@ export default function MonitorPage() {
           </header>
 
           <main className="flex-1 flex flex-col items-center justify-center text-center z-30 px-4 overflow-hidden w-full">
-            {slides[imagemAtualIndex].tipo === 'intro' ? (
+            {(slides[imagemAtualIndex].tipo === 'intro' || slides[imagemAtualIndex].tipo === 'video') ? (
               <div className="animate-in zoom-in-95 duration-700 fade-in my-auto py-4">
                 <div className="flex items-center justify-center gap-4 mb-4">
                   <div className="w-12 md:w-20 h-[1px] bg-gradient-to-r from-transparent to-[#C7977D]/80"></div>
                   <Sparkles size={24} className="text-[#C7977D] opacity-90 animate-pulse" />
                   <div className="w-12 md:w-20 h-[1px] bg-gradient-to-l from-transparent to-[#C7977D]/80"></div>
                 </div>
-                <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
+                <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
                   Cuidado em cada <span className="text-[#F8D1BE] italic">detalhe</span>.
                 </h1>
-                <p className="text-sm md:text-lg text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+                <p className="text-sm md:text-xl text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                   Uma pausa merecida para o seu bem-estar começará em breve.
                 </p>
               </div>
-            ) : (
-              <div className="bg-[#120308]/60 backdrop-blur-xl border border-[#DCAE96]/30 p-4 sm:p-6 md:p-8 rounded-[32px] max-w-xl mx-auto shadow-[0_0_40px_rgba(0,0,0,0.8)] animate-in slide-in-from-bottom-8 duration-700 fade-in my-auto">
-                <img src="/debora.jpg" className="w-12 h-12 sm:w-16 sm:h-16 mx-auto rounded-full object-cover border border-[#C7977D] mb-3 shadow-lg" alt="Débora" />
-                <h2 className="font-serif text-xl sm:text-3xl text-[#F8D1BE] mb-2 drop-shadow-md">Muito prazer, sou a Débora.</h2>
-                <p className="text-xs md:text-sm text-gray-300 leading-relaxed font-light mb-4 px-4">
-                  Há mais de 6 anos venho transformando a autoestima de mulheres através de um trabalho feito com muita dedicação e amor. Para mim, a beleza mora na simplicidade de se sentir bem e confiante consigo mesma.
+            ) : slides[imagemAtualIndex].tipo === 'sobre' ? (
+              <div className="animate-in zoom-in-95 duration-700 fade-in my-auto py-4 flex flex-col items-center">
+                <img src="/fotonova.jpeg" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-[#C7977D] mb-4 shadow-[0_0_20px_rgba(199,151,125,0.4)]" alt="Débora" />
+                <h2 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
+                  Muito prazer, sou a <span className="text-[#F8D1BE] italic">Debora.</span>
+                </h2>
+                <p className="text-sm md:text-xl text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-2xl px-4 leading-relaxed">
+                  Há mais de 6 anos transformando autoestima com dedicação e amor. A verdadeira beleza mora na simplicidade de se sentir bem e confiante.
                 </p>
-                <span className="inline-flex items-center gap-1.5 border border-[#C7977D]/50 text-[#C7977D] bg-black/40 text-[9px] uppercase tracking-widest px-4 py-1.5 rounded-full font-bold">
-                  <Sparkles size={12}/> A Especialista
-                </span>
               </div>
-            )}
+            ) : null}
           </main>
 
           <footer className="w-full p-4 z-30 flex justify-center gap-2 shrink-0">
@@ -524,7 +541,7 @@ export default function MonitorPage() {
           
           <aside className="w-[30%] min-w-[140px] sm:min-w-[200px] max-w-[260px] bg-[#120308]/90 backdrop-blur-xl border-r border-[#DCAE96]/20 flex flex-col z-20 h-full shrink-0 shadow-2xl">
             <div className="p-3 sm:p-5 border-b border-[#DCAE96]/10 flex flex-col items-start shrink-0">
-              <img src="/debora.jpg" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover mb-2 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
+              <img src="/fotonova.jpeg" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover mb-2 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
               <p className="text-[8px] sm:text-[9px] text-[#C7977D] uppercase tracking-[0.1em] sm:tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
               <h2 className="font-serif text-base sm:text-xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
             </div>
@@ -545,8 +562,8 @@ export default function MonitorPage() {
               <div className="bg-black/40 p-2 sm:p-3 rounded-lg flex items-center justify-between border border-[#DCAE96]/10">
                 <div>
                   <p className="text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Rede: <span className="font-bold text-white">Debora_VIP</span></p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Senha: <span className="font-bold text-white">fiquelinda</span></p>
+                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
+                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
                 </div>
                 <Wifi className="text-[#C7977D] opacity-80" size={14} />
               </div>

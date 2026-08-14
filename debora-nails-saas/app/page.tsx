@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban } from 'lucide-react';
+import Image from 'next/image'; // 🛡️ Importação do Image nativo do Next.js
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
@@ -30,19 +31,18 @@ export default function LandingPage() {
   const [servicoEscolhido, setServicoEscolhido] = useState<any>(null);
   const [dataEscolhida, setDataEscolhida] = useState<Date | null>(null);
   const [horaEscolhida, setHoraEscolhida] = useState('');
-  const [clienteDados, setClienteDados] = useState({ nome: '', telefone: '' });
+  
+  const [clienteDados, setClienteDados] = useState({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
   
   const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
 
-  // NOVOS ESTADOS PARA O CÉREBRO DA AGENDA
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [configuracoes, setConfiguracoes] = useState<any>(null);
   const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
   const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
 
-  // ESTADOS DO PIX NATIVO
   const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
   const [pixId, setPixId] = useState<string | null>(null);
   const [pixManualFallback, setPixManualFallback] = useState(false);
@@ -51,9 +51,6 @@ export default function LandingPage() {
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
 
-  // ========================================================
-  // MATEMÁTICA DE HORÁRIOS (MESMA INTELIGÊNCIA DO DASHBOARD)
-  // ========================================================
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
     const [h, m] = horaStr.split(':').map(Number);
@@ -144,6 +141,10 @@ export default function LandingPage() {
     const blocksDoDia = configuracoes.bloqueios.filter((b: any) => b.data === dataStr);
 
     const slotsLivres = [];
+    const hojeStrBase = formatarDataLocalStr(new Date());
+    const isHoje = dataStr === hojeStrBase;
+    const dataAtualLocal = new Date();
+    const minutosAtualReal = dataAtualLocal.getHours() * 60 + dataAtualLocal.getMinutes();
 
     for (let minAtual = aberturaMin; minAtual <= (fechamentoMin - duracaoServicoMin); minAtual += passoIntervalo) {
       const fimMin = minAtual + duracaoServicoMin;
@@ -162,7 +163,9 @@ export default function LandingPage() {
         return (minAtual < minFim) && (fimMin > minInicio);
       });
 
-      if (!conflitoAgendamento && !conflitoBloqueio) {
+      const tempoJaPassou = isHoje && (minAtual < minutosAtualReal);
+
+      if (!conflitoAgendamento && !conflitoBloqueio && !tempoJaPassou) {
         slotsLivres.push(converterParaHoraStr(minAtual));
       }
     }
@@ -171,10 +174,6 @@ export default function LandingPage() {
     setHoraEscolhida('');
   }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
 
-
-  // ========================================================
-  // LÓGICA DE SESSÃO E PAGAMENTOS
-  // ========================================================
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -278,7 +277,7 @@ export default function LandingPage() {
     await supabase.auth.signOut();
     setUsuarioLogado(null);
     setDadosFidelidade({ atendimentos: 0, isVip: false });
-    setClienteDados({ nome: '', telefone: '' });
+    setClienteDados({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
   };
 
   const iniciarAgendamento = (servico: any = null, forceLogado = false) => {
@@ -316,9 +315,23 @@ export default function LandingPage() {
   const processarPagamento = async () => {
     setIsProcessando(true);
     
-    // 🛡️ TRAVA 1: VERIFICA SE A VAGA AINDA EXISTE ANTES DE GERAR COBRANÇA!
     if (dataEscolhida && servicoEscolhido && horaEscolhida) {
       const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
+      
+      const hojeStrBase = formatarDataLocalStr(new Date());
+      if (dataFiltroBase === hojeStrBase) {
+         const agora = new Date();
+         const minAtual = agora.getHours() * 60 + agora.getMinutes();
+         const inicioMins = converterParaMinutos(horaEscolhida);
+         if (inicioMins < minAtual) {
+           alert("🚨 Esse horário acabou de passar! Por favor, escolha um horário futuro.");
+           setIsProcessando(false);
+           setIsModalOpen(false);
+           setStep(1);
+           return;
+         }
+      }
+
       const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
       const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
       const fimDate = new Date(inicioDate);
@@ -416,7 +429,6 @@ export default function LandingPage() {
         const fimDate = new Date(inicioDate);
         fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-        // 🛡️ TRAVA 2: VERIFICAÇÃO FINAL ANTES DO INSERT (Impede clonagem exata)
         const { data: conflitoFinal } = await supabase
           .from('agendamentos')
           .select('id')
@@ -433,7 +445,9 @@ export default function LandingPage() {
           servico_id: dados.servicoEscolhido.id, 
           tipo: 'agendado', 
           inicio: inicioDate.toISOString(), 
-          fim: fimDate.toISOString()
+          fim: fimDate.toISOString(),
+          observacoes: dados.clienteDados.observacoes,
+          prefere_silencio: dados.clienteDados.prefere_silencio
         }]);
 
         if (errAgendamento) {
@@ -453,11 +467,13 @@ export default function LandingPage() {
         }]);
 
         const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
+        const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
         
-        // 👈 A MÁGICA AQUI: Puxa o texto do painel e anexa os detalhes da reserva embaixo
-        const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu agendamento.";
-        
-        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\n👤 Cliente: ${dados.clienteDados.nome}\n💅 Serviço: *${dados.servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${dados.horaEscolhida}*\n\nTe esperamos no Debora Nails Studio! ✨`;
+        const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
+        const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
+
+        // 🛡️ MENSAGEM DO WHATSAPP MAIS PROFISSIONAL
+        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\nData: ${dataFormatada} às ${dados.horaEscolhida}\n\n*Política de Cancelamento:*\nPedimos a gentileza de avisar com no mínimo 24h de antecedência em caso de imprevistos.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
           await fetch('/api/whatsapp', {
@@ -493,7 +509,7 @@ export default function LandingPage() {
 
       <nav className="fixed w-full top-0 left-0 z-[100] bg-[#0a0204]/90 backdrop-blur-xl border-b border-[#3a2522] px-5 py-3 md:px-8 md:py-4 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
-          <img src="/debora.card.PNG" alt="Logo Debora Nails" fetchPriority="high" className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
+          <Image src="/debora.card.PNG" alt="Logo Debora Nails" width={48} height={48} priority className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
           <div className="flex flex-col">
             <span className="font-serif text-[18px] md:text-[22px] text-[#E8D3C8] leading-none mb-0.5">Debora Nails</span>
             <span className="text-[8px] md:text-[10px] text-gray-400 tracking-[0.15em] uppercase font-bold">Studio de Alto Padrão</span>
@@ -565,8 +581,8 @@ export default function LandingPage() {
 
         <div className="flex-1 relative w-full max-w-md h-[500px] hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300 fill-mode-both">
           <div className="absolute top-10 right-0 w-64 glass-card neon-border rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 hover:-translate-y-2 transition-transform duration-500">
-            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)]">
-              <img src="/debora.jpg" alt="Débora" fetchPriority="high" className="w-full h-full object-cover" />
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)] relative">
+              <Image src="/debora.jpg" alt="Débora" fill priority className="object-cover" />
             </div>
             <strong className="text-[#F8D1BE] text-xl font-serif mb-1">Debora Nails Studio</strong>
             <span className="text-gray-400 text-xs uppercase tracking-widest mb-5">Beauty & Nail Design</span>
@@ -590,7 +606,9 @@ export default function LandingPage() {
       <section id="sobre" className="py-20 px-6 relative z-10">
         <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
           <div className="w-full md:w-1/3 relative group">
-            <img src="/fotonova.jpeg" alt="Debora Silva" loading="lazy" decoding="async" className="w-full rounded-2xl relative z-10 border border-[#DCAE96]/20 object-cover aspect-square md:aspect-[4/5]" />
+            <div className="w-full aspect-square md:aspect-[4/5] relative rounded-2xl overflow-hidden border border-[#DCAE96]/20 z-10">
+               <Image src="/fotonova.jpeg" alt="Debora Silva" fill className="object-cover" />
+            </div>
             <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
               <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
               <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
@@ -624,7 +642,7 @@ export default function LandingPage() {
                 className="shrink-0 w-[300px] md:w-[350px] snap-center h-[420px] rounded-3xl overflow-hidden relative cursor-pointer neon-hover transition-all duration-300 group border border-[#3a2522] shadow-xl"
               >
                 {serv.imagens && serv.imagens.length > 0 ? (
-                  <img src={serv.imagens[0]} alt={serv.nome} loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <Image src={serv.imagens[0]} alt={serv.nome} fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
                 ) : (
                   <div className="w-full h-full bg-[#120308] flex items-center justify-center"><Sparkles size={40} className="text-[#C7977D] opacity-30" /></div>
                 )}
@@ -638,7 +656,7 @@ export default function LandingPage() {
                   </div>
                 )}
 
-                <div className="absolute bottom-0 left-0 w-full p-6 flex flex-col justify-end">
+                <div className="absolute bottom-0 left-0 w-full p-6 flex flex-col justify-end z-10">
                   <h3 className="font-serif text-2xl text-white mb-2 leading-tight group-hover:text-[#F8D1BE] transition-colors">{serv.nome}</h3>
                   <p className="text-gray-300 text-sm line-clamp-3 leading-relaxed mb-4">{serv.descricao}</p>
                   
@@ -664,18 +682,18 @@ export default function LandingPage() {
 
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Nails Design</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
-            {['/01.jpg', '/vermelha.jpeg', '/02.jpg','nude-branca.jpeg','pontinho-preto.jpeg','delicada.jpeg','branca-nude.jpeg','roxa.jpeg','nude-dourada.jpeg'].map((img, i) => (
-              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer">
-                <img src={img} alt="Trabalho Debora Nails" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+            {['/01.jpg', '/vermelha.jpeg', '/02.jpg','/nude-branca.jpeg','/delicada.jpeg','/branca-nude.jpeg','/roxa.jpeg','/nude-dourada.jpeg'].map((img, i) => (
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer relative">
+                <Image src={img} alt="Trabalho Debora Nails" fill className="object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
             ))}
           </div>
 
           <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Maquiagem Profissional</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {['/make01.jpeg','/make-cadeira.jpg', '/make02.jpeg', '/make03.jpeg','make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
-              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer">
-                <img src={img} alt="Maquiagem Profissional" loading="lazy" decoding="async" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+            {['/make01.jpeg','/make-cadeira.jpg', '/make02.jpeg', '/make03.jpeg','/make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer relative">
+                <Image src={img} alt="Maquiagem Profissional" fill className="object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
             ))}
           </div>
@@ -686,16 +704,16 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
-            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group">
-               <img src="/cadeiras.png" alt="Interior do Ateliê" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group relative">
+               <Image src="/cadeiras.png" alt="Interior do Ateliê" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
                <video autoPlay loop muted playsInline className="w-full h-full object-cover">
                   <source src="/espaco.mp4" type="video/mp4" />
                </video>
             </div>
-            <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group">
-               <img src="/mesa.png" alt="Detalhe do Ateliê" loading="lazy" decoding="async" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+            <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group relative">
+               <Image src="/mesa.png" alt="Detalhe do Ateliê" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
           </div>
 
@@ -783,7 +801,7 @@ export default function LandingPage() {
             <div className="bg-[#1a0c0f] border border-[#DCAE96]/20 p-5 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] w-[280px] animate-in slide-in-from-bottom-8 duration-700 relative pointer-events-auto">
               <button onClick={() => setBubbleFechado(true)} className="absolute top-2 right-2 text-gray-500 hover:text-white transition-colors bg-[#0a0204] rounded-full p-1"><X size={14}/></button>
               <div className="flex items-center gap-3 mb-3">
-                <img src="/debora.card.PNG" className="w-12 h-12 rounded-full border border-[#DCAE96]/40 object-cover shrink-0" />
+                <Image src="/debora.card.PNG" width={48} height={48} alt="Débora" className="w-12 h-12 rounded-full border border-[#DCAE96]/40 object-cover shrink-0" />
                 <strong className="text-[#F8D1BE] text-lg font-serif">Oii! 👋🏼</strong>
               </div>
               <p className="text-xs text-gray-300 leading-relaxed font-light">Ficou com alguma dúvida ou não encontrou o horário ideal para o seu agendamento? Fale comigo pelo WhatsApp e vou te ajudar a encontrar a melhor opção para você. 💕</p>
@@ -826,7 +844,7 @@ export default function LandingPage() {
             <div className="relative h-64 bg-[#2D0A12] shrink-0">
               <button onClick={() => setServicoDetalhe(null)} className="absolute top-4 right-4 z-20 bg-black/50 text-white rounded-full p-2 hover:bg-black transition-colors"><X size={20}/></button>
               {servicoDetalhe.imagens && servicoDetalhe.imagens.length > 0 ? (
-                <img src={servicoDetalhe.imagens[0]} alt={servicoDetalhe.nome} className="w-full h-full object-cover" />
+                <Image src={servicoDetalhe.imagens[0]} alt={servicoDetalhe.nome} fill className="object-cover" />
               ) : <div className="flex items-center justify-center h-full"><Sparkles size={50} className="text-[#C7977D]" /></div>}
               <div className="absolute inset-0 bg-gradient-to-t from-[#120308] via-[#120308]/40 to-transparent"></div>
             </div>
@@ -900,7 +918,6 @@ export default function LandingPage() {
                            <p className="text-xs text-red-400">Nenhum horário livre suficiente para este serviço no dia selecionado.</p>
                          </div>
                       ) : (
-                        // 👇 AQUI APLICAMOS A BLINDAGEM RESPONSIVA!
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                           {horariosLivres.map(hora => (
                             <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
@@ -929,6 +946,22 @@ export default function LandingPage() {
                     <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Seu WhatsApp</label>
                     <input type="tel" value={clienteDados.telefone} onChange={e => setClienteDados({...clienteDados, telefone: e.target.value})} placeholder="(47) 99999-9999" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
+                  
+                  <div>
+                    <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Observações (Opcional)</label>
+                    <textarea value={clienteDados.observacoes} onChange={e => setClienteDados({...clienteDados, observacoes: e.target.value})} placeholder="Ex: Unha encravada, sensibilidade a algum produto..." className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE] resize-none h-20 custom-scrollbar"/>
+                  </div>
+                  
+                  <div className="bg-[#180A0D] border border-[#3a2522] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-[#DCAE96]/50 transition-colors" onClick={() => setClienteDados({...clienteDados, prefere_silencio: !clienteDados.prefere_silencio})}>
+                    <div>
+                      <p className="text-white text-sm font-bold flex items-center gap-2">Terapia Silenciosa 🤫</p>
+                      <p className="text-gray-500 text-[10px] mt-0.5">Prefiro um atendimento sem muita conversa para relaxar.</p>
+                    </div>
+                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${clienteDados.prefere_silencio ? 'bg-[#DCAE96]' : 'bg-[#3a2522]'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${clienteDados.prefere_silencio ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </div>
+                  </div>
+
                   <button disabled={!clienteDados.nome || !clienteDados.telefone} onClick={() => { if (calcularSinal() > 0) setStep(4); else processarPagamento(); }} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
                     {calcularSinal() > 0 ? 'Ir para Pagamento da Reserva' : 'Confirmar Agendamento'}
                   </button>
@@ -938,12 +971,9 @@ export default function LandingPage() {
                 <div className="animate-in fade-in slide-in-from-right-4">
                   
                   {pixManualFallback ? (
-                    // PLANO B: CHAVE PIX DIRETO DO BANCO DE DADOS
                     <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
                       <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Pague com a Chave PIX</h3>
-                      
                       <p className="text-gray-400 text-xs text-center mb-4">Envie o valor do sinal para a chave abaixo e clique em confirmar.</p>
-                      
                       <div className="w-full bg-[#180A0D] border border-[#3a2522] p-4 rounded-xl mb-6">
                         <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Chave ({configuracoes?.tipo_chave_pix || 'PIX'})</p>
                         <div className="flex gap-2 items-center">
@@ -951,40 +981,45 @@ export default function LandingPage() {
                           <button onClick={() => {navigator.clipboard.writeText(configuracoes?.chave_pix || ''); alert("Chave copiada!");}} className="bg-[#3a2522] text-white p-2 rounded-lg hover:bg-[#DCAE96] hover:text-black transition-colors shrink-0"><Copy size={14}/></button>
                         </div>
                       </div>
-                      
                       <button onClick={() => { processarPagamento(); setStep(5); }} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
                         <CheckCircle2 size={18}/> Já realizei o pagamento
                       </button>
                     </div>
 
                   ) : qrCodePix ? (
-                    // TELA DO PIX NATIVO AUTOMÁTICO
                     <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
                       <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Escaneie para Pagar</h3>
-                      
                       <div className="bg-white p-2 rounded-xl mb-4 shadow-[0_0_20px_rgba(0,177,234,0.3)]">
                         <img src={`data:image/jpeg;base64,${qrCodePix.base64}`} alt="QR Code PIX" className="w-48 h-48" />
                       </div>
-                      
                       <p className="text-gray-400 text-xs mb-2">Ou use o código Copia e Cola:</p>
                       <div className="w-full flex gap-2">
                          <input type="text" readOnly value={qrCodePix.copiaCola} className="w-full bg-[#180A0D] border border-[#3a2522] rounded-lg px-3 py-2 text-[10px] text-gray-500 truncate" />
                          <button onClick={() => {navigator.clipboard.writeText(qrCodePix.copiaCola); alert("PIX Copiado!");}} className="bg-[#3a2522] text-white px-3 rounded-lg text-xs font-bold hover:bg-[#DCAE96] hover:text-black transition-colors flex items-center gap-1 shrink-0"><Copy size={12}/> Copiar</button>
                       </div>
-                      
                       <div className="mt-6 flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
                          <Loader2 className="animate-spin" size={14} /> Aguardando Pagamento...
                       </div>
                     </div>
                   ) : (
-                    // TELA DE ESCOLHA DE PAGAMENTO
                     <>
-                      <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                      <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between mb-4 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
                         <div className="flex items-center gap-3">
                           <AlertCircle className="text-red-400" size={20} />
                           <div><p className="text-white font-bold text-xs">Vaga reservada temporariamente!</p><p className="text-red-300 text-[10px] mt-0.5">Pague o sinal para confirmar.</p></div>
                         </div>
                         <div className="text-lg font-mono text-red-400 font-bold bg-[#120308] px-3 py-1 rounded-lg border border-red-500/30">{formatarTempo(tempoRestante)}</div>
+                      </div>
+
+                      {/* 🛡️ CARD DE POLÍTICA DE ESTORNO */}
+                      <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-4 rounded-2xl flex items-start gap-3">
+                        <Info size={16} className="text-[#C7977D] shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[#E8D3C8] text-xs font-bold mb-1">Política de Cancelamento</p>
+                          <p className="text-gray-400 text-[10px] leading-relaxed">
+                            Ao prosseguir, você concorda que: Cancelamentos com até 48h de antecedência garantem <strong>100% de estorno</strong>. Com até 24h, o estorno é de <strong>50%</strong>. Cancelamentos no dia ou não comparecimento resultam na retenção integral do sinal para cobrir custos de agenda.
+                          </p>
+                        </div>
                       </div>
 
                       <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">

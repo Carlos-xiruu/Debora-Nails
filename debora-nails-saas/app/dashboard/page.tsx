@@ -14,27 +14,32 @@ export default function DashboardPage() {
   const [filaAgendamentos, setFilaAgendamentos] = useState<any[]>([]); 
   
   const [lucroHoje, setLucroHoje] = useState(0);
+  const [saudacao, setSaudacao] = useState('Bom dia'); 
 
   useEffect(() => {
+    const horaAtual = new Date().getHours();
+    if (horaAtual >= 12 && horaAtual < 18) {
+      setSaudacao('Boa tarde');
+    } else if (horaAtual >= 18 || horaAtual < 5) {
+      setSaudacao('Boa noite');
+    }
+
     fetchDadosHoje();
   }, []);
 
   const fetchDadosHoje = async () => {
     setIsLoading(true);
     
-    // Busca o status do Monitor (Tablet)
     const { data: sessaoData } = await supabase.from('sessao_monitor').select('*').eq('id', 1).single();
     if (sessaoData) {
       setAtendimentoEmAndamento(sessaoData.ativo);
       setSessaoMonitor(sessaoData);
     }
 
-    // Trava de Fuso Horário Local (Garante que "Hoje" é hoje no Brasil)
     const dataLocalStr = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
     const inicioDoDia = `${dataLocalStr}T00:00:00-03:00`;
     const fimDoDia = `${dataLocalStr}T23:59:59-03:00`;
 
-    // 🛡️ Note a adição do 'taxa_sinal' para evitar duplicidade de cobrança
     const { data: agendaData, error } = await supabase
       .from('agendamentos')
       .select(`id, inicio, fim, tipo, status_pagamento, clientes ( nome, telefone ), servicos ( nome, preco, taxa_sinal )`)
@@ -47,14 +52,12 @@ export default function DashboardPage() {
     if (agendaData && agendaData.length > 0) {
       setAgendamentosHoje(agendaData);
       
-      // Soma o valor total PRODUZIDO hoje (independente se o sinal caiu outro dia)
       const totalProduzido = agendaData.filter(a => a.tipo === 'concluido').reduce((acc, curr) => {
         const servicos = curr.servicos as any;
         return acc + (Number(Array.isArray(servicos) ? servicos[0]?.preco : servicos?.preco) || 0);
       }, 0);
       setLucroHoje(totalProduzido);
 
-      // Lógica de Fila Inteligente (Trava quem estiver em andamento no topo)
       const pendentes = agendaData.filter(a => a.tipo !== 'concluido');
       const emAndamento = pendentes.find(a => a.tipo === 'em_andamento');
       
@@ -82,11 +85,11 @@ export default function DashboardPage() {
     if (!agendamento) return;
     setIsLoading(true);
     
-    // Sincroniza com o painel do Monitor
+    // 🛡️ Blindado com Optional Chaining
     await supabase.from('sessao_monitor').update({
       ativo: true,
-      cliente_nome: agendamento.clientes.nome,
-      servico_nome: agendamento.servicos.nome,
+      cliente_nome: agendamento.clientes?.nome || 'Cliente não identificado',
+      servico_nome: agendamento.servicos?.nome || 'Serviço não identificado',
       inicio: new Date().toISOString(),
       status_pagamento: agendamento.status_pagamento || 'pendente' 
     }).eq('id', 1);
@@ -100,20 +103,19 @@ export default function DashboardPage() {
   const encerrarAtendimento = async () => {
     setIsLoading(true);
     
-    // Desliga a tela do Monitor
     await supabase.from('sessao_monitor').update({ ativo: false }).eq('id', 1);
 
     if (proximoAgendamento && proximoAgendamento.tipo === 'em_andamento') {
       
-      // 🛡️ LÓGICA FINANCEIRA BLINDADA (Calcula se falta pagar algo)
       if (proximoAgendamento.status_pagamento !== 'pago') {
-        const precoServico = Number(proximoAgendamento.servicos.preco);
-        const taxaSinal = Number(proximoAgendamento.servicos.taxa_sinal || 0);
+        // 🛡️ Blindado com Optional Chaining
+        const precoServico = Number(proximoAgendamento.servicos?.preco || 0);
+        const taxaSinal = Number(proximoAgendamento.servicos?.taxa_sinal || 0);
         const valorRestante = precoServico - (precoServico * (taxaSinal / 100));
 
         if (valorRestante > 0) {
           await supabase.from('transacoes').insert([{
-            descricao: `Atendimento (Manual): ${proximoAgendamento.clientes.nome} - ${proximoAgendamento.servicos.nome}`,
+            descricao: `Atendimento (Manual): ${proximoAgendamento.clientes?.nome || 'Cliente'} - ${proximoAgendamento.servicos?.nome || 'Serviço'}`,
             tipo: 'entrada',
             valor: valorRestante,
             categoria: 'Atendimento'
@@ -121,7 +123,6 @@ export default function DashboardPage() {
         }
       }
 
-      // Conclui o agendamento e marca como pago integralmente
       await supabase.from('agendamentos').update({ 
         tipo: 'concluido',
         status_pagamento: 'pago' 
@@ -135,7 +136,7 @@ export default function DashboardPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="mb-8">
-        <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><LayoutDashboard className="text-[#C7977D]" size={28} /> Bom dia, Débora!</h1>
+        <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><LayoutDashboard className="text-[#C7977D]" size={28} /> {saudacao}, Débora!</h1>
         <p className="text-[#E8D3C8]">Aqui está a sua fila de produção para hoje.</p>
       </div>
 
@@ -158,7 +159,6 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* O AGENDAMENTO ATUAL / PRÓXIMO EM DESTAQUE */}
           {proximoAgendamento || atendimentoEmAndamento ? (
             <div className={`border p-8 rounded-2xl flex flex-col md:flex-row justify-between items-center gap-6 mb-10 transition-all duration-500 ${atendimentoEmAndamento ? 'bg-gradient-to-br from-[#120308] to-[#0A1A12] border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.15)]' : 'bg-[#120308] border-[#DCAE96]/30 shadow-xl'}`}>
               <div className="w-full md:w-auto text-center md:text-left flex flex-col items-center md:items-start">
@@ -166,14 +166,16 @@ export default function DashboardPage() {
                   {atendimentoEmAndamento || proximoAgendamento?.tipo === 'em_andamento' ? 'Em Atendimento Agora' : 'Próximo Atendimento'}
                 </span>
                 <h2 className="font-serif text-3xl md:text-4xl text-white mt-5 mb-3">
-                  {atendimentoEmAndamento && !proximoAgendamento ? sessaoMonitor?.cliente_nome : proximoAgendamento?.clientes?.nome}
+                  {/* 🛡️ Blindado */}
+                  {atendimentoEmAndamento && !proximoAgendamento ? sessaoMonitor?.cliente_nome : proximoAgendamento?.clientes?.nome || 'Cliente Desconhecido'}
                 </h2>
                 <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-6 text-[#E8D3C8] text-sm bg-black/40 px-4 py-2 rounded-xl border border-[#DCAE96]/10">
                   {proximoAgendamento ? (
                     <>
                       <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {new Date(proximoAgendamento.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span>
                       <span className="hidden sm:block text-gray-600">|</span>
-                      <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {proximoAgendamento.servicos.nome}</span>
+                      {/* 🛡️ Blindado */}
+                      <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {proximoAgendamento.servicos?.nome || 'Serviço excluído'}</span>
                     </>
                   ) : (
                     <span className="flex items-center gap-2"><Scissors size={16} className="text-[#C7977D]"/> {sessaoMonitor?.servico_nome} (Finalize para liberar)</span>
@@ -195,7 +197,6 @@ export default function DashboardPage() {
              <div className="bg-[#120308]/60 border border-[#DCAE96]/20 p-8 rounded-2xl text-center mb-10"><p className="text-[#E8D3C8]">Nenhum agendamento pendente para hoje.</p></div>
           )}
 
-          {/* LISTA DA FILA DE HOJE */}
           {filaAgendamentos.length > 0 && (
             <div>
               <h3 className="font-serif text-xl text-[#F8D1BE] mb-4 border-b border-[#DCAE96]/10 pb-2">Restante da Fila de Hoje</h3>
@@ -207,12 +208,12 @@ export default function DashboardPage() {
                         <span className="text-[#F8D1BE] font-serif text-lg leading-none">{new Date(agendamento.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span>
                       </div>
                       <div className="min-w-0">
-                        <p className="text-white font-bold text-sm flex items-center gap-2 mb-1 truncate"><User size={14} className="text-[#C7977D] shrink-0"/> {agendamento.clientes?.nome}</p>
-                        <p className="text-gray-400 text-xs flex items-center gap-2 truncate"><Scissors size={12} className="shrink-0"/> {agendamento.servicos?.nome}</p>
+                        {/* 🛡️ Blindado */}
+                        <p className="text-white font-bold text-sm flex items-center gap-2 mb-1 truncate"><User size={14} className="text-[#C7977D] shrink-0"/> {agendamento.clientes?.nome || 'Cliente'}</p>
+                        <p className="text-gray-400 text-xs flex items-center gap-2 truncate"><Scissors size={12} className="shrink-0"/> {agendamento.servicos?.nome || 'Serviço'}</p>
                       </div>
                     </div>
                     
-                    {/* Botão de Cortesia para iniciar um fora de ordem */}
                     {!atendimentoEmAndamento && (
                       <button 
                         onClick={() => iniciarAtendimento(agendamento)} 

@@ -16,6 +16,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificacaoOpen, setIsNotificacaoOpen] = useState(false); 
+  const [isMobile, setIsMobile] = useState(true); // 🛡️ Nova trava de segurança para o servidor
   
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [temNaoLida, setTemNaoLida] = useState(false);
@@ -26,9 +27,21 @@ export default function DashboardClientLayout({ children }: { children: React.Re
 
   const EMAIL_ADMIN = 'debora199917silva@gmail.com';
 
+  // 🛡️ Novo useEffect exclusivo para monitorar o tamanho da tela de forma segura
   useEffect(() => {
-    if (window.innerWidth > 768) setIsSidebarOpen(true);
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (!mobile) setIsSidebarOpen(true);
+    };
 
+    handleResize(); // Executa na primeira vez que abre
+    window.addEventListener('resize', handleResize); // Fica monitorando se virar a tela
+
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
       setDeferredPrompt(e);
@@ -141,7 +154,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
         }`}
       >
         <div className="h-16 flex items-center justify-between px-4 border-b border-[#DCAE96]/20 shrink-0">
-          {(isSidebarOpen || window.innerWidth <= 768) && (
+          {(isSidebarOpen || isMobile) && (
             <div className="overflow-hidden whitespace-nowrap animate-in fade-in">
               <h2 className="font-serif text-2xl text-[#F8D1BE] drop-shadow-[0_0_10px_rgba(248,209,190,0.4)]">
                 Debora Nails
@@ -163,7 +176,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
               <Link 
                 key={item.name} 
                 href={item.path}
-                onClick={() => window.innerWidth <= 768 && setIsSidebarOpen(false)} 
+                onClick={() => isMobile && setIsSidebarOpen(false)} 
                 className={`flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-300 ${
                   isActive 
                     ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] shadow-[0_0_15px_rgba(248,209,190,0.4)] font-bold' 
@@ -172,7 +185,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
                 title={!isSidebarOpen ? item.name : ''}
               >
                 <item.icon size={22} className="shrink-0" />
-                {(isSidebarOpen || window.innerWidth <= 768) && <span className="whitespace-nowrap">{item.name}</span>}
+                {(isSidebarOpen || isMobile) && <span className="whitespace-nowrap">{item.name}</span>}
               </Link>
             );
           })}
@@ -185,7 +198,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
             title={!isSidebarOpen ? 'Sair do Sistema' : ''}
           >
             <LogOut size={22} className="shrink-0" />
-            {(isSidebarOpen || window.innerWidth <= 768) && <span className="whitespace-nowrap font-medium">Sair do Sistema</span>}
+            {(isSidebarOpen || isMobile) && <span className="whitespace-nowrap font-medium">Sair do Sistema</span>}
           </button>
         </div>
       </aside>

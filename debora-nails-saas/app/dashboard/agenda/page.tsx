@@ -101,6 +101,10 @@ export default function AgendaPage() {
 
   const timelineItems: any[] = [];
   
+  const isHoje = dataFiltro === dataHojeLocal;
+  const dataAtualParaTrava = new Date();
+  const minutosAtualReal = dataAtualParaTrava.getHours() * 60 + dataAtualParaTrava.getMinutes();
+
   if (regraDoDia?.ativo) {
     const aberturaMin = converterParaMinutos(regraDoDia.abertura);
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
@@ -124,12 +128,16 @@ export default function AgendaPage() {
       });
 
       if (!ocupadoPorAgendamento && !ocupadoPorBloqueio) {
-        timelineItems.push({
-          id: `livre-${horaCheck}`,
-          inicio: new Date(`${dataFiltro}T${horaCheck}:00-03:00`).toISOString(),
-          isLivre: true,
-          horaFormatada: horaCheck
-        });
+        const tempoJaPassou = isHoje && (minutoAtual < minutosAtualReal);
+
+        if (!tempoJaPassou) {
+          timelineItems.push({
+            id: `livre-${horaCheck}`,
+            inicio: new Date(`${dataFiltro}T${horaCheck}:00-03:00`).toISOString(),
+            isLivre: true,
+            horaFormatada: horaCheck
+          });
+        }
       }
     }
   }
@@ -159,7 +167,6 @@ export default function AgendaPage() {
     return true;
   });
 
-  // 🛡️ A FUNÇÃO DE CRIAR AGENDAMENTO AGORA ESTÁ BLINDADA
   const handleCriarAgendamento = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -173,15 +180,22 @@ export default function AgendaPage() {
     const duracaoMins = extrairMinutosDuracao(servicoInfo?.duracao);
     const inicioMins = converterParaMinutos(horaEscolhida);
     const fimAtendimentoMin = inicioMins + duracaoMins;
+
+    if (dataEscolhida === dataHojeLocal) {
+      const agora = new Date();
+      const minAtual = agora.getHours() * 60 + agora.getMinutes();
+      if (inicioMins < minAtual) {
+        alert("🚨 Você não pode agendar um serviço em um horário que já passou hoje!");
+        setIsSaving(false); return;
+      }
+    }
     
-    // Verifica se extrapola o fechamento
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
     if (fimAtendimentoMin > fechamentoMin) {
       alert(`Erro: O serviço demora ${servicoInfo.duracao}. Se começar às ${horaEscolhida}, passará do horário de fechamento (${regraDoDia.fechamento}).`);
       setIsSaving(false); return;
     }
 
-    // Verifica sobreposição com Bloqueios Manuais
     const conflitoBloqueio = configuracoes.bloqueios.some((b: any) => {
         if (b.data !== dataEscolhida) return false;
         const bInicio = converterParaMinutos(b.inicio);
@@ -198,7 +212,6 @@ export default function AgendaPage() {
     const dataFim = new Date(dataInicio); 
     dataFim.setMinutes(dataFim.getMinutes() + duracaoMins); 
 
-    // Verifica sobreposição no Banco de Dados (Race Condition)
     const { data: conflitoDb } = await supabase
       .from('agendamentos')
       .select('id')
@@ -231,7 +244,6 @@ export default function AgendaPage() {
     setIsSaving(false);
   };
 
-  // 🛡️ A EDIÇÃO AGORA VERIFICA CONFLITOS IGNORANDO A SI MESMA
   const handleEditarAgendamento = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
@@ -243,12 +255,20 @@ export default function AgendaPage() {
     
     const inicioMins = converterParaMinutos(novaHora);
     const fimAtendimentoMin = inicioMins + duracaoMins;
+
+    if (novaData === dataHojeLocal) {
+      const agora = new Date();
+      const minAtual = agora.getHours() * 60 + agora.getMinutes();
+      if (inicioMins < minAtual) {
+        alert("🚨 Você não pode remarcar para um horário que já passou hoje!");
+        setIsSaving(false); return;
+      }
+    }
     
     const dataInicio = new Date(`${novaData}T${novaHora}:00-03:00`);
     const dataFim = new Date(dataInicio); 
     dataFim.setMinutes(dataFim.getMinutes() + duracaoMins); 
 
-    // Verifica bloqueios locais
     const conflitoBloqueio = configuracoes.bloqueios.some((b: any) => {
         if (b.data !== novaData) return false;
         const bInicio = converterParaMinutos(b.inicio);
@@ -261,7 +281,6 @@ export default function AgendaPage() {
         setIsSaving(false); return;
     }
 
-    // Verifica conflito no banco (ignorando o agendamento atual)
     const { data: conflitoDb } = await supabase
       .from('agendamentos')
       .select('id')
@@ -433,13 +452,14 @@ export default function AgendaPage() {
         )}
       </div>
 
-      {/* MODAL CONFIGURAÇÃO (DISPONIBILIDADE E BLOQUEIOS) */}
+      {/* 🛡️ CORREÇÃO DO MODAL DE CONFIGURAÇÃO (Agora com rolagem nativa e Z-index absoluto) */}
       {isDisponibilidadeOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 flex flex-col max-h-[90dvh]">
+            
+            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Settings size={20}/> Configurar Agenda</h2>
-              <button onClick={() => setIsDisponibilidadeOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setIsDisponibilidadeOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
             
             <div className="flex bg-[#180A0D] border-b border-[#DCAE96]/20 p-2 gap-2 shrink-0">
@@ -447,8 +467,8 @@ export default function AgendaPage() {
               <button onClick={() => setAbaConfig('bloqueios')} className={`flex-1 py-3 rounded-lg text-sm font-bold transition-all ${abaConfig === 'bloqueios' ? 'bg-[#2D0A12] text-[#F8D1BE] border border-[#DCAE96]/30' : 'text-gray-500 hover:text-gray-300'}`}>Bloqueios Específicos</button>
             </div>
 
-            <form onSubmit={handleSalvarDisponibilidade} className="flex flex-col overflow-hidden">
-              <div className="p-6 md:p-8 space-y-6 overflow-y-auto custom-scrollbar flex-1">
+            <form onSubmit={handleSalvarDisponibilidade} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 md:p-8 space-y-6 overflow-y-auto custom-scrollbar">
                 
                 {abaConfig === 'horarios' && (
                   <div className="space-y-4">
@@ -504,7 +524,7 @@ export default function AgendaPage() {
                   </div>
                 )}
               </div>
-              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
                 <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-3 rounded-xl font-bold hover:scale-[1.02] transition-transform flex justify-center items-center gap-2">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20}/> Salvar Definitivamente no Banco</>}
                 </button>
@@ -514,16 +534,16 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* MODAL NOVO AGENDAMENTO MANUAL */}
+      {/* 🛡️ CORREÇÃO MODAL NOVO AGENDAMENTO MANUAL */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[50] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-lg overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-lg shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 flex flex-col max-h-[90dvh]">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><CalendarDays size={20}/> Agendar Horário</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
-            <form onSubmit={handleCriarAgendamento} className="flex flex-col overflow-hidden">
-              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar flex-1">
+            <form onSubmit={handleCriarAgendamento} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                 <div className="flex bg-[#2D0A12] p-1 rounded-xl border border-[#DCAE96]/20">
                   <button type="button" onClick={() => setAbaCliente('existente')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${abaCliente === 'existente' ? 'bg-[#DCAE96]/20 text-[#F8D1BE]' : 'text-gray-400'}`}>Cadastrada</button>
                   <button type="button" onClick={() => setAbaCliente('nova')} className={`flex-1 py-2 text-sm font-medium rounded-lg ${abaCliente === 'nova' ? 'bg-[#DCAE96]/20 text-[#F8D1BE]' : 'text-gray-400'}`}>Nova Cliente</button>
@@ -552,7 +572,7 @@ export default function AgendaPage() {
                   <option value="pago">Já foi Pago (Adiantado)</option>
                 </select>
               </div>
-              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
                 <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20}/> Salvar na Agenda</>}
                 </button>
@@ -562,13 +582,13 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* MODAL DETALHES */}
+      {/* 🛡️ CORREÇÃO MODAL DETALHES */}
       {detalhesAgendamento && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95">
-            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE]">Detalhes da Sessão</h2>
-              <button onClick={() => setDetalhesAgendamento(null)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setDetalhesAgendamento(null)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
             <div className="p-6 space-y-4">
               <div><p className="text-xs text-gray-400">Cliente</p><p className="text-lg font-bold text-white">{detalhesAgendamento.clientes?.nome}</p></div>
@@ -583,16 +603,16 @@ export default function AgendaPage() {
         </div>
       )}
 
-      {/* MODAL EDIÇÃO/REMARCAÇÃO */}
+      {/* 🛡️ CORREÇÃO MODAL EDIÇÃO/REMARCAÇÃO */}
       {agendamentoEditando && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95">
-            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-sm shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90dvh]">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Edit size={20}/> Remarcar</h2>
-              <button onClick={() => setAgendamentoEditando(null)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setAgendamentoEditando(null)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
-            <form onSubmit={handleEditarAgendamento}>
-              <div className="p-6 space-y-5">
+            <form onSubmit={handleEditarAgendamento} className="flex flex-col flex-1 overflow-hidden">
+              <div className="p-6 space-y-5 overflow-y-auto custom-scrollbar">
                 <label className="block">
                   <span className="text-xs text-gray-400">Nova Data</span>
                   <input type="date" name="data" defaultValue={new Date(agendamentoEditando.inicio).toISOString().split('T')[0]} required className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
@@ -606,7 +626,7 @@ export default function AgendaPage() {
                   <select name="status_pagamento" defaultValue={agendamentoEditando.status_pagamento || 'pendente'} className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:border-[#F8D1BE] outline-none"><option value="pendente">Pendente</option><option value="pago">Pago</option></select>
                 </label>
               </div>
-              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20">
+              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
                 <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform">
                    {isSaving ? <Loader2 className="animate-spin" size={20} /> : <><Save size={20}/> Salvar Alterações</>}
                 </button>
