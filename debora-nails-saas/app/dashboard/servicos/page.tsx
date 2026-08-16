@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react';
+import Image from 'next/image'; // 🛡️ Importação para Otimização de Imagens
 import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert, Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase'; // Caminho padronizado
+import { supabase } from '../../lib/supabase';
 
 const imagensDisponiveis = [
   '/01.jpg', '/02.jpg', '/03.jpg', 
@@ -73,10 +74,10 @@ export default function ServicosPage() {
     const formData = new FormData(e.target as HTMLFormElement);
     
     // Tratamento de vírgula brasileira para cálculo seguro
-    const precoRaw = formData.get('preco') as string;
+    const precoRaw = (formData.get('preco') as string) || '0';
     const precoCalc = parseFloat(precoRaw.replace(',', '.'));
     
-    const taxaSinal = parseInt(formData.get('taxa_sinal') as string);
+    const taxaSinal = parseInt((formData.get('taxa_sinal') as string) || '0');
     const valorSinal = precoCalc * (taxaSinal / 100);
     const sinalCalc = taxaSinal > 0 ? `${taxaSinal}% (R$ ${valorSinal.toFixed(2).replace('.', ',')})` : 'Não exigido';
 
@@ -118,7 +119,6 @@ export default function ServicosPage() {
     const { error } = await supabase.from('servicos').delete().eq('id', id);
     
     if (error) {
-      // Intercepta erro de Foreign Key (Código 23503 do PostgreSQL)
       if (error.code === '23503') {
         alert("⚠️ ATENÇÃO: Você não pode excluir este serviço porque ele já está vinculado a agendamentos ou ao histórico financeiro do sistema. \n\nEm vez de excluí-lo, recomendamos usar o botão 'Desativar' para que ele não apareça mais para os clientes.");
       } else {
@@ -160,14 +160,15 @@ export default function ServicosPage() {
                 <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
                   <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
                     {fotos.length > 0 ? (
-                      <img src={fotos[0]} alt={servico.nome} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                      // 🛡️ Imagem ultra otimizada com a tag nativa Image
+                      <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
-                    <div className="absolute top-4 right-4">
+                    <div className="absolute top-4 right-4 z-10">
                       {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
                     </div>
                   </div>
 
-                  <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col">
+                  <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
                     <h3 className={`text-2xl font-serif mb-2 ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
                     <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
                     
@@ -194,15 +195,17 @@ export default function ServicosPage() {
         </div>
       )}
 
+      {/* 🛡️ Z-INDEX 999 E SCROLL SEGURO NO MODAL DE SERVIÇOS */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90vh]">
-            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90dvh]">
+            
+            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Sparkles size={20}/> {servicoEditando ? 'Editar Serviço' : 'Novo Serviço'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
             
-            <form onSubmit={handleSalvarServico} className="flex flex-col overflow-hidden">
+            <form onSubmit={handleSalvarServico} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar space-y-6 flex-1">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
@@ -257,8 +260,8 @@ export default function ServicosPage() {
                       <div className="flex flex-wrap gap-2">
                         {imagensSelecionadas.map((imgUrl, idx) => (
                           <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#C7977D] shadow-lg">
-                            <img src={imgUrl} className="w-full h-full object-cover" />
-                            <button type="button" onClick={() => setImagensSelecionadas(imagensSelecionadas.filter(i => i !== imgUrl))} className="absolute top-0 right-0 bg-red-600/90 text-white p-1 rounded-bl-lg hover:bg-red-500 transition-colors">
+                            <Image src={imgUrl} alt="Upload" fill sizes="64px" className="object-cover" />
+                            <button type="button" onClick={() => setImagensSelecionadas(imagensSelecionadas.filter(i => i !== imgUrl))} className="absolute top-0 right-0 z-10 bg-red-600/90 text-white p-1 rounded-bl-lg hover:bg-red-500 transition-colors">
                               <X size={10} />
                             </button>
                           </div>
@@ -271,14 +274,14 @@ export default function ServicosPage() {
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
                     {imagensDisponiveis.map((img) => (
                       <div key={img} onClick={() => toggleImagem(img)} className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${imagensSelecionadas.includes(img) ? 'border-[#C7977D] scale-95 shadow-[0_0_15px_rgba(199,151,125,0.4)]' : 'border-transparent opacity-50 hover:opacity-80'}`}>
-                        <img src={img} className="w-full h-full object-cover" />
-                        {imagensSelecionadas.includes(img) && <div className="absolute inset-0 bg-[#120308]/60 flex items-center justify-center backdrop-blur-[1px]"><CheckCircle2 size={28} className="text-[#F8D1BE] drop-shadow-md" /></div>}
+                        <Image src={img} alt="Padrão" fill sizes="100px" className="object-cover" />
+                        {imagensSelecionadas.includes(img) && <div className="absolute inset-0 z-10 bg-[#120308]/60 flex items-center justify-center backdrop-blur-[1px]"><CheckCircle2 size={28} className="text-[#F8D1BE] drop-shadow-md" /></div>}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
-              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
                 <button type="submit" disabled={isSaving || isUploading} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform shadow-lg disabled:opacity-50">
                   {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Serviço'}
                 </button>

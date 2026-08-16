@@ -48,7 +48,6 @@ export default function MonitorPage() {
     { bg: '/nude-dourada.jpeg', tipo: 'intro' }
   ];
 
-  // ESTADOS DO NOVO CÉREBRO DE AGENDAMENTO
   const [configuracoes, setConfiguracoes] = useState<any>(null);
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
@@ -63,9 +62,6 @@ export default function MonitorPage() {
   const [qrCodeAgendamento, setQrCodeAgendamento] = useState<string | null>(null);
   const [pixIdAgendamento, setPixIdAgendamento] = useState<string | null>(null);
 
-  // ==========================================
-  // FUNÇÕES MATEMÁTICAS DA AGENDA
-  // ==========================================
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
     const [h, m] = horaStr.split(':').map(Number);
@@ -93,9 +89,6 @@ export default function MonitorPage() {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   };
 
-  // ==========================================
-  // EFEITOS INICIAIS E RELÓGIO
-  // ==========================================
   useEffect(() => {
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -185,7 +178,6 @@ export default function MonitorPage() {
     return () => { supabase.removeChannel(canal); };
   }, []);
 
-  // DIAS E HORÁRIOS DISPONÍVEIS
   useEffect(() => {
     if (!configuracoes) return;
     const dias = [];
@@ -238,7 +230,6 @@ export default function MonitorPage() {
   }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
 
 
-  // TEMPO DECORRIDO DA SESSÃO ATUAL
   useEffect(() => {
     let cronometro: NodeJS.Timeout;
     if (atendimentoAtivo && sessaoData?.inicio) {
@@ -253,7 +244,6 @@ export default function MonitorPage() {
     return () => clearInterval(cronometro);
   }, [atendimentoAtivo, sessaoData]);
 
-  // ROTATIVIDADE DOS SLIDES COM TEMPO MAIOR (10s)
   useEffect(() => {
     let carrossel: NodeJS.Timeout;
     if (!atendimentoAtivo) {
@@ -263,9 +253,6 @@ export default function MonitorPage() {
   }, [atendimentoAtivo, slides.length]);
 
 
-  // ==========================================
-  // LÓGICA DE PAGAMENTO FINAL (O RESTANTE)
-  // ==========================================
   const precoTotal = dadosServicoSessao?.preco || 0;
   const taxaSinal = dadosServicoSessao?.taxa_sinal || 0;
   const valorRestante = precoTotal - (precoTotal * (taxaSinal / 100));
@@ -328,9 +315,6 @@ export default function MonitorPage() {
   }, [pagamentoMercadoPagoId, statusPagamento, sessaoData, valorRestante]);
 
 
-  // ==========================================
-  // LÓGICA DE NOVO AGENDAMENTO (O SINAL)
-  // ==========================================
   const iniciarProcessoAgendamento = async () => {
     if (!servicoEscolhido || !dataEscolhida || !horaEscolhida) return;
     setIsProcessandoAgendamento(true);
@@ -457,18 +441,21 @@ export default function MonitorPage() {
       {!atendimentoAtivo && (
         <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           
-          {/* 🛡️ RENDERIZADOR DE SLIDES (O EFEITO CINEMÁTICO DE DESFOQUE) */}
+          {/* 🛡️ RENDERIZADOR DE SLIDES (VOLTAMOS PARA OS 3 VÍDEOS COM PRELOAD) */}
           {slides.map((slide, idx) => {
             if (slide.tipo === 'video') {
               return (
-                <div key={idx} className="absolute inset-0 flex items-center justify-center overflow-hidden" style={{ opacity: idx === imagemAtualIndex ? 0.7 : 0, transition: 'opacity 2s ease-in-out' }}>
-                  
-                  {/* Fundo Desfocado (Preenche as laterais sem distorcer) */}
-                  <video src={slide.bg} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover blur-[80px] scale-125 opacity-50" />
-                  
-                  {/* Vídeo Principal (No centro, focado e nítido) */}
-                  <video src={slide.bg} autoPlay loop muted playsInline className="relative z-10 h-[90%] w-auto max-w-full object-contain rounded-2xl shadow-[0_0_60px_rgba(0,0,0,0.8)] border border-[#DCAE96]/30" />
-                  
+                <div key={idx} className="absolute inset-0 flex gap-2 sm:gap-4 p-2 sm:p-4" style={{ opacity: idx === imagemAtualIndex ? 0.4 : 0, transition: 'opacity 2s ease-in-out' }}>
+                  {/* Tríptico: 3 Colunas com preload="auto" para carregar junto e evitar engasgos */}
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl">
+                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden sm:block">
+                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden md:block">
+                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
+                  </div>
                 </div>
               );
             }

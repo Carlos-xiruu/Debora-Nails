@@ -16,7 +16,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNotificacaoOpen, setIsNotificacaoOpen] = useState(false); 
-  const [isMobile, setIsMobile] = useState(true); // 🛡️ Nova trava de segurança para o servidor
+  const [isMobile, setIsMobile] = useState(true); 
   
   const [notificacoes, setNotificacoes] = useState<any[]>([]);
   const [temNaoLida, setTemNaoLida] = useState(false);
@@ -27,7 +27,6 @@ export default function DashboardClientLayout({ children }: { children: React.Re
 
   const EMAIL_ADMIN = 'debora199917silva@gmail.com';
 
-  // 🛡️ Novo useEffect exclusivo para monitorar o tamanho da tela de forma segura
   useEffect(() => {
     const handleResize = () => {
       const mobile = window.innerWidth <= 768;
@@ -35,8 +34,8 @@ export default function DashboardClientLayout({ children }: { children: React.Re
       if (!mobile) setIsSidebarOpen(true);
     };
 
-    handleResize(); // Executa na primeira vez que abre
-    window.addEventListener('resize', handleResize); // Fica monitorando se virar a tela
+    handleResize(); 
+    window.addEventListener('resize', handleResize); 
 
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -146,7 +145,6 @@ export default function DashboardClientLayout({ children }: { children: React.Re
         />
       )}
 
-      {/* 🛡️ TRAVA NATIVA: paddingTop via style garante que a Safe Area seja respeitada sempre */}
       <aside 
         style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)', paddingBottom: 'max(env(safe-area-inset-bottom), 16px)' }}
         className={`fixed inset-y-0 left-0 h-[100dvh] border-r border-[#DCAE96]/20 bg-[#2D0A12]/95 backdrop-blur-xl flex flex-col transition-transform duration-300 z-50 md:translate-x-0 ${
@@ -205,10 +203,10 @@ export default function DashboardClientLayout({ children }: { children: React.Re
 
       <main className={`flex-1 flex flex-col h-[100dvh] overflow-hidden transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-20'}`}>
         
-        {/* 🛡️ TRAVA NATIVA: Forçando a margem do topo com inline-style */}
+        {/* 🛡️ Restauração do z-30 no Header para ele não conflitar com a caixa vazia */}
         <header 
           style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
-          className="min-h-[5rem] shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 bg-[#120308]/90 backdrop-blur-md md:bg-transparent"
+          className="min-h-[5rem] shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 z-30 bg-[#120308]/90 backdrop-blur-md md:bg-transparent"
         >
           <div className="flex items-center">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-[#E8D3C8] hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 rounded-lg -ml-2 transition-colors">
@@ -216,7 +214,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
             </button>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4 relative z-50">
+          <div className="flex items-center gap-2 sm:gap-4 relative">
             {deferredPrompt && (
               <button onClick={handleInstallClick} className="flex items-center gap-1.5 sm:gap-2 bg-[#00B1EA] text-white px-3 sm:px-4 py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-[0_0_15px_rgba(0,177,234,0.4)] animate-pulse hover:scale-105 transition-transform">
                 <Download size={16} className="shrink-0" /> <span className="hidden sm:inline">Instalar App</span>
@@ -275,10 +273,10 @@ export default function DashboardClientLayout({ children }: { children: React.Re
           </div>
         </header>
         
-        {/* 🛡️ TRAVA NATIVA: Protegendo o scroll no final da página */}
+        {/* 🛡️ REMOVIDA A TRAVA "relative z-10" AQUI (Os modais agora podem crescer por cima do header) */}
         <div 
           style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 40px)' }}
-          className="flex-1 overflow-y-auto p-4 md:p-8 pt-2 md:pt-2 custom-scrollbar relative z-10"
+          className="flex-1 overflow-y-auto p-4 md:p-8 pt-2 md:pt-2 custom-scrollbar"
         >
           {children}
         </div>
