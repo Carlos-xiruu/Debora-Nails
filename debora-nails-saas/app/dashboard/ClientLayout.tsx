@@ -208,7 +208,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
         {/* 🛡️ TRAVA NATIVA: Forçando a margem do topo com inline-style */}
         <header 
           style={{ paddingTop: 'max(env(safe-area-inset-top), 16px)' }}
-          className="min-h-[5rem] shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 z-30 bg-[#120308]/90 backdrop-blur-md md:bg-transparent"
+          className="min-h-[5rem] shrink-0 flex items-center justify-between px-4 md:px-8 border-b md:border-none border-[#DCAE96]/20 sticky top-0 bg-[#120308]/90 backdrop-blur-md md:bg-transparent"
         >
           <div className="flex items-center">
             <button onClick={() => setIsSidebarOpen(true)} className="md:hidden p-2 text-[#E8D3C8] hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 rounded-lg -ml-2 transition-colors">
@@ -216,7 +216,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
             </button>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4 relative">
+          <div className="flex items-center gap-2 sm:gap-4 relative z-50">
             {deferredPrompt && (
               <button onClick={handleInstallClick} className="flex items-center gap-1.5 sm:gap-2 bg-[#00B1EA] text-white px-3 sm:px-4 py-2 rounded-full text-[10px] sm:text-xs font-bold shadow-[0_0_15px_rgba(0,177,234,0.4)] animate-pulse hover:scale-105 transition-transform">
                 <Download size={16} className="shrink-0" /> <span className="hidden sm:inline">Instalar App</span>
@@ -236,7 +236,7 @@ export default function DashboardClientLayout({ children }: { children: React.Re
               </button>
 
               {isNotificacaoOpen && (
-                <div className="absolute right-0 mt-3 w-[90vw] sm:w-80 max-w-sm bg-[#120308]/95 backdrop-blur-xl border border-[#DCAE96]/30 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-50 animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
+                <div className="absolute right-0 mt-3 w-[90vw] sm:w-80 max-w-sm bg-[#120308]/95 backdrop-blur-xl border border-[#DCAE96]/30 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden z-[100] animate-in fade-in slide-in-from-top-4 duration-200 origin-top-right">
                   <div className="p-4 border-b border-[#DCAE96]/20 flex justify-between items-center bg-[#2D0A12]/80">
                     <h3 className="font-serif text-[#F8D1BE] text-lg">Notificações</h3>
                     <button onClick={marcarComoLidas} className="text-[10px] text-gray-400 hover:text-white uppercase tracking-wider font-bold transition-colors">Marcar Lidas</button>

@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image'; // 🛡️ Importação do Image nativo do Next.js
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info } from 'lucide-react';
+import Image from 'next/image'; 
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
@@ -15,6 +15,49 @@ const DISPONIBILIDADE_PADRAO = {
   4: { ativo: true, abertura: '10:00', fechamento: '20:00' },
   5: { ativo: true, abertura: '08:00', fechamento: '18:00' },
   6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
+};
+
+// 🛡️ NOVO COMPONENTE: Slider de Antes e Depois Premium
+const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisSrc: string }) => {
+  const [posicao, setPosicao] = useState(50);
+
+  return (
+    <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden group border border-[#DCAE96]/20 select-none shadow-xl">
+      {/* Imagem do Antes (Fundo) */}
+      <Image src={antesSrc} alt="Antes" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
+
+      {/* Imagem do Depois (Corte dinâmico por cima) */}
+      <div 
+        className="absolute inset-0 z-10 pointer-events-none"
+        style={{ clipPath: `polygon(0 0, ${posicao}% 0, ${posicao}% 100%, 0 100%)` }}
+      >
+        <Image src={depoisSrc} alt="Depois" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
+      </div>
+
+      {/* Linha e Puxador do Slider */}
+      <div 
+        className="absolute top-0 bottom-0 z-20 w-[2px] bg-white cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.8)] pointer-events-none"
+        style={{ left: `calc(${posicao}% - 1px)` }}
+      >
+        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-200">
+          <div className="flex gap-0.5">
+            <ChevronLeft size={14} className="text-[#C7977D]" />
+            <ChevronRight size={14} className="text-[#C7977D]" />
+          </div>
+        </div>
+      </div>
+
+      {/* Input invisível que controla a mágica (Funciona perfeito em Touch e Mouse) */}
+      <input 
+        type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))}
+        className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize"
+      />
+      
+      {/* Badges */}
+      <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
+      <div className="absolute top-4 right-4 z-20 bg-[#DCAE96]/80 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
+    </div>
+  );
 };
 
 export default function LandingPage() {
@@ -205,7 +248,7 @@ export default function LandingPage() {
     verificarSessaoEIntencao();
   }, [router]);
 
- useEffect(() => {
+  useEffect(() => {
     setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const statusPagamento = params.get('pagamento');
@@ -213,19 +256,23 @@ export default function LandingPage() {
       if (statusPagamento === 'sucesso') {
         const reservaSalva = localStorage.getItem('reserva_temp_debora');
         if (reservaSalva) {
-          const dados = JSON.parse(reservaSalva);
-          
-          setServicoEscolhido(dados.servicoEscolhido);
-          setDataEscolhida(new Date(dados.dataEscolhida));
-          setHoraEscolhida(dados.horaEscolhida);
-          setClienteDados(dados.clienteDados);
-          setMetodoPagamento(dados.metodoPagamento);
-          
-          salvarAgendamentoOficial(dados);
-          
-          setStep(5);
-          setIsModalOpen(true);
-          localStorage.removeItem('reserva_temp_debora');
+          try {
+            const dados = JSON.parse(reservaSalva);
+            
+            setServicoEscolhido(dados.servicoEscolhido);
+            setDataEscolhida(new Date(dados.dataEscolhida));
+            setHoraEscolhida(dados.horaEscolhida);
+            setClienteDados(dados.clienteDados);
+            setMetodoPagamento(dados.metodoPagamento);
+            
+            salvarAgendamentoOficial(dados);
+            
+            setStep(5);
+            setIsModalOpen(true);
+            localStorage.removeItem('reserva_temp_debora');
+          } catch(e) {
+            console.error("Erro ao ler cache do agendamento", e);
+          }
         }
         window.history.replaceState({}, document.title, window.location.pathname);
         
@@ -472,7 +519,6 @@ export default function LandingPage() {
         const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
         const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
 
-        // 🛡️ MENSAGEM DO WHATSAPP MAIS PROFISSIONAL
         const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\nData: ${dataFormatada} às ${dados.horaEscolhida}\n\n*Política de Cancelamento:*\nPedimos a gentileza de avisar com no mínimo 24h de antecedência em caso de imprevistos.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
@@ -582,7 +628,7 @@ export default function LandingPage() {
         <div className="flex-1 relative w-full max-w-md h-[500px] hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300 fill-mode-both">
           <div className="absolute top-10 right-0 w-64 glass-card neon-border rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 hover:-translate-y-2 transition-transform duration-500">
             <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)] relative">
-              <Image src="/debora.jpg" alt="Débora" fill priority className="object-cover" />
+              <Image src="/debora.jpg" alt="Débora" fill priority sizes="(max-width: 768px) 100vw, 96px" className="object-cover" />
             </div>
             <strong className="text-[#F8D1BE] text-xl font-serif mb-1">Debora Nails Studio</strong>
             <span className="text-gray-400 text-xs uppercase tracking-widest mb-5">Beauty & Nail Design</span>
@@ -607,7 +653,7 @@ export default function LandingPage() {
         <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
           <div className="w-full md:w-1/3 relative group">
             <div className="w-full aspect-square md:aspect-[4/5] relative rounded-2xl overflow-hidden border border-[#DCAE96]/20 z-10">
-               <Image src="/fotonova.jpeg" alt="Debora Silva" fill className="object-cover" />
+               <Image src="/fotonova.jpeg" alt="Debora Silva" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
             </div>
             <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
               <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
@@ -642,7 +688,7 @@ export default function LandingPage() {
                 className="shrink-0 w-[300px] md:w-[350px] snap-center h-[420px] rounded-3xl overflow-hidden relative cursor-pointer neon-hover transition-all duration-300 group border border-[#3a2522] shadow-xl"
               >
                 {serv.imagens && serv.imagens.length > 0 ? (
-                  <Image src={serv.imagens[0]} alt={serv.nome} fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                  <Image src={serv.imagens[0]} alt={serv.nome} fill sizes="(max-width: 768px) 100vw, 350px" className="object-cover group-hover:scale-110 transition-transform duration-700" />
                 ) : (
                   <div className="w-full h-full bg-[#120308] flex items-center justify-center"><Sparkles size={40} className="text-[#C7977D] opacity-30" /></div>
                 )}
@@ -684,19 +730,34 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
             {['/01.jpg', '/vermelha.jpeg', '/02.jpg','/nude-branca.jpeg','/delicada.jpeg','/branca-nude.jpeg','/roxa.jpeg','/nude-dourada.jpeg'].map((img, i) => (
               <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer relative">
-                <Image src={img} alt="Trabalho Debora Nails" fill className="object-cover transition-transform duration-700 group-hover:scale-110" />
+                <Image src={img} alt="Trabalho Debora Nails" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
             ))}
           </div>
 
-          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Maquiagem Profissional</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
-            {['/make01.jpeg','/make-cadeira.jpg', '/make02.jpeg', '/make03.jpeg','/make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
+          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4 mt-20">Maquiagem Profissional</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+            {['/make01.jpeg','/make-loira.jpeg','/make-rabico.jpeg', '/make02.jpeg', '/make-batomv.jpeg' , '/make03.jpeg','/make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
               <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer relative">
-                <Image src={img} alt="Maquiagem Profissional" fill className="object-cover transition-transform duration-700 group-hover:scale-110" />
+                <Image src={img} alt="Maquiagem Profissional" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
               </article>
             ))}
           </div>
+
+          {/* 🛡️ NOVA SEÇÃO: Antes e Depois Interativo (Slider) */}
+          <div className="pt-16 border-t border-[#3a2522]">
+            <div className="text-center mb-10">
+              <span className="glow-text text-sm font-bold uppercase tracking-widest">O Poder da Maquiagem</span>
+              <h3 className="font-serif text-3xl md:text-4xl text-white mt-2">Antes & Depois</h3>
+              <p className="text-gray-400 text-sm mt-3 font-light">Arraste a linha para ver a transformação completa.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <AntesEDepoisSlider antesSrc="/make-antes1.jpeg" depoisSrc="/make-depois1.jpeg" />
+              <AntesEDepoisSlider antesSrc="/make-antes2.jpeg" depoisSrc="/make-depois2.jpeg" />
+            </div>
+          </div>
+          
         </div>
       </section>
 
@@ -705,7 +766,7 @@ export default function LandingPage() {
           <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
             <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group relative">
-               <Image src="/cadeiras.png" alt="Interior do Ateliê" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
+               <Image src="/cadeiras.png" alt="Interior do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
             <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
                <video autoPlay loop muted playsInline className="w-full h-full object-cover">
@@ -713,7 +774,7 @@ export default function LandingPage() {
                </video>
             </div>
             <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group relative">
-               <Image src="/mesa.png" alt="Detalhe do Ateliê" fill className="object-cover group-hover:scale-105 transition-transform duration-700" />
+               <Image src="/mesa.png" alt="Detalhe do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
             </div>
           </div>
 
@@ -844,7 +905,7 @@ export default function LandingPage() {
             <div className="relative h-64 bg-[#2D0A12] shrink-0">
               <button onClick={() => setServicoDetalhe(null)} className="absolute top-4 right-4 z-20 bg-black/50 text-white rounded-full p-2 hover:bg-black transition-colors"><X size={20}/></button>
               {servicoDetalhe.imagens && servicoDetalhe.imagens.length > 0 ? (
-                <Image src={servicoDetalhe.imagens[0]} alt={servicoDetalhe.nome} fill className="object-cover" />
+                <Image src={servicoDetalhe.imagens[0]} alt={servicoDetalhe.nome} fill sizes="(max-width: 768px) 100vw, 350px" className="object-cover" />
               ) : <div className="flex items-center justify-center h-full"><Sparkles size={50} className="text-[#C7977D]" /></div>}
               <div className="absolute inset-0 bg-gradient-to-t from-[#120308] via-[#120308]/40 to-transparent"></div>
             </div>
