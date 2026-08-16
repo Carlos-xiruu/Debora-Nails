@@ -183,14 +183,17 @@ export default function MonitorPage() {
     const dias = [];
     let d = new Date();
     let count = 0;
+    
     while (count < 14) {
-      d.setDate(d.getDate() + 1);
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
+      
       if (regra && regra.ativo) {
         dias.push(new Date(d));
         count++;
       }
+      
+      d.setDate(d.getDate() + 1);
     }
     setDiasDisponiveis(dias);
   }, [configuracoes]);

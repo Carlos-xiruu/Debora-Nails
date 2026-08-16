@@ -150,16 +150,21 @@ export default function LandingPage() {
   useEffect(() => {
     if (!configuracoes) return;
     const dias = [];
-    let d = new Date();
+    let d = new Date(); // Começa do dia de HOJE
     let count = 0;
+    
     while (count < 14) {
-      d.setDate(d.getDate() + 1);
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
+      
+      // Verifica se o dia atual está ativo
       if (regra && regra.ativo) {
         dias.push(new Date(d));
         count++;
       }
+      
+      // Soma +1 dia SÓ DEPOIS de verificar hoje
+      d.setDate(d.getDate() + 1);
     }
     setDiasDisponiveis(dias);
   }, [configuracoes]);

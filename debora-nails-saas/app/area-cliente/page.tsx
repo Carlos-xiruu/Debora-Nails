@@ -17,52 +17,48 @@ export default function AreaClientePage() {
 
   const carregarDados = async () => {
     setIsLoading(true);
-    // Pega o usuário logado
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session) {
-      window.location.href = '/login';
-      return;
-    }
-    setUsuario(session.user);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        window.location.href = '/login';
+        return;
+      }
+      setUsuario(session.user);
 
-    // Tenta achar o cliente pelo email (se logou, o email está na auth)
-    // No seu caso, o ideal é checar pelo telefone se você salva lá na auth, 
-    // ou buscar o cliente pelo nome/telefone. Vamos buscar os dados globais:
-    const telefone = session.user.user_metadata?.telefone;
-    
-    // Busca na tabela clientes
-    let clienteId = null;
-    let clienteStats = null;
-    
-    if (telefone) {
-        const { data: cData } = await supabase.from('clientes').select('*').eq('telefone', telefone).single();
-        if (cData) {
-            clienteId = cData.id;
-            clienteStats = cData;
-        }
-    } else {
-        // Fallback: Tenta achar pelo nome exato se o telefone não estiver salvo na auth
-        const { data: cData } = await supabase.from('clientes').select('*').eq('nome', session.user.user_metadata?.nome_completo).limit(1).single();
-        if (cData) {
-            clienteId = cData.id;
-            clienteStats = cData;
-        }
-    }
+      const telefone = session.user.user_metadata?.telefone;
+      let clienteId = null;
+      let clienteStats = null;
+      
+      if (telefone) {
+          const { data: cData } = await supabase.from('clientes').select('*').eq('telefone', telefone).single();
+          if (cData) {
+              clienteId = cData.id;
+              clienteStats = cData;
+          }
+      } else {
+          const { data: cData } = await supabase.from('clientes').select('*').eq('nome', session.user.user_metadata?.nome_completo).limit(1).single();
+          if (cData) {
+              clienteId = cData.id;
+              clienteStats = cData;
+          }
+      }
 
-    setClienteBanco(clienteStats);
+      setClienteBanco(clienteStats);
 
-    // Busca os agendamentos caso tenha achado o ID da cliente
-    if (clienteId) {
-      const { data: agendaData } = await supabase
-        .from('agendamentos')
-        .select(`*, servicos ( nome, preco, duracao )`)
-        .eq('cliente_id', clienteId)
-        .order('inicio', { ascending: false });
-        
-      if (agendaData) setAgendamentos(agendaData);
+      if (clienteId) {
+        const { data: agendaData } = await supabase
+          .from('agendamentos')
+          .select(`*, servicos ( nome, preco, duracao )`)
+          .eq('cliente_id', clienteId)
+          .order('inicio', { ascending: false });
+          
+        if (agendaData) setAgendamentos(agendaData);
+      }
+    } catch (error) {
+      console.error("Erro ao carregar dados VIP:", error);
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   const handleLogout = async () => {
@@ -78,6 +74,7 @@ export default function AreaClientePage() {
     );
   }
 
+  // 🛡️ Lógica VIP blindada com garantias de fallback numérico
   const atendimentosFeitos = clienteBanco?.atendimentos || 0;
   const faltamParaVip = Math.max(10 - atendimentosFeitos, 0);
   const isVip = atendimentosFeitos >= 10;
@@ -108,7 +105,7 @@ export default function AreaClientePage() {
         
         {/* CABEÇALHO DO PAINEL */}
         <div className="flex flex-col md:flex-row items-center gap-6 mb-12 bg-gradient-to-r from-[#180A0D] to-[#120308] border border-[#3a2522] p-8 rounded-[32px] shadow-2xl relative overflow-hidden">
-          {isVip && <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/20 blur-[50px] rounded-full pointer-events-none"></div>}
+          {isVip && <div className="absolute -top-10 -right-10 w-40 h-40 bg-yellow-500/20 blur-[50px] rounded-full pointer-events-none animate-pulse" style={{ animationDuration: '4s' }}></div>}
           
           <div className="w-24 h-24 bg-[#0a0204] border border-[#C7977D]/40 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(199,151,125,0.2)] shrink-0 relative">
             {isVip && <Crown size={24} className="absolute -top-3 text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.8)]" />}
@@ -124,7 +121,7 @@ export default function AreaClientePage() {
           </div>
           
           <div className="w-full md:w-auto mt-4 md:mt-0 flex justify-center">
-            <Link href="/" className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-8 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform text-sm whitespace-nowrap">
+            <Link href="/#servicos" className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-8 py-3 rounded-full font-bold shadow-[0_0_20px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform text-sm whitespace-nowrap">
               Novo Agendamento
             </Link>
           </div>
@@ -134,14 +131,14 @@ export default function AreaClientePage() {
         <div className="bg-[#120308]/60 backdrop-blur-md border border-[#3a2522] rounded-[24px] p-6 md:p-8 mb-12 shadow-xl">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <h2 className="font-serif text-2xl text-[#F8D1BE] flex items-center gap-2"><Award size={24}/> Clube de Fidelidade</h2>
-            <span className="bg-[#180A0D] border border-[#3a2522] px-4 py-1.5 rounded-full text-xs font-bold text-gray-300 uppercase tracking-wider">
-              {atendimentosFeitos} / 10 Visitas
+            <span className={`border px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider ${isVip ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' : 'bg-[#180A0D] border-[#3a2522] text-gray-300'}`}>
+              {isVip ? 'Status VIP Ativo' : `${atendimentosFeitos} / 10 Visitas`}
             </span>
           </div>
           
           <div className="relative w-full h-4 bg-[#0a0204] rounded-full overflow-hidden border border-[#3a2522] mb-4 shadow-inner">
             <div 
-              className="absolute top-0 left-0 h-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] transition-all duration-1000 ease-out"
+              className={`absolute top-0 left-0 h-full transition-all duration-1000 ease-out ${isVip ? 'bg-gradient-to-r from-yellow-600 to-yellow-400' : 'bg-gradient-to-r from-[#DCAE96] to-[#C7977D]'}`}
               style={{ width: `${progressoFidelidade}%` }}
             ></div>
           </div>
@@ -160,13 +157,13 @@ export default function AreaClientePage() {
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Recompensa 1 - O Kit */}
-              <div className="bg-[#0a0204] border border-[#DCAE96]/20 p-5 rounded-2xl flex items-start gap-4 hover:border-[#DCAE96]/50 transition-colors group shadow-lg">
-                <div className="w-12 h-12 rounded-full bg-[#DCAE96]/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
-                  <Gift className="text-[#DCAE96]" size={22} />
+              <div className={`bg-[#0a0204] border ${isVip ? 'border-yellow-500/30 shadow-[0_0_15px_rgba(250,204,21,0.1)]' : 'border-[#DCAE96]/20 shadow-lg'} p-5 rounded-2xl flex items-start gap-4 transition-colors group`}>
+                <div className={`w-12 h-12 rounded-full ${isVip ? 'bg-yellow-500/20' : 'bg-[#DCAE96]/10'} flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform`}>
+                  <Gift className={isVip ? 'text-yellow-400' : 'text-[#DCAE96]'} size={22} />
                 </div>
                 <div>
                   <h4 className="text-white font-bold text-sm mb-1.5 flex items-center gap-2">
-                    Kit de Auto cuidado <span className="bg-[#C7977D]/20 text-[#DCAE96] text-[9px] px-2 py-0.5 rounded uppercase tracking-wider">11ª Visita</span>
+                    Kit de Auto cuidado <span className={`text-[9px] px-2 py-0.5 rounded uppercase tracking-wider font-bold ${isVip ? 'bg-yellow-500/20 text-yellow-400' : 'bg-[#C7977D]/20 text-[#DCAE96]'}`}>{isVip ? 'Desbloqueado' : '11ª Visita'}</span>
                   </h4>
                   <p className="text-gray-400 text-xs leading-relaxed">
                     Na sua 11ª visita, você recebe um kit exclusivo contendo uma canetinha de óleo hidratante de cutículas personalizada e um mini creme de mãos de alta qualidade.
@@ -181,7 +178,7 @@ export default function AreaClientePage() {
                 </div>
                 <div>
                   <h4 className="text-white font-bold text-sm mb-1.5 flex items-center gap-2">
-                    Indique e Ganhe <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1"><CheckCircle2 size={8}/> Ilimitado</span>
+                    Indique e Ganhe <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] px-2 py-0.5 rounded uppercase tracking-wider flex items-center gap-1 font-bold"><CheckCircle2 size={8}/> Ilimitado</span>
                   </h4>
                   <p className="text-gray-400 text-xs leading-relaxed">
                     Indique uma amiga para o Studio e, quando ela realizar o primeiro atendimento, você ganha uma <strong className="text-[#F8D1BE] font-medium">Plástica dos Pés</strong> para relaxar e renovar.
@@ -207,7 +204,7 @@ export default function AreaClientePage() {
               const data = new Date(ag.inicio);
               const dataFormatada = data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
               const horaFormatada = data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-              const statusCor = ag.tipo === 'concluido' ? 'text-gray-500 bg-gray-900/50' : ag.tipo === 'em_andamento' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-[#F8D1BE] bg-[#DCAE96]/10 border-[#DCAE96]/30';
+              const statusCor = ag.tipo === 'concluido' ? 'text-gray-500 bg-gray-900/50 border-gray-800' : ag.tipo === 'em_andamento' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-[#F8D1BE] bg-[#DCAE96]/10 border-[#DCAE96]/30';
 
               return (
                 <div key={ag.id} className="bg-[#180A0D] border border-[#3a2522] rounded-2xl p-5 hover:border-[#DCAE96]/30 transition-colors flex flex-col">
