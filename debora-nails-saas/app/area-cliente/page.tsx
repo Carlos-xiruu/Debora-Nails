@@ -25,31 +25,46 @@ export default function AreaClientePage() {
       }
       setUsuario(session.user);
 
-      const telefone = session.user.user_metadata?.telefone;
+      const telefoneUsuario = session.user.user_metadata?.telefone || '';
+      const nomeUsuario = session.user.user_metadata?.nome_completo || '';
+      
       let clienteId = null;
       let clienteStats = null;
       
-      if (telefone) {
-          const { data: cData } = await supabase.from('clientes').select('*').eq('telefone', telefone).single();
-          if (cData) {
-              clienteId = cData.id;
-              clienteStats = cData;
+      // 🛡️ Busca Blindada Simples: Procura o último cliente com este telefone
+      if (telefoneUsuario) {
+          const { data: cData } = await supabase.from('clientes')
+              .select('*')
+              .eq('telefone', telefoneUsuario)
+              .order('created_at', { ascending: false })
+              .limit(1);
+              
+          if (cData && cData.length > 0) {
+              clienteId = cData[0].id;
+              clienteStats = cData[0];
           }
-      } else {
-          const { data: cData } = await supabase.from('clientes').select('*').eq('nome', session.user.user_metadata?.nome_completo).limit(1).single();
-          if (cData) {
-              clienteId = cData.id;
-              clienteStats = cData;
+      } 
+      
+      // 🛡️ Fallback Simples: Se não achou por telefone, procura pelo nome
+      if (!clienteId && nomeUsuario) {
+          const { data: cData } = await supabase.from('clientes')
+              .select('*')
+              .ilike('nome', `%${nomeUsuario}%`)
+              .order('created_at', { ascending: false })
+              .limit(1);
+              
+          if (cData && cData.length > 0) {
+              clienteId = cData[0].id;
+              clienteStats = cData[0];
           }
       }
 
       setClienteBanco(clienteStats);
 
       if (clienteId) {
-        // Ignora agendamentos já cancelados para limpar a tela
         const { data: agendaData } = await supabase
           .from('agendamentos')
-          .select(`*, servicos ( nome, preco, duracao )`)
+          .select(`*, servicos ( nome, preco, duracao, taxa_sinal )`)
           .eq('cliente_id', clienteId)
           .neq('tipo', 'cancelado')
           .order('inicio', { ascending: false });
@@ -74,10 +89,8 @@ export default function AreaClientePage() {
     
     setIsLoading(true);
     try {
-      // 1. Cancela na agenda
       await supabase.from('agendamentos').update({ tipo: 'cancelado' }).eq('id', ag.id);
       
-      // 2. Notifica a Débora no WhatsApp
       const dataFormatada = new Date(ag.inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
       const mensagemDebora = `🚨 *CANCELAMENTO VIP (Requer Estorno)* 🚨\n\nA cliente *${clienteBanco?.nome}* acabou de cancelar pelo aplicativo o agendamento de *${ag.servicos?.nome}* do dia *${dataFormatada}*.\n\n✅ *Aviso feito com mais de 48h de antecedência.*\n💰 *Ação Necessária:* Realizar o estorno do sinal para a cliente. A vaga já foi liberada automaticamente na agenda online!`;
       
@@ -160,7 +173,7 @@ export default function AreaClientePage() {
           </div>
         </div>
 
-        {/* CLUBE DE FIDELIDADE (MANTIDO INTACTO) */}
+        {/* CLUBE DE FIDELIDADE */}
         <div className="bg-[#120308]/60 backdrop-blur-md border border-[#3a2522] rounded-[24px] p-6 md:p-8 mb-12 shadow-xl">
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             <h2 className="font-serif text-2xl text-[#F8D1BE] flex items-center gap-2"><Award size={24}/> Clube de Fidelidade</h2>
@@ -219,10 +232,10 @@ export default function AreaClientePage() {
         <h3 className="font-serif text-2xl text-white mb-6 flex items-center gap-2"><History className="text-[#C7977D]"/> Seus Agendamentos</h3>
         
         {agendamentos.length === 0 ? (
-          <div className="bg-[#120308]/60 border border-[#3a2522] border-dashed rounded-[24px] p-12 text-center flex flex-col items-center">
+          <div className="bg-[#120308]/60 border border-[#3a2522] border-dashed rounded-[24px] p-8 md:p-12 text-center flex flex-col items-center">
             <CalendarDays size={48} className="text-gray-600 mb-4" />
             <p className="text-gray-400 text-lg">Você ainda não possui agendamentos ativos.</p>
-            <p className="text-gray-500 text-sm mt-2">Agende o seu primeiro momento de beleza e ele aparecerá aqui.</p>
+            <p className="text-gray-500 text-sm mt-2 mb-8">Agende o seu primeiro momento de beleza e ele aparecerá aqui.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -232,7 +245,6 @@ export default function AreaClientePage() {
               const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
               
               const isFuture = dataObj > new Date();
-              // Calcula as horas de diferença do momento atual até o agendamento
               const hoursDifference = isFuture ? (dataObj.getTime() - new Date().getTime()) / (1000 * 60 * 60) : 0;
               
               const statusCor = ag.tipo === 'concluido' ? 'text-gray-500 bg-gray-900/50 border-gray-800' : ag.tipo === 'em_andamento' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-[#F8D1BE] bg-[#DCAE96]/10 border-[#DCAE96]/30';
