@@ -23,7 +23,6 @@ export default function AgendaPage() {
   const [agendamentoEditando, setAgendamentoEditando] = useState<any>(null);
   const [horaModal, setHoraModal] = useState('');
   
-  // 🛡️ ESTADOS DO MOTOR DE CANCELAMENTO
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
   const [agendamentoCancelar, setAgendamentoCancelar] = useState<any>(null);
   
@@ -186,6 +185,10 @@ export default function AgendaPage() {
     const inicioMins = converterParaMinutos(horaEscolhida);
     const fimAtendimentoMin = inicioMins + duracaoMins;
 
+    // 🛡️ CORREÇÃO: Pega a regra específica do dia escolhido no modal
+    const diaDaSemanaModal = new Date(dataEscolhida + "T00:00:00").getDay();
+    const regraModal = configuracoes.disponibilidade[diaDaSemanaModal];
+
     if (dataEscolhida === dataHojeLocal) {
       const agora = new Date();
       const minAtual = agora.getHours() * 60 + agora.getMinutes();
@@ -195,10 +198,13 @@ export default function AgendaPage() {
       }
     }
     
-    const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
+    const fechamentoMin = converterParaMinutos(regraModal?.fechamento || '18:00');
     if (fimAtendimentoMin > fechamentoMin) {
-      alert(`Erro: O serviço demora ${servicoInfo.duracao}. Se começar às ${horaEscolhida}, passará do horário de fechamento (${regraDoDia.fechamento}).`);
-      setIsSaving(false); return;
+      // 🛡️ CORREÇÃO: PODER DE ADMIN (Aviso em vez de bloqueio absoluto)
+      const confirmacao = window.confirm(`⚠️ Atenção: O serviço demora ${servicoInfo.duracao}. Se começar às ${horaEscolhida}, vai passar do horário de fechamento (${regraModal.fechamento}).\n\nComo você é a dona da agenda, deseja FORÇAR este agendamento mesmo assim?`);
+      if (!confirmacao) {
+        setIsSaving(false); return;
+      }
     }
 
     const conflitoBloqueio = configuracoes.bloqueios.some((b: any) => {
@@ -245,7 +251,7 @@ export default function AgendaPage() {
     }]);
 
     if (erroAgenda) { alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); } 
-    else { await fetchDados(); setIsModalOpen(false); alert("Agendamento criado com sucesso!"); }
+    else { await fetchDados(); setIsModalOpen(false); alert("✅ Agendamento forçado/criado com sucesso!"); }
     
     setIsSaving(false);
   };
@@ -313,17 +319,18 @@ export default function AgendaPage() {
     e.preventDefault();
     setIsSaving(true);
     
-    const { error } = await supabase.from('configuracoes').upsert({
-      id: 1,
+    // 🛡️ CORREÇÃO: Usando update absoluto para garantir que salve no banco
+    const { error } = await supabase.from('configuracoes').update({
       disponibilidade: configuracoes.disponibilidade,
       bloqueios: configuracoes.bloqueios
-    });
+    }).eq('id', 1);
 
     if (error) {
-      alert(`ERRO: Não foi possível salvar as configurações. Detalhe: ${error.message}`);
+      alert(`ERRO: Não foi possível salvar as configurações no banco de dados. Detalhe: ${error.message}`);
     } else {
       setIsDisponibilidadeOpen(false);
-      fetchDados(); 
+      await fetchDados(); 
+      alert("✅ Disponibilidade da Agenda salva com sucesso!");
     }
     setIsSaving(false);
   };
@@ -336,12 +343,10 @@ export default function AgendaPage() {
       const preco = agendamentoCancelar.servicos?.preco || 0;
       const taxa = agendamentoCancelar.servicos?.taxa_sinal || 0;
       const valorSinal = preco * (taxa / 100);
-      const valorRestante = preco - valorSinal; // ⚠️ A Dívida gerada!
+      const valorRestante = preco - valorSinal;
 
-      // 1. Marca agendamento como Cancelado
       await supabase.from('agendamentos').update({ tipo: 'cancelado' }).eq('id', agendamentoCancelar.id);
 
-      // 2. Executa a regra financeira e de CRM
       if (tipo === 'falta' && clienteId) {
         const faltasAtuais = agendamentoCancelar.clientes?.faltas || 0;
         const { data: cData } = await supabase.from('clientes').select('divida_pendente').eq('id', clienteId).single();
@@ -353,14 +358,12 @@ export default function AgendaPage() {
         }).eq('id', clienteId);
       } 
       else if (tipo === 'reembolso_total' && valorSinal > 0) {
-        // Devolve 100%
         await supabase.from('transacoes').insert([{
           descricao: `Reembolso 100% (+48h) - ${agendamentoCancelar.clientes?.nome}`,
           tipo: 'saida', valor: valorSinal, categoria: 'Reembolso', data_pagamento: new Date().toISOString()
         }]);
       } 
       else if (tipo === 'reembolso_parcial' && clienteId) {
-        // Desistência Tardia: Perde o sinal e gera dívida do restante
         const { data: cData } = await supabase.from('clientes').select('divida_pendente').eq('id', clienteId).single();
         const dividaAtual = cData?.divida_pendente || 0;
         
