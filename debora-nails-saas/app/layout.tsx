@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
+import { icons } from 'lucide-react';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],
@@ -34,11 +35,14 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  icons: {
+    icon: '/favicon.ico',
+  },
   // 👇 ADICIONADO: OpenGraph para o link virar um "Cartão de Visitas" no WhatsApp
   openGraph: {
     title: 'Debora Nails | Studio de Alto Padrão',
     description: 'Design, durabilidade e sofisticação. Agende sua experiência exclusiva.',
-    url: 'https://deboranails.com.br', 
+    url: 'https://deboranails.com.br',
     images: [
       {
         url: '/metadados.png', // O WhatsApp vai puxar essa foto para mostrar no preview!
