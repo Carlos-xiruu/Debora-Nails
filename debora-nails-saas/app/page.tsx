@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image'; 
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight } from 'lucide-react';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
@@ -17,28 +17,16 @@ const DISPONIBILIDADE_PADRAO = {
   6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
 };
 
-// 🛡️ NOVO COMPONENTE: Slider de Antes e Depois Premium
 const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisSrc: string }) => {
   const [posicao, setPosicao] = useState(50);
 
   return (
     <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden group border border-[#DCAE96]/20 select-none shadow-xl">
-      {/* Imagem do Antes (Fundo) */}
       <Image src={antesSrc} alt="Antes" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
-
-      {/* Imagem do Depois (Corte dinâmico por cima) */}
-      <div 
-        className="absolute inset-0 z-10 pointer-events-none"
-        style={{ clipPath: `polygon(0 0, ${posicao}% 0, ${posicao}% 100%, 0 100%)` }}
-      >
+      <div className="absolute inset-0 z-10 pointer-events-none" style={{ clipPath: `polygon(0 0, ${posicao}% 0, ${posicao}% 100%, 0 100%)` }}>
         <Image src={depoisSrc} alt="Depois" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
       </div>
-
-      {/* Linha e Puxador do Slider */}
-      <div 
-        className="absolute top-0 bottom-0 z-20 w-[2px] bg-white cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.8)] pointer-events-none"
-        style={{ left: `calc(${posicao}% - 1px)` }}
-      >
+      <div className="absolute top-0 bottom-0 z-20 w-[2px] bg-white cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.8)] pointer-events-none" style={{ left: `calc(${posicao}% - 1px)` }}>
         <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-200">
           <div className="flex gap-0.5">
             <ChevronLeft size={14} className="text-[#C7977D]" />
@@ -46,14 +34,7 @@ const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisS
           </div>
         </div>
       </div>
-
-      {/* Input invisível que controla a mágica (Funciona perfeito em Touch e Mouse) */}
-      <input 
-        type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))}
-        className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize"
-      />
-      
-      {/* Badges */}
+      <input type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))} className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize" />
       <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
       <div className="absolute top-4 right-4 z-20 bg-[#DCAE96]/80 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
     </div>
@@ -76,7 +57,8 @@ export default function LandingPage() {
   const [horaEscolhida, setHoraEscolhida] = useState('');
   
   const [clienteDados, setClienteDados] = useState({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
-  
+  const [dividaPendente, setDividaPendente] = useState(0); // 🛡️ NOVO: Guarda dívida da cliente
+
   const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
@@ -138,7 +120,7 @@ export default function LandingPage() {
       }
 
       const hojeStr = formatarDataLocalStr(new Date());
-      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`);
+      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`).neq('tipo', 'cancelado');
       if (agends) setAgendamentos(agends);
     };
 
@@ -150,20 +132,17 @@ export default function LandingPage() {
   useEffect(() => {
     if (!configuracoes) return;
     const dias = [];
-    let d = new Date(); // Começa do dia de HOJE
+    let d = new Date();
     let count = 0;
     
     while (count < 14) {
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
       
-      // Verifica se o dia atual está ativo
       if (regra && regra.ativo) {
         dias.push(new Date(d));
         count++;
       }
-      
-      // Soma +1 dia SÓ DEPOIS de verificar hoje
       d.setDate(d.getDate() + 1);
     }
     setDiasDisponiveis(dias);
@@ -235,8 +214,12 @@ export default function LandingPage() {
         
         const telefoneUser = session.user.user_metadata?.telefone;
         if (telefoneUser) {
-          const { data: clienteBanco } = await supabase.from('clientes').select('atendimentos').eq('telefone', telefoneUser).single();
-          if (clienteBanco) setDadosFidelidade({ atendimentos: clienteBanco.atendimentos, isVip: clienteBanco.atendimentos >= 10 });
+          setClienteDados(prev => ({...prev, telefone: telefoneUser}));
+          const { data: clienteBanco } = await supabase.from('clientes').select('atendimentos, divida_pendente').eq('telefone', telefoneUser).single();
+          if (clienteBanco) {
+            setDadosFidelidade({ atendimentos: clienteBanco.atendimentos, isVip: clienteBanco.atendimentos >= 10 });
+            setDividaPendente(clienteBanco.divida_pendente || 0);
+          }
         }
         
         const intencao = localStorage.getItem('intencao_agendamento');
@@ -263,12 +246,12 @@ export default function LandingPage() {
         if (reservaSalva) {
           try {
             const dados = JSON.parse(reservaSalva);
-            
             setServicoEscolhido(dados.servicoEscolhido);
             setDataEscolhida(new Date(dados.dataEscolhida));
             setHoraEscolhida(dados.horaEscolhida);
             setClienteDados(dados.clienteDados);
             setMetodoPagamento(dados.metodoPagamento);
+            setDividaPendente(dados.dividaPendente); // 🛡️ Recupera a dívida paga
             
             salvarAgendamentoOficial(dados);
             
@@ -313,7 +296,7 @@ export default function LandingPage() {
           const data = await res.json();
           if (data.status === 'approved') {
             clearInterval(interval);
-            const dados = { clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento };
+            const dados = { clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente };
             await salvarAgendamentoOficial(dados);
             setStep(5);
           }
@@ -323,13 +306,14 @@ export default function LandingPage() {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento]);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     setUsuarioLogado(null);
     setDadosFidelidade({ atendimentos: 0, isVip: false });
     setClienteDados({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
+    setDividaPendente(0);
   };
 
   const iniciarAgendamento = (servico: any = null, forceLogado = false) => {
@@ -360,27 +344,50 @@ export default function LandingPage() {
     }
   };
 
-  const calcularSinal = (servicoAtual = servicoEscolhido) => servicoAtual ? servicoAtual.preco * ((servicoAtual.taxa_sinal || 0) / 100) : 0;
+  const calcularSinalBase = (servicoAtual = servicoEscolhido) => servicoAtual ? servicoAtual.preco * ((servicoAtual.taxa_sinal || 0) / 100) : 0;
+  
+  // 🛡️ A MÁGICA DO MOTOR DE COBRANÇA
+  const calcularTotalSinalEDivida = () => calcularSinalBase() + dividaPendente;
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
-  const valorTotalSinal = metodoPagamento === 'cartao' ? calcularSinal() + calcularTaxaCartao(calcularSinal()) : calcularSinal();
+  const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
+
+  // 🛡️ VALIDA DÍVIDAS ANTES DE IR PRO PAGAMENTO
+  const validarEAvancarPagamento = async () => {
+    setIsProcessando(true);
+    let dividaAtual = 0;
+
+    const numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
+    if (numeroLimpo.length >= 10) {
+      const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', clienteDados.telefone).limit(1).single();
+      if (cli && cli.divida_pendente > 0) {
+        dividaAtual = cli.divida_pendente;
+      }
+    }
+    
+    setDividaPendente(dividaAtual);
+    setIsProcessando(false);
+
+    if (calcularSinalBase() > 0 || dividaAtual > 0) {
+      setStep(4);
+    } else {
+      processarPagamento(); 
+    }
+  };
 
   const processarPagamento = async () => {
     setIsProcessando(true);
     
     if (dataEscolhida && servicoEscolhido && horaEscolhida) {
       const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
-      
       const hojeStrBase = formatarDataLocalStr(new Date());
+      
       if (dataFiltroBase === hojeStrBase) {
          const agora = new Date();
          const minAtual = agora.getHours() * 60 + agora.getMinutes();
          const inicioMins = converterParaMinutos(horaEscolhida);
          if (inicioMins < minAtual) {
            alert("🚨 Esse horário acabou de passar! Por favor, escolha um horário futuro.");
-           setIsProcessando(false);
-           setIsModalOpen(false);
-           setStep(1);
-           return;
+           setIsProcessando(false); setIsModalOpen(false); setStep(1); return;
          }
       }
 
@@ -392,15 +399,13 @@ export default function LandingPage() {
       const { data: vagaOcupada } = await supabase
         .from('agendamentos')
         .select('id')
+        .neq('tipo', 'cancelado')
         .lt('inicio', fimDate.toISOString())
         .gt('fim', inicioDate.toISOString());
 
       if (vagaOcupada && vagaOcupada.length > 0) {
         alert("Poxa! 😢 Alguém acabou de reservar esse horário enquanto você preenchia os dados. Por favor, escolha outro horário.");
-        setIsProcessando(false);
-        setIsModalOpen(false);
-        setStep(1); 
-        return; 
+        setIsProcessando(false); setIsModalOpen(false); setStep(1); return; 
       }
     }
     
@@ -409,7 +414,7 @@ export default function LandingPage() {
         const res = await fetch('/api/pagamento-monitor', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ valor: valorTotalSinal, descricao: `Sinal Reserva - ${servicoEscolhido.nome}` })
+          body: JSON.stringify({ valor: valorTotalCobrar, descricao: `Sinal Reserva - ${servicoEscolhido.nome}` })
         });
         const data = await res.json();
         
@@ -417,42 +422,29 @@ export default function LandingPage() {
           setQrCodePix({ base64: data.qr_code_base64, copiaCola: data.qr_code });
           setPixId(data.id);
         } else {
-          if (configuracoes?.chave_pix) {
-            setPixManualFallback(true);
-          } else {
-            alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
-          }
+          if (configuracoes?.chave_pix) setPixManualFallback(true);
+          else alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
         }
       } catch (e) {
-        console.error("Erro PIX:", e);
-        if (configuracoes?.chave_pix) {
-          setPixManualFallback(true);
-        } else {
-          alert("Ocorreu um erro ao processar. Tente novamente.");
-        }
+        if (configuracoes?.chave_pix) setPixManualFallback(true);
+        else alert("Ocorreu um erro ao processar. Tente novamente.");
       } finally {
         setIsProcessando(false);
       }
 
     } else {
-      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento }));
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente }));
       try {
         const resposta = await fetch('/api/pagamento', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalSinal, clienteNome: clienteDados.nome })
+          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalCobrar, clienteNome: clienteDados.nome })
         });
         const data = await resposta.json();
-        if (data.init_point) {
-          window.location.href = data.init_point;
-        } else {
-          alert("Ocorreu um erro ao gerar o link. Tente novamente.");
-          setIsProcessando(false);
-        }
+        if (data.init_point) window.location.href = data.init_point;
+        else { alert("Ocorreu um erro ao gerar o link. Tente novamente."); setIsProcessando(false); }
       } catch (erro) {
-        console.error(erro);
-        alert("Erro de conexão. Verifique sua internet.");
-        setIsProcessando(false);
+        alert("Erro de conexão. Verifique sua internet."); setIsProcessando(false);
       }
     }
   };
@@ -467,14 +459,20 @@ export default function LandingPage() {
         cliente_id = clientesEncontrados[0].id;
       } else {
         const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().limit(1);
-        if (errCli) {
-          alert("🚨 Erro ao salvar Cliente: " + errCli.message);
-          return;
-        }
+        if (errCli) { alert("🚨 Erro ao salvar Cliente."); return; }
         if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
 
       if (cliente_id) {
+        // 🛡️ QUITA A DÍVIDA NO BANCO DE DADOS
+        if (dados.dividaPendente > 0) {
+          await supabase.from('clientes').update({ divida_pendente: 0 }).eq('id', cliente_id);
+          await supabase.from('transacoes').insert([{
+            descricao: `Pagamento Dívida (Falta Anterior) - ${dados.clienteDados.nome}`, 
+            tipo: 'entrada', valor: dados.dividaPendente, categoria: 'Outros', data_pagamento: new Date().toISOString()
+          }]);
+        }
+
         const dataFiltroBase = formatarDataLocalStr(new Date(dados.dataEscolhida));
         const inicioDate = new Date(`${dataFiltroBase}T${dados.horaEscolhida}:00-03:00`);
         const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
@@ -484,39 +482,30 @@ export default function LandingPage() {
         const { data: conflitoFinal } = await supabase
           .from('agendamentos')
           .select('id')
+          .neq('tipo', 'cancelado')
           .lt('inicio', fimDate.toISOString())
           .gt('fim', inicioDate.toISOString());
 
         if (conflitoFinal && conflitoFinal.length > 0) {
-           alert("🚨 Ocorreu um conflito de horário no momento exato da reserva. Entre em contato com o suporte para verificarmos o estorno ou remanejamento da vaga.");
-           return; 
+           alert("🚨 Ocorreu um conflito de horário no momento exato da reserva. Entre em contato com o suporte para estorno."); return; 
         }
 
         const { error: errAgendamento } = await supabase.from('agendamentos').insert([{
-          cliente_id: cliente_id, 
-          servico_id: dados.servicoEscolhido.id, 
-          tipo: 'agendado', 
-          inicio: inicioDate.toISOString(), 
-          fim: fimDate.toISOString(),
-          observacoes: dados.clienteDados.observacoes,
-          prefere_silencio: dados.clienteDados.prefere_silencio
+          cliente_id: cliente_id, servico_id: dados.servicoEscolhido.id, tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString(), observacoes: dados.clienteDados.observacoes, prefere_silencio: dados.clienteDados.prefere_silencio
         }]);
 
-        if (errAgendamento) {
-          alert("🚨 Erro ao salvar na Agenda (Supabase): " + errAgendamento.message);
-          return; 
-        }
+        if (errAgendamento) { alert("🚨 Erro ao salvar na Agenda."); return; }
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
-            ? calcularSinal(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinal(dados.servicoEscolhido)) 
-            : calcularSinal(dados.servicoEscolhido);
+            ? calcularSinalBase(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinalBase(dados.servicoEscolhido)) 
+            : calcularSinalBase(dados.servicoEscolhido);
 
-        const { error: errTransacao } = await supabase.from('transacoes').insert([{
-          descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
-          tipo: 'entrada', 
-          valor: valorSinalPago, 
-          categoria: 'Sinal'
-        }]);
+        if (valorSinalPago > 0) {
+          await supabase.from('transacoes').insert([{
+            descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
+            tipo: 'entrada', valor: valorSinalPago, categoria: 'Sinal', data_pagamento: new Date().toISOString()
+          }]);
+        }
 
         const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
         const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
@@ -524,7 +513,7 @@ export default function LandingPage() {
         const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
         const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
 
-        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\nData: ${dataFormatada} às ${dados.horaEscolhida}\n\n*Política de Cancelamento:*\nPedimos a gentileza de avisar com no mínimo 24h de antecedência em caso de imprevistos.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
+        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\nData: ${dataFormatada} às ${dados.horaEscolhida}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
           await fetch('/api/whatsapp', {
@@ -749,7 +738,6 @@ export default function LandingPage() {
             ))}
           </div>
 
-          {/* 🛡️ NOVA SEÇÃO: Antes e Depois Interativo (Slider) */}
           <div className="pt-16 border-t border-[#3a2522]">
             <div className="text-center mb-10">
               <span className="glow-text text-sm font-bold uppercase tracking-widest">O Poder da Maquiagem</span>
@@ -1028,18 +1016,27 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  <button disabled={!clienteDados.nome || !clienteDados.telefone} onClick={() => { if (calcularSinal() > 0) setStep(4); else processarPagamento(); }} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
-                    {calcularSinal() > 0 ? 'Ir para Pagamento da Reserva' : 'Confirmar Agendamento'}
+                  {/* 🛡️ BOTÃO QUE VALIDA A DÍVIDA */}
+                  <button disabled={!clienteDados.nome || !clienteDados.telefone || isProcessando} onClick={validarEAvancarPagamento} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform flex justify-center items-center gap-2">
+                    {isProcessando ? <Loader2 className="animate-spin" size={20} /> : 'Confirmar Agendamento'}
                   </button>
                 </div>
               )}
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-right-4">
                   
+                  {/* 🛡️ AVISO DE DÍVIDA (SE ELA TIVER FALTADO DA ÚLTIMA VEZ) */}
+                  {dividaPendente > 0 && (
+                    <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                      <p className="text-red-400 font-bold text-sm flex items-center gap-2 mb-1"><AlertTriangle size={18}/> Débito Pendente de Falta</p>
+                      <p className="text-gray-400 text-xs leading-relaxed">Identificamos um cancelamento tardio/falta na sua última reserva no valor de <strong>R$ {dividaPendente.toFixed(2).replace('.', ',')}</strong>. Como manda nossa política de cancelamento, esse valor foi adicionado ao seu sinal para liberar este novo agendamento.</p>
+                    </div>
+                  )}
+
                   {pixManualFallback ? (
                     <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
                       <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Pague com a Chave PIX</h3>
-                      <p className="text-gray-400 text-xs text-center mb-4">Envie o valor do sinal para a chave abaixo e clique em confirmar.</p>
+                      <p className="text-gray-400 text-xs text-center mb-4">Envie o valor exato abaixo para a chave e clique em confirmar.</p>
                       <div className="w-full bg-[#180A0D] border border-[#3a2522] p-4 rounded-xl mb-6">
                         <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Chave ({configuracoes?.tipo_chave_pix || 'PIX'})</p>
                         <div className="flex gap-2 items-center">
@@ -1077,20 +1074,20 @@ export default function LandingPage() {
                         <div className="text-lg font-mono text-red-400 font-bold bg-[#120308] px-3 py-1 rounded-lg border border-red-500/30">{formatarTempo(tempoRestante)}</div>
                       </div>
 
-                      {/* 🛡️ CARD DE POLÍTICA DE ESTORNO */}
                       <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-4 rounded-2xl flex items-start gap-3">
                         <Info size={16} className="text-[#C7977D] shrink-0 mt-0.5" />
                         <div>
                           <p className="text-[#E8D3C8] text-xs font-bold mb-1">Política de Cancelamento</p>
                           <p className="text-gray-400 text-[10px] leading-relaxed">
-                            Ao prosseguir, você concorda que: Cancelamentos com até 48h de antecedência garantem <strong>100% de estorno</strong>. Com até 24h, o estorno é de <strong>50%</strong>. Cancelamentos no dia ou não comparecimento resultam na retenção integral do sinal para cobrir custos de agenda.
+                            Ao prosseguir, você concorda que: Cancelamentos com até 48h de antecedência garantem <strong>100% de estorno</strong>. Faltas ou cancelamentos com menos de 24h implicam em retenção do sinal e multa do valor restante na sua próxima reserva.
                           </p>
                         </div>
                       </div>
 
                       <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">
                         <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do Serviço</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
-                        <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinal().toFixed(2).replace('.', ',')}</span></div>
+                        <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinalBase().toFixed(2).replace('.', ',')}</span></div>
+                        {dividaPendente > 0 && <div className="flex justify-between text-sm text-red-400 font-bold mt-2 pt-2 border-t border-red-500/20"><span>Dívida de Falta Adicionada</span><span>+ R$ {dividaPendente.toFixed(2).replace('.', ',')}</span></div>}
                       </div>
 
                       <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-3 font-bold uppercase tracking-wider">Forma de Pagamento</label>
@@ -1112,9 +1109,9 @@ export default function LandingPage() {
                       <div className="bg-[#180A0D] p-5 rounded-2xl border border-[#3a2522] flex justify-between items-center mb-6">
                         <div>
                           <p className="text-gray-400 text-xs mb-1">Total a pagar agora</p>
-                          <p className="text-2xl font-bold text-white">R$ {valorTotalSinal.toFixed(2).replace('.', ',')}</p>
+                          <p className="text-2xl font-bold text-white">R$ {valorTotalCobrar.toFixed(2).replace('.', ',')}</p>
                         </div>
-                        {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularSinal()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
+                        {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularTotalSinalEDivida()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
                       </div>
 
                       <button onClick={processarPagamento} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
@@ -1136,7 +1133,7 @@ export default function LandingPage() {
                     <p className="text-white font-bold mb-1 text-sm">{servicoEscolhido.nome}</p>
                     <p className="text-[#C7977D] text-xs mb-4 font-medium">{dataEscolhida?.toLocaleDateString('pt-BR')} às {horaEscolhida}</p>
                     <div className="bg-[#0a0204] p-3 rounded-lg border border-[#3a2522]">
-                      <p className="text-[10px] md:text-xs text-gray-400">Restará pagar <strong className="text-white">R$ {(servicoEscolhido.preco - calcularSinal()).toFixed(2).replace('.', ',')}</strong> no dia do atendimento.</p>
+                      <p className="text-[10px] md:text-xs text-gray-400">Restará pagar <strong className="text-white">R$ {(servicoEscolhido.preco - calcularSinalBase()).toFixed(2).replace('.', ',')}</strong> no dia do atendimento.</p>
                     </div>
                   </div>
                   <button onClick={() => {setIsModalOpen(false); setStep(1);}} className="bg-[#DCAE96] text-[#120308] px-8 py-3.5 rounded-full font-bold w-full text-sm shadow-lg hover:scale-105 transition-transform">Concluir</button>
