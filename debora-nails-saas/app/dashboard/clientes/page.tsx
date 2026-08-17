@@ -1,17 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Calendar, ShieldAlert, X, Users, Loader2, Ban, MessageCircle, Clock } from 'lucide-react';
+import { Plus, Search, Calendar, ShieldAlert, X, Users, Loader2, Ban, MessageCircle, Clock, Edit2, FileText, Sparkles } from 'lucide-react';
 import { supabase } from '../../lib/supabase'; 
 
 export default function ClientesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isHistoricoModalOpen, setIsHistoricoModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [busca, setBusca] = useState('');
   const [telefoneInput, setTelefoneInput] = useState('');
   
   const [clientes, setClientes] = useState<any[]>([]);
+  const [clienteEditando, setClienteEditando] = useState<any>(null);
+  const [historicoCliente, setHistoricoCliente] = useState<any[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
 
   useEffect(() => {
     fetchClientes();
@@ -29,10 +34,9 @@ export default function ClientesPage() {
     setIsLoading(false);
   };
 
-  // 🛡️ Máscara de Telefone Automática (XX) XXXXX-XXXX
   const handleTelefoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let valor = e.target.value.replace(/\D/g, ''); // Remove tudo que não for número
-    if (valor.length > 11) valor = valor.slice(0, 11); // Limita a 11 dígitos
+    let valor = e.target.value.replace(/\D/g, ''); 
+    if (valor.length > 11) valor = valor.slice(0, 11); 
     
     if (valor.length > 2) valor = `(${valor.slice(0, 2)}) ${valor.slice(2)}`;
     if (valor.length > 10) valor = `${valor.slice(0, 10)}-${valor.slice(10)}`;
@@ -49,6 +53,7 @@ export default function ClientesPage() {
       nome: formData.get('nome') as string,
       telefone: telefoneInput,
       comportamento: formData.get('comportamento') as string,
+      observacoes: formData.get('observacoes') as string,
       status: 'Novo',
       atendimentos: 0, 
       faltas: 0, 
@@ -65,9 +70,59 @@ export default function ClientesPage() {
     } else if (data) {
       setClientes([data[0], ...clientes]);
       setIsModalOpen(false);
-      setTelefoneInput(''); // Limpa o estado para o próximo cadastro
+      setTelefoneInput(''); 
     }
     setIsSaving(false);
+  };
+
+  const abrirModalEdicao = (cliente: any) => {
+    setClienteEditando(cliente);
+    setTelefoneInput(cliente.telefone || '');
+    setIsEditModalOpen(true);
+  };
+
+  const handleSalvarEdicao = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!clienteEditando) return;
+    setIsSaving(true);
+    const formData = new FormData(e.target as HTMLFormElement);
+
+    const dadosAtualizados = {
+      nome: formData.get('nome') as string,
+      telefone: telefoneInput,
+      comportamento: formData.get('comportamento') as string,
+      observacoes: formData.get('observacoes') as string
+    };
+
+    const { data, error } = await supabase
+      .from('clientes')
+      .update(dadosAtualizados)
+      .eq('id', clienteEditando.id)
+      .select();
+
+    if (!error && data) {
+      setClientes(clientes.map(c => c.id === clienteEditando.id ? data[0] : c));
+      setIsEditModalOpen(false);
+      setClienteEditando(null);
+    } else {
+      alert('Erro ao atualizar informações da cliente.');
+    }
+    setIsSaving(false);
+  };
+
+  const verHistorico = async (cliente: any) => {
+    setClienteEditando(cliente);
+    setIsHistoricoModalOpen(true);
+    setLoadingHistorico(true);
+
+    const { data } = await supabase
+      .from('agendamentos')
+      .select(`*, servicos(nome, preco)`)
+      .eq('cliente_id', cliente.id)
+      .order('inicio', { ascending: false });
+
+    if (data) setHistoricoCliente(data);
+    setLoadingHistorico(false);
   };
 
   const toggleBloqueio = async (id: string, statusAtual: boolean) => {
@@ -77,14 +132,13 @@ export default function ClientesPage() {
     await supabase.from('clientes').update({ bloqueado: !statusAtual }).eq('id', id);
   };
 
-  // 🛡️ Filtro de Busca Blindado (Ignora formatação de telefone)
   const clientesFiltrados = clientes.filter(c => {
     const nomeMatch = c.nome.toLowerCase().includes(busca.toLowerCase());
     const buscaNumeros = busca.replace(/\D/g, '');
-    const telNumeros = c.telefone.replace(/\D/g, '');
+    const telNumeros = (c.telefone || '').replace(/\D/g, '');
     const telMatch = buscaNumeros !== '' && telNumeros.includes(buscaNumeros);
     
-    return nomeMatch || telMatch || c.telefone.includes(busca);
+    return nomeMatch || telMatch || (c.telefone && c.telefone.includes(busca));
   });
 
   return (
@@ -97,7 +151,7 @@ export default function ClientesPage() {
             <Users className="text-[#C7977D]" size={28} />
             CRM de Clientes
           </h1>
-          <p className="text-[#E8D3C8]">Histórico, comportamentos e gestão de bloqueios.</p>
+          <p className="text-[#E8D3C8]">Histórico, comportamentos, segredos VIP e gestão de bloqueios.</p>
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full md:w-auto">
@@ -131,7 +185,7 @@ export default function ClientesPage() {
             </div>
           ) : (
             clientesFiltrados.map(cliente => (
-              <div key={cliente.id} className={`bg-[#120308]/60 backdrop-blur-md border p-6 rounded-2xl shadow-lg transition-all ${cliente.bloqueado ? 'border-red-900/50 opacity-75' : 'border-[#DCAE96]/20 hover:border-[#DCAE96]/40'}`}>
+              <div key={cliente.id} className={`bg-[#120308]/60 backdrop-blur-md border p-6 rounded-2xl shadow-lg transition-all flex flex-col ${cliente.bloqueado ? 'border-red-900/50 opacity-75' : 'border-[#DCAE96]/20 hover:border-[#DCAE96]/40'}`}>
                 
                 <div className="flex justify-between items-start gap-3 mb-4">
                   <div className="min-w-0 flex-1">
@@ -146,7 +200,7 @@ export default function ClientesPage() {
                       <span className="bg-orange-500/20 text-orange-400 border border-orange-500/50 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider whitespace-nowrap">Atenção</span>
                     )}
                     {!cliente.bloqueado && cliente.atendimentos >= 10 && (
-                      <span className="bg-indigo-500/20 text-indigo-400 border border-indigo-500/50 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider whitespace-nowrap">VIP</span>
+                      <span className="bg-yellow-500/20 text-yellow-400 border border-yellow-500/50 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider whitespace-nowrap flex items-center gap-1"><Sparkles size={10}/> VIP</span>
                     )}
                     {cliente.bloqueado && (
                       <span className="bg-red-500/20 text-red-400 border border-red-500/50 text-[10px] px-2 py-1 rounded font-bold uppercase tracking-wider whitespace-nowrap">Bloqueada</span>
@@ -165,23 +219,33 @@ export default function ClientesPage() {
                   </div>
                 </div>
 
-                <div className="mb-6">
-                  <p className="text-xs text-gray-400 mb-2">Perfil de Atendimento:</p>
-                  <span className="inline-flex items-start gap-1.5 bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-1.5 rounded-lg whitespace-normal break-words">
-                    <MessageCircle size={14} className="shrink-0 mt-0.5"/> {cliente.comportamento}
+                {/* OBSERVAÇÕES / SEGREDO DA CLIENTE */}
+                <div className="space-y-2 mb-6 flex-1">
+                  <span className="inline-flex items-start gap-1.5 bg-indigo-900/30 text-indigo-300 border border-indigo-500/30 text-xs px-3 py-1.5 rounded-lg whitespace-normal break-words w-full">
+                    <MessageCircle size={14} className="shrink-0 mt-0.5"/> {cliente.comportamento || 'Perfil não definido'}
                   </span>
+                  
+                  {cliente.observacoes && (
+                    <div className="bg-[#2D0A12]/60 border border-[#C7977D]/30 p-2.5 rounded-lg text-xs text-[#E8D3C8] flex items-start gap-2">
+                      <FileText size={14} className="text-[#C7977D] shrink-0 mt-0.5" />
+                      <p className="italic">{cliente.observacoes}</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="flex gap-3">
-                  <button onClick={() => alert('O Histórico Detalhado entrará na próxima atualização do sistema!')} className="flex-1 bg-transparent border border-[#DCAE96]/30 text-[#E8D3C8] hover:bg-[#DCAE96]/10 py-2.5 rounded-lg transition-colors text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2">
-                    <Clock size={14}/> Ver Histórico
+                <div className="flex gap-2 pt-4 border-t border-[#DCAE96]/10 mt-auto">
+                  <button onClick={() => verHistorico(cliente)} className="flex-1 bg-transparent border border-[#DCAE96]/30 text-[#E8D3C8] hover:bg-[#DCAE96]/10 py-2.5 rounded-lg transition-colors text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-1.5">
+                    <Clock size={14}/> Histórico
+                  </button>
+                  <button onClick={() => abrirModalEdicao(cliente)} className="p-2.5 bg-[#DCAE96]/10 text-[#F8D1BE] border border-[#DCAE96]/30 hover:bg-[#DCAE96]/20 rounded-lg transition-colors" title="Editar Perfil / Observações">
+                    <Edit2 size={16} />
                   </button>
                   <button 
                     onClick={() => toggleBloqueio(cliente.id, cliente.bloqueado)}
                     className={`p-2.5 rounded-lg border transition-colors flex items-center justify-center shrink-0 ${cliente.bloqueado ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'bg-transparent text-gray-500 border-[#DCAE96]/30 hover:border-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}
                     title={cliente.bloqueado ? "Desbloquear" : "Bloquear Cliente"}
                   >
-                    <Ban size={18} />
+                    <Ban size={16} />
                   </button>
                 </div>
 
@@ -193,8 +257,8 @@ export default function ClientesPage() {
 
       {/* MODAL: CADASTRAR CLIENTE */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-md overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-md overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90dvh] flex flex-col">
             <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Users size={20}/> Cadastrar Cliente</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
@@ -221,12 +285,16 @@ export default function ClientesPage() {
                 <div>
                   <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">Perfil de Atendimento</label>
                   <select name="comportamento" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none transition-colors">
-                    <option value="Silenciosa">Silenciosa (Gosta de relaxar)</option>
-                    <option value="Comunicativa">Comunicativa (Gosta de conversar)</option>
-                    <option value="Indecisa">Indecisa (Precisa de ajuda para escolher)</option>
-                    <option value="Apressada">Apressada (Foco no tempo)</option>
+                    <option value="Silenciosa (Gosta de relaxar)">Silenciosa (Gosta de relaxar)</option>
+                    <option value="Comunicativa (Gosta de conversar)">Comunicativa (Gosta de conversar)</option>
+                    <option value="Indecisa (Precisa de ajuda)">Indecisa (Precisa de ajuda para escolher)</option>
+                    <option value="Apressada (Foco no tempo)">Apressada (Foco no tempo)</option>
                     <option value="Não definido">Não definido ainda</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">Observações / Segredos da Cliente</label>
+                  <textarea name="observacoes" rows={3} placeholder="Ex: Café sem açúcar, cutícula sensível, prefere tons nude..." className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#F8D1BE] resize-none transition-colors" />
                 </div>
               </div>
               
@@ -236,6 +304,90 @@ export default function ClientesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: EDITAR CLIENTE */}
+      {isEditModalOpen && clienteEditando && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-md overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[90dvh] flex flex-col">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+              <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Edit2 size={20}/> Editar Perfil VIP</h2>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+            </div>
+            
+            <form onSubmit={handleSalvarEdicao} className="flex flex-col overflow-hidden">
+              <div className="p-6 space-y-4 overflow-y-auto custom-scrollbar flex-1">
+                <div>
+                  <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">Nome Completo *</label>
+                  <input type="text" name="nome" defaultValue={clienteEditando.nome} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
+                </div>
+                <div>
+                  <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">WhatsApp *</label>
+                  <input 
+                    type="tel" 
+                    value={telefoneInput}
+                    onChange={handleTelefoneChange}
+                    required 
+                    className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-white font-mono focus:outline-none focus:border-[#F8D1BE] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">Perfil de Atendimento</label>
+                  <select name="comportamento" defaultValue={clienteEditando.comportamento} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none transition-colors">
+                    <option value="Silenciosa (Gosta de relaxar)">Silenciosa (Gosta de relaxar)</option>
+                    <option value="Comunicativa (Gosta de conversar)">Comunicativa (Gosta de conversar)</option>
+                    <option value="Indecisa (Precisa de ajuda)">Indecisa (Precisa de ajuda para escolher)</option>
+                    <option value="Apressada (Foco no tempo)">Apressada (Foco no tempo)</option>
+                    <option value="Não definido">Não definido ainda</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-[#E8D3C8] mb-1.5 uppercase font-bold tracking-wider">Observações / Segredos da Cliente</label>
+                  <textarea name="observacoes" defaultValue={clienteEditando.observacoes} rows={3} placeholder="Ex: Café sem açúcar, cutícula sensível, prefere tons nude..." className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-lg px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] resize-none transition-colors" />
+                </div>
+              </div>
+              
+              <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0">
+                <button type="submit" disabled={isSaving} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-3.5 rounded-xl font-bold hover:scale-[1.02] transition-transform disabled:opacity-50 flex justify-center items-center gap-2">
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: HISTÓRICO DE ATENDIMENTOS */}
+      {isHistoricoModalOpen && clienteEditando && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4">
+          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-lg overflow-hidden shadow-[0_0_40px_rgba(199,151,125,0.2)] animate-in zoom-in-95 duration-300 max-h-[85dvh] flex flex-col">
+            <div className="bg-[#2D0A12] px-6 py-4 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0">
+              <div>
+                <h2 className="text-lg font-serif text-[#F8D1BE]">{clienteEditando.nome}</h2>
+                <p className="text-xs text-gray-400 font-mono">{clienteEditando.telefone}</p>
+              </div>
+              <button onClick={() => setIsHistoricoModalOpen(false)} className="text-gray-400 hover:text-white"><X size={24} /></button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+              {loadingHistorico ? (
+                <div className="flex justify-center py-10 text-[#C7977D]"><Loader2 className="animate-spin" size={32} /></div>
+              ) : historicoCliente.length === 0 ? (
+                <p className="text-center text-gray-500 py-8 text-sm">Nenhum atendimento registrado no histórico desta cliente.</p>
+              ) : (
+                historicoCliente.map((ag) => (
+                  <div key={ag.id} className="bg-[#2D0A12]/40 border border-[#DCAE96]/10 p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                      <p className="text-white font-medium text-sm">{ag.servicos?.nome || 'Atendimento'}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{new Date(ag.inicio).toLocaleDateString('pt-BR')} às {new Date(ag.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</p>
+                    </div>
+                    <span className="text-[#F8D1BE] font-bold text-sm">R$ {ag.servicos?.preco ? Number(ag.servicos.preco).toFixed(2).replace('.', ',') : '0,00'}</span>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}
