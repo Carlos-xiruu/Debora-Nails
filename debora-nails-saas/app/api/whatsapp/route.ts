@@ -4,13 +4,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    // Como quem faz o fetch agora é o servidor, o bloqueio do Navegador não existe mais!
-    // 👇 COLOQUE O SEU LINK DO LOCALTUNNEL AQUI:
-    const response = await fetch('http://64.227.19.193:10000/enviar-mensagem', {
+    
+    const response = await fetch('http://64.227.19.193:10000/api/whatsapp', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Bypass-Tunnel-Reminder': 'true' // A chave mestra
       },
       body: JSON.stringify(body)
     });
