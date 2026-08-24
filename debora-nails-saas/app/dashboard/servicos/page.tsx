@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image'; // 🛡️ Importação para Otimização de Imagens
-import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert, Upload } from 'lucide-react';
+import Image from 'next/image'; 
+import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert, Upload, Crown, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const imagensDisponiveis = [
@@ -21,6 +21,10 @@ export default function ServicosPage() {
   const [imagensSelecionadas, setImagensSelecionadas] = useState<string[]>([]);
   const [servicoEditando, setServicoEditando] = useState<any>(null);
 
+  // 🛡️ NOVOS ESTADOS PARA O MOTOR DE PACOTES
+  const [isPacote, setIsPacote] = useState(false);
+  const [qtdSessoes, setQtdSessoes] = useState(1);
+
   useEffect(() => {
     fetchServicos();
   }, []);
@@ -35,6 +39,11 @@ export default function ServicosPage() {
   const abrirModal = (servico: any = null) => {
     setServicoEditando(servico);
     setImagensSelecionadas(servico ? (servico.imagens || []) : []);
+    
+    // 🛡️ Puxa o status do banco se estiver editando, senão reseta para serviço comum
+    setIsPacote(servico ? servico.is_pacote : false);
+    setQtdSessoes(servico ? servico.qtd_sessoes : 1);
+    
     setIsModalOpen(true);
   };
 
@@ -73,7 +82,6 @@ export default function ServicosPage() {
     setIsSaving(true);
     const formData = new FormData(e.target as HTMLFormElement);
     
-    // Tratamento de vírgula brasileira para cálculo seguro
     const precoRaw = (formData.get('preco') as string) || '0';
     const precoCalc = parseFloat(precoRaw.replace(',', '.'));
     
@@ -88,7 +96,10 @@ export default function ServicosPage() {
       preco: precoCalc,
       taxa_sinal: taxaSinal,
       sinal: sinalCalc,
-      imagens: imagensSelecionadas.length > 0 ? imagensSelecionadas : ['/01.jpg']
+      imagens: imagensSelecionadas.length > 0 ? imagensSelecionadas : ['/01.jpg'],
+      // 🛡️ SALVANDO OS NOVOS CAMPOS DO PACOTE
+      is_pacote: isPacote,
+      qtd_sessoes: isPacote ? qtdSessoes : 1
     };
 
     if (servicoEditando) {
@@ -137,11 +148,11 @@ export default function ServicosPage() {
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
-          <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><Sparkles className="text-[#C7977D]" size={28} /> Meus Serviços</h1>
-          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e adicione fotos direto da sua galeria.</p>
+          <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><Sparkles className="text-[#C7977D]" size={28} /> Meus Serviços & Pacotes</h1>
+          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e crie assinaturas mensais.</p>
         </div>
         <button onClick={() => abrirModal(null)} className="w-full md:w-auto bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)]">
-          <Plus size={20} /> Novo Serviço
+          <Plus size={20} /> Adicionar Novo
         </button>
       </div>
 
@@ -158,9 +169,16 @@ export default function ServicosPage() {
               const fotos = servico.imagens || [];
               return (
                 <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
+                  
+                  {/* 🛡️ BANNER VIP PARA PACOTES */}
+                  {servico.is_pacote && (
+                    <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                      <Crown size={12} /> {servico.qtd_sessoes} Sessões
+                    </div>
+                  )}
+
                   <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
                     {fotos.length > 0 ? (
-                      // 🛡️ Imagem ultra otimizada com a tag nativa Image
                       <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
                     ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
                     <div className="absolute top-4 right-4 z-10">
@@ -195,23 +213,55 @@ export default function ServicosPage() {
         </div>
       )}
 
-      {/* 🛡️ Z-INDEX 999 E SCROLL SEGURO NO MODAL DE SERVIÇOS */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90dvh]">
             
             <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
-              <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2"><Sparkles size={20}/> {servicoEditando ? 'Editar Serviço' : 'Novo Serviço'}</h2>
+              <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2">
+                {servicoEditando ? <><Edit2 size={20}/> Editar Serviço</> : <><Sparkles size={20}/> Adicionar Novo</>}
+              </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
             
             <form onSubmit={handleSalvarServico} className="flex flex-col flex-1 overflow-hidden">
               <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar space-y-6 flex-1">
+                
+                {/* 🛡️ CHAVE MESTRA: TRANSFORMANDO EM PACOTE */}
+                <div className="bg-gradient-to-r from-[#2D0A12] to-[#120308] border border-[#DCAE96]/30 rounded-2xl p-5 mb-2 shadow-lg">
+                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsPacote(!isPacote)}>
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${isPacote ? 'bg-[#DCAE96]/20 text-[#DCAE96]' : 'bg-gray-800 text-gray-500'}`}>
+                        <Package size={20} />
+                      </div>
+                      <div>
+                        <h4 className="text-white font-bold text-sm">Transformar em Pacote Mensal?</h4>
+                        <p className="text-gray-400 text-xs">Venda múltiplas sessões com desconto de uma vez só.</p>
+                      </div>
+                    </div>
+                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isPacote ? 'bg-[#DCAE96]' : 'bg-[#3a2522]'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isPacote ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </div>
+                  </div>
+
+                  {isPacote && (
+                    <div className="mt-4 pt-4 border-t border-[#DCAE96]/20 animate-in fade-in slide-in-from-top-2">
+                      <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Número de Sessões do Pacote</label>
+                      <div className="flex items-center gap-3">
+                        <button type="button" onClick={() => setQtdSessoes(Math.max(2, qtdSessoes - 1))} className="bg-[#120308] border border-[#DCAE96]/30 text-[#DCAE96] w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[#DCAE96]/10 font-bold text-lg">-</button>
+                        <span className="text-xl font-bold text-white w-8 text-center">{qtdSessoes}</span>
+                        <button type="button" onClick={() => setQtdSessoes(qtdSessoes + 1)} className="bg-[#120308] border border-[#DCAE96]/30 text-[#DCAE96] w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[#DCAE96]/10 font-bold text-lg">+</button>
+                      </div>
+                      <p className="text-[10px] text-[#C7977D] mt-2">A cliente vai agendar {qtdSessoes} horários de uma vez na Landing Page.</p>
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Nome do Serviço *</label>
-                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Nome do Pacote *' : 'Nome do Serviço *'}</label>
+                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} placeholder={isPacote ? "Ex: Pacote 2x Banho de Gel" : "Ex: Banho de Gel Tradicional"} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
                   </div>
                   
                   <div className="col-span-1 md:col-span-2">
@@ -220,8 +270,8 @@ export default function ServicosPage() {
                   </div>
                   
                   <div>
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Duração Média *</label>
-                    <input type="text" name="duracao" defaultValue={servicoEditando?.duracao || ''} placeholder="Ex: 40m, 1h, 1h 30m" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Duração (Por Sessão) *' : 'Duração Média *'}</label>
+                    <input type="text" name="duracao" defaultValue={servicoEditando?.duracao || ''} placeholder="Ex: 1h 30m" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
                   </div>
                   
                   <div>
@@ -232,7 +282,7 @@ export default function ServicosPage() {
                   <div className="col-span-1 md:col-span-2">
                     <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-2">Exigir pagamento antecipado (Sinal)</label>
                     <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-                      {['0', '10', '20', '30', '40', '50'].map(taxa => (
+                      {['0', '10', '20', '30', '40', '50','100'].map(taxa => (
                         <label key={taxa} className="flex-1 min-w-[3rem] cursor-pointer">
                           <input type="radio" name="taxa_sinal" value={taxa} defaultChecked={(servicoEditando?.taxa_sinal?.toString() || '0') === taxa} className="peer sr-only" />
                           <div className="py-2.5 text-center rounded-lg border border-[#DCAE96]/20 bg-[#2D0A12]/30 text-gray-400 peer-checked:bg-[#C7977D] peer-checked:text-[#120308] peer-checked:font-bold transition-all text-sm">
@@ -246,7 +296,7 @@ export default function ServicosPage() {
 
                 <div className="pt-6 border-t border-[#DCAE96]/20">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                    <label className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Fotos do Serviço</label>
+                    <label className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Fotos de Referência</label>
                     
                     <label className="bg-[#C7977D] text-[#120308] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform w-full sm:w-auto justify-center">
                       {isUploading ? <Loader2 className="animate-spin" size={14} /> : <><Upload size={14} /> Upar do Dispositivo</>}

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image'; 
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight, AlertTriangle, Package, Check } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
 
@@ -43,7 +43,10 @@ const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisS
 
 export default function LandingPage() {
   const router = useRouter();
-  const [servicos, setServicos] = useState<any[]>([]);
+  
+  const [servicosComuns, setServicosComuns] = useState<any[]>([]);
+  const [pacotes, setPacotes] = useState<any[]>([]);
+  
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); 
   const [servicoDetalhe, setServicoDetalhe] = useState<any>(null);
@@ -53,11 +56,13 @@ export default function LandingPage() {
   
   const [step, setStep] = useState(1);
   const [servicoEscolhido, setServicoEscolhido] = useState<any>(null);
+  
+  const [sessoesSelecionadas, setSessoesSelecionadas] = useState<{data: Date, hora: string}[]>([]);
   const [dataEscolhida, setDataEscolhida] = useState<Date | null>(null);
   const [horaEscolhida, setHoraEscolhida] = useState('');
   
   const [clienteDados, setClienteDados] = useState({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
-  const [dividaPendente, setDividaPendente] = useState(0); // 🛡️ NOVO: Guarda dívida da cliente
+  const [dividaPendente, setDividaPendente] = useState(0); 
 
   const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
   const [tempoRestante, setTempoRestante] = useState(300);
@@ -105,8 +110,11 @@ export default function LandingPage() {
 
   useEffect(() => {
     const fetchDadosGerais = async () => {
-      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
-      if (servs) setServicos(servs);
+      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('preco', { ascending: true });
+      if (servs) {
+        setServicosComuns(servs.filter(s => !s.is_pacote));
+        setPacotes(servs.filter(s => s.is_pacote));
+      }
 
       const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
       if (config) {
@@ -135,10 +143,9 @@ export default function LandingPage() {
     let d = new Date();
     let count = 0;
     
-    while (count < 14) {
+    while (count < 45) {
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
-      
       if (regra && regra.ativo) {
         dias.push(new Date(d));
         count++;
@@ -177,29 +184,33 @@ export default function LandingPage() {
       const fimMin = minAtual + duracaoServicoMin;
 
       const conflitoAgendamento = agendsDoDia.some(a => {
-        const dInicio = new Date(a.inicio);
-        const dFim = new Date(a.fim);
-        const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes();
-        const minFim = dFim.getHours() * 60 + dFim.getMinutes();
+        const dInicio = new Date(a.inicio); const dFim = new Date(a.fim);
+        const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes(); const minFim = dFim.getHours() * 60 + dFim.getMinutes();
         return (minAtual < minFim) && (fimMin > minInicio);
       });
 
       const conflitoBloqueio = blocksDoDia.some((b: any) => {
-        const minInicio = converterParaMinutos(b.inicio);
-        const minFim = converterParaMinutos(b.fim);
+        const minInicio = converterParaMinutos(b.inicio); const minFim = converterParaMinutos(b.fim);
         return (minAtual < minFim) && (fimMin > minInicio);
+      });
+      
+      const conflitoNoCarrinho = sessoesSelecionadas.some(s => {
+          if(formatarDataLocalStr(new Date(s.data)) !== dataStr) return false;
+          const minCarrinho = converterParaMinutos(s.hora);
+          const fimCarrinho = minCarrinho + duracaoServicoMin;
+          return (minAtual < fimCarrinho) && (fimMin > minCarrinho);
       });
 
       const tempoJaPassou = isHoje && (minAtual < minutosAtualReal);
 
-      if (!conflitoAgendamento && !conflitoBloqueio && !tempoJaPassou) {
+      if (!conflitoAgendamento && !conflitoBloqueio && !conflitoNoCarrinho && !tempoJaPassou) {
         slotsLivres.push(converterParaHoraStr(minAtual));
       }
     }
 
     setHorariosLivres(slotsLivres);
     setHoraEscolhida('');
-  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
+  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos, sessoesSelecionadas]);
 
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
@@ -247,11 +258,10 @@ export default function LandingPage() {
           try {
             const dados = JSON.parse(reservaSalva);
             setServicoEscolhido(dados.servicoEscolhido);
-            setDataEscolhida(new Date(dados.dataEscolhida));
-            setHoraEscolhida(dados.horaEscolhida);
+            setSessoesSelecionadas(dados.sessoesSelecionadas);
             setClienteDados(dados.clienteDados);
             setMetodoPagamento(dados.metodoPagamento);
-            setDividaPendente(dados.dividaPendente); // 🛡️ Recupera a dívida paga
+            setDividaPendente(dados.dividaPendente); 
             
             salvarAgendamentoOficial(dados);
             
@@ -263,7 +273,6 @@ export default function LandingPage() {
           }
         }
         window.history.replaceState({}, document.title, window.location.pathname);
-        
       } else if (statusPagamento === 'erro') {
         alert("O pagamento via cartão foi recusado pelo banco. Tente novamente.");
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -296,7 +305,7 @@ export default function LandingPage() {
           const data = await res.json();
           if (data.status === 'approved') {
             clearInterval(interval);
-            const dados = { clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente };
+            const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
             await salvarAgendamentoOficial(dados);
             setStep(5);
           }
@@ -306,7 +315,7 @@ export default function LandingPage() {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente]);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -320,6 +329,9 @@ export default function LandingPage() {
     if (usuarioLogado || forceLogado) {
       setServicoDetalhe(null);
       setServicoEscolhido(servico);
+      setSessoesSelecionadas([]); 
+      setDataEscolhida(null);
+      setHoraEscolhida('');
       setStep(servico ? 2 : 1);
       setIsModalOpen(true);
       setTempoRestante(300);
@@ -344,14 +356,54 @@ export default function LandingPage() {
     }
   };
 
+  const avancarData = () => {
+    const novaSessao = { data: dataEscolhida!, hora: horaEscolhida };
+    const numSessoes = servicoEscolhido?.qtd_sessoes || 1;
+
+    if (sessoesSelecionadas.length + 1 < numSessoes) {
+      const proximaDataAlvo = new Date(dataEscolhida!);
+      proximaDataAlvo.setDate(proximaDataAlvo.getDate() + 15);
+      proximaDataAlvo.setHours(0,0,0,0);
+
+      let dataSugerida = null;
+      for (const dia of diasDisponiveis) {
+        if (dia.getTime() >= proximaDataAlvo.getTime()) {
+          dataSugerida = dia;
+          break;
+        }
+      }
+
+      setSessoesSelecionadas([...sessoesSelecionadas, novaSessao]);
+      setDataEscolhida(dataSugerida); 
+      setHoraEscolhida('');
+      
+      if (dataSugerida) {
+         setTimeout(() => {
+           const element = document.getElementById(`dia-${dataSugerida.getTime()}`);
+           if(element) element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+         }, 100);
+      }
+    } else {
+      setSessoesSelecionadas([...sessoesSelecionadas, novaSessao]);
+      setStep(3);
+    }
+  };
+
+  const voltarData = () => {
+    const sessoesSalvas = [...sessoesSelecionadas];
+    const ultimaSessao = sessoesSalvas.pop();
+    if (ultimaSessao) {
+      setSessoesSelecionadas(sessoesSalvas);
+      setDataEscolhida(ultimaSessao.data);
+      setHoraEscolhida(ultimaSessao.hora);
+    }
+  };
+
   const calcularSinalBase = (servicoAtual = servicoEscolhido) => servicoAtual ? servicoAtual.preco * ((servicoAtual.taxa_sinal || 0) / 100) : 0;
-  
-  // 🛡️ A MÁGICA DO MOTOR DE COBRANÇA
   const calcularTotalSinalEDivida = () => calcularSinalBase() + dividaPendente;
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
 
-  // 🛡️ VALIDA DÍVIDAS ANTES DE IR PRO PAGAMENTO
   const validarEAvancarPagamento = async () => {
     setIsProcessando(true);
     let dividaAtual = 0;
@@ -377,21 +429,21 @@ export default function LandingPage() {
   const processarPagamento = async () => {
     setIsProcessando(true);
     
-    if (dataEscolhida && servicoEscolhido && horaEscolhida) {
-      const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
+    for (const sessao of sessoesSelecionadas) {
+      const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
       const hojeStrBase = formatarDataLocalStr(new Date());
       
       if (dataFiltroBase === hojeStrBase) {
          const agora = new Date();
          const minAtual = agora.getHours() * 60 + agora.getMinutes();
-         const inicioMins = converterParaMinutos(horaEscolhida);
+         const inicioMins = converterParaMinutos(sessao.hora);
          if (inicioMins < minAtual) {
-           alert("🚨 Esse horário acabou de passar! Por favor, escolha um horário futuro.");
+           alert(`🚨 O horário ${sessao.hora} acabou de passar! Volte e escolha um novo horário.`);
            setIsProcessando(false); setIsModalOpen(false); setStep(1); return;
          }
       }
 
-      const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
+      const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
       const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
       const fimDate = new Date(inicioDate);
       fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
@@ -404,7 +456,7 @@ export default function LandingPage() {
         .gt('fim', inicioDate.toISOString());
 
       if (vagaOcupada && vagaOcupada.length > 0) {
-        alert("Poxa! 😢 Alguém acabou de reservar esse horário enquanto você preenchia os dados. Por favor, escolha outro horário.");
+        alert("Poxa! 😢 Alguém acabou de reservar uma de suas datas escolhidas. Por favor, reinicie o agendamento.");
         setIsProcessando(false); setIsModalOpen(false); setStep(1); return; 
       }
     }
@@ -414,7 +466,7 @@ export default function LandingPage() {
         const res = await fetch('/api/pagamento-monitor', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ valor: valorTotalCobrar, descricao: `Sinal Reserva - ${servicoEscolhido.nome}` })
+          body: JSON.stringify({ valor: valorTotalCobrar, descricao: `Sinal - ${servicoEscolhido.nome}` })
         });
         const data = await res.json();
         
@@ -433,7 +485,7 @@ export default function LandingPage() {
       }
 
     } else {
-      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, dataEscolhida, horaEscolhida, metodoPagamento, dividaPendente }));
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
       try {
         const resposta = await fetch('/api/pagamento', {
           method: 'POST',
@@ -452,8 +504,7 @@ export default function LandingPage() {
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
-      
-      const { data: clientesEncontrados, error: errBusca } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
+      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
       
       if (clientesEncontrados && clientesEncontrados.length > 0) {
         cliente_id = clientesEncontrados[0].id;
@@ -464,7 +515,6 @@ export default function LandingPage() {
       }
 
       if (cliente_id) {
-        // 🛡️ QUITA A DÍVIDA NO BANCO DE DADOS
         if (dados.dividaPendente > 0) {
           await supabase.from('clientes').update({ divida_pendente: 0 }).eq('id', cliente_id);
           await supabase.from('transacoes').insert([{
@@ -473,27 +523,29 @@ export default function LandingPage() {
           }]);
         }
 
-        const dataFiltroBase = formatarDataLocalStr(new Date(dados.dataEscolhida));
-        const inicioDate = new Date(`${dataFiltroBase}T${dados.horaEscolhida}:00-03:00`);
-        const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
-        const fimDate = new Date(inicioDate);
-        fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+        const grupoPacoteId = dados.servicoEscolhido.is_pacote ? crypto.randomUUID() : null;
+        const agendamentosParaInserir = [];
 
-        const { data: conflitoFinal } = await supabase
-          .from('agendamentos')
-          .select('id')
-          .neq('tipo', 'cancelado')
-          .lt('inicio', fimDate.toISOString())
-          .gt('fim', inicioDate.toISOString());
+        for (const sessao of dados.sessoesSelecionadas) {
+          const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
+          const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
+          const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
+          const fimDate = new Date(inicioDate);
+          fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-        if (conflitoFinal && conflitoFinal.length > 0) {
-           alert("🚨 Ocorreu um conflito de horário no momento exato da reserva. Entre em contato com o suporte para estorno."); return; 
+          agendamentosParaInserir.push({
+            cliente_id: cliente_id, 
+            servico_id: dados.servicoEscolhido.id, 
+            tipo: 'agendado', 
+            inicio: inicioDate.toISOString(), 
+            fim: fimDate.toISOString(), 
+            observacoes: dados.clienteDados.observacoes, 
+            prefere_silencio: dados.clienteDados.prefere_silencio,
+            grupo_pacote_id: grupoPacoteId
+          });
         }
 
-        const { error: errAgendamento } = await supabase.from('agendamentos').insert([{
-          cliente_id: cliente_id, servico_id: dados.servicoEscolhido.id, tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString(), observacoes: dados.clienteDados.observacoes, prefere_silencio: dados.clienteDados.prefere_silencio
-        }]);
-
+        const { error: errAgendamento } = await supabase.from('agendamentos').insert(agendamentosParaInserir);
         if (errAgendamento) { alert("🚨 Erro ao salvar na Agenda."); return; }
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
@@ -507,13 +559,15 @@ export default function LandingPage() {
           }]);
         }
 
-        const dataFormatada = new Date(dados.dataEscolhida).toLocaleDateString('pt-BR');
         const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
-        
         const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
         const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
 
-        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\nData: ${dataFormatada} às ${dados.horaEscolhida}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
+        const datasFormatadasMsg = dados.sessoesSelecionadas.map((s: any, i: number) => {
+           return `🔹 Sessão ${i + 1}: ${new Date(s.data).toLocaleDateString('pt-BR')} às ${s.hora}`;
+        }).join('\n');
+
+        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
           await fetch('/api/whatsapp', {
@@ -559,6 +613,7 @@ export default function LandingPage() {
         <div className="hidden lg:flex items-center gap-2">
           <button onClick={() => rolarPara('sobre')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Quem sou eu?</button>
           <button onClick={() => rolarPara('servicos')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Serviços</button>
+          {pacotes.length > 0 && <button onClick={() => rolarPara('pacotes')} className="px-5 py-2 rounded-full text-sm font-medium text-[#DCAE96] hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all flex items-center gap-1.5"><Crown size={14}/> Pacotes VIP</button>}
           <button onClick={() => rolarPara('portfolio')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Portfólio</button>
           <button onClick={() => rolarPara('espaco')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">O Espaço</button>
         </div>
@@ -672,10 +727,10 @@ export default function LandingPage() {
         </div>
 
         <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-12 pr-6 md:px-6 hide-scroll">
-          {servicos.length === 0 ? (
+          {servicosComuns.length === 0 ? (
             <div className="w-full py-10 text-center"><Loader2 className="animate-spin text-[#C7977D] mx-auto" size={40} /></div>
           ) : (
-            servicos.map((serv) => (
+            servicosComuns.map((serv) => (
               <article 
                 key={serv.id} 
                 onClick={() => setServicoDetalhe(serv)} 
@@ -712,6 +767,72 @@ export default function LandingPage() {
           )}
         </div>
       </section>
+
+      {pacotes.length > 0 && (
+        <section id="pacotes" className="py-24 px-6 relative z-10 bg-gradient-to-b from-[#0a0204] to-[#120308] border-t border-[#3a2522]">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <span className="inline-flex items-center gap-2 bg-[#DCAE96]/10 border border-[#DCAE96]/30 text-[#DCAE96] px-4 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold mb-4">
+                <Crown size={14} /> Clube VIP
+              </span>
+              <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Pacotes & Assinaturas</h2>
+              <p className="text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
+                Por que pagar mais caro agendando toda semana se você pode ter um plano inteligente? Garanta sua vaga, mantenha suas unhas impecáveis e economize assinando nossos pacotes mensais.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center">
+              {pacotes.map(pacote => (
+                <div key={pacote.id} className="relative bg-[#0a0204] rounded-3xl p-8 border border-[#DCAE96]/30 shadow-[0_0_30px_rgba(199,151,125,0.1)] hover:-translate-y-2 transition-transform duration-500 flex flex-col group">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#DCAE96]/10 rounded-bl-full rounded-tr-3xl -z-10 transition-all duration-500 group-hover:bg-[#DCAE96]/20"></div>
+                  
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#DCAE96] to-[#C7977D] flex items-center justify-center shadow-lg">
+                      <Package className="text-[#120308]" size={24} />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-serif text-white leading-tight">{pacote.nome}</h3>
+                      <p className="text-xs text-[#DCAE96] font-bold uppercase tracking-wider">{pacote.qtd_sessoes} Sessões no Mês</p>
+                    </div>
+                  </div>
+
+                  <div className="mb-6 pb-6 border-b border-[#3a2522]">
+                    <div className="flex items-end gap-2">
+                      <span className="text-4xl font-bold text-white">R$ {pacote.preco.toFixed(2).replace('.', ',')}</span>
+                      <span className="text-gray-500 text-sm mb-1">/mês</span>
+                    </div>
+                  </div>
+
+                  <div className="flex-1 space-y-4 mb-8">
+                    <p className="text-sm text-gray-400 italic leading-relaxed">{pacote.descricao}</p>
+                    <ul className="space-y-3">
+                      <li className="flex items-start gap-2 text-sm text-gray-300">
+                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                        <span>Agende {pacote.qtd_sessoes} horários de uma vez</span>
+                      </li>
+                      <li className="flex items-start gap-2 text-sm text-gray-300">
+                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                        <span>Vagas fixas e prioridade na agenda</span>
+                      </li>
+                      <li className="flex items-start gap-2 text-sm text-gray-300">
+                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                        <span>Muito mais econômico que o avulso</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button 
+                    onClick={() => iniciarAgendamento(pacote)}
+                    className="w-full bg-transparent border-2 border-[#C7977D] text-[#DCAE96] py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#C7977D] hover:text-[#120308] transition-colors"
+                  >
+                    Assinar e Agendar Datas
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       <section id="portfolio" className="py-20 px-6 bg-[#050102] border-y border-[#3a2522] relative z-10">
         <div className="max-w-7xl mx-auto">
@@ -929,13 +1050,13 @@ export default function LandingPage() {
                 {step < 5 && <div className="bg-[#DCAE96] text-[#120308] w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">{step}</div>}
                 <h2 className="text-sm md:text-base font-serif text-white">{step === 1 ? 'Escolha o Serviço' : step === 2 ? 'Data e Hora' : step === 3 ? 'Seus Dados' : step === 4 ? 'Pagamento Seguro' : 'Pronto!'}</h2>
               </div>
-              {step < 5 && <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
+              {step < 5 && <button onClick={() => { setIsModalOpen(false); setSessoesSelecionadas([]); }} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#120308]">
               {step === 1 && (
                 <div className="space-y-3">
-                  {servicos.map(s => (
+                  {servicosComuns.map(s => (
                     <div key={s.id} onClick={() => {setServicoEscolhido(s); setStep(2);}} className="glass-card neon-hover border border-[#3a2522] p-4 rounded-2xl cursor-pointer flex justify-between items-center group transition-all">
                       <div>
                         <h4 className="text-white font-serif text-base mb-1 group-hover:text-[#DCAE96] transition-colors">{s.nome}</h4>
@@ -948,16 +1069,49 @@ export default function LandingPage() {
               )}
               {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                  
+                  {/* 🛡️ A MÁGICA DOS PACOTES: TÍTULO DINÂMICO E MINI-CARRINHO */}
+                  <div className="text-center mb-4">
+                    <h3 className="text-[#F8D1BE] font-serif text-xl">{servicoEscolhido?.nome}</h3>
+                    {servicoEscolhido?.is_pacote && (
+                       <p className="text-[#C7977D] text-xs uppercase tracking-widest font-bold mt-1">Agendando Sessão {sessoesSelecionadas.length + 1} de {servicoEscolhido.qtd_sessoes}</p>
+                    )}
+                  </div>
+
+                  {/* 🛡️ MINI-RESUMO DAS SESSÕES ANTERIORES */}
+                  {sessoesSelecionadas.length > 0 && (
+                    <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-3 rounded-xl animate-in fade-in">
+                      <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Sessões já escolhidas:</p>
+                      <div className="space-y-2">
+                        {sessoesSelecionadas.map((sessao, index) => (
+                          <div key={index} className="flex justify-between items-center text-xs border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                            <span className="text-[#E8D3C8] flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-400"/> Sessão {index + 1}</span>
+                            <span className="font-bold text-[#F8D1BE]">{new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <div>
-                    <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider mb-3">Dias Disponíveis</label>
+                    <div className="flex justify-between items-end mb-3">
+                      <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider">
+                        Dias Disponíveis
+                        {dataEscolhida && <span className="block text-[#C7977D] font-serif capitalize mt-0.5 text-sm">{dataEscolhida.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>}
+                      </label>
+                      {sessoesSelecionadas.length > 0 && (
+                        <button onClick={voltarData} className="text-[#C7977D] text-xs font-bold hover:text-white transition-colors underline underline-offset-2 mb-1">Desfazer Data</button>
+                      )}
+                    </div>
                     {diasDisponiveis.length === 0 ? (
                       <p className="text-xs text-red-400">Nenhuma data disponível na agenda no momento.</p>
                     ) : (
                       <div className="flex gap-2 overflow-x-auto hide-scroll pb-2">
                         {diasDisponiveis.map((data, idx) => (
-                          <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 py-3 rounded-xl flex flex-col items-center justify-center transition-all border ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96] text-[#120308] border-transparent font-bold shadow-lg' : 'glass-card text-gray-400 border-[#3a2522] hover:border-[#DCAE96]/50'}`}>
-                            <span className="text-[9px] uppercase mb-1">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
-                            <span className="text-lg font-serif">{data.getDate()}</span>
+                          <button key={idx} id={`dia-${data.getTime()}`} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all border ${dataEscolhida?.getDate() === data.getDate() && dataEscolhida?.getMonth() === data.getMonth() ? 'bg-[#DCAE96] text-[#120308] border-transparent font-bold shadow-lg scale-105' : 'glass-card text-gray-400 border-[#3a2522] hover:border-[#DCAE96]/50'}`}>
+                            <span className="text-[8px] sm:text-[9px] uppercase opacity-70">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
+                            <span className="text-base sm:text-lg font-serif my-0.5">{data.getDate()}</span>
+                            <span className={`text-[8px] sm:text-[9px] uppercase font-bold ${dataEscolhida?.getDate() === data.getDate() && dataEscolhida?.getMonth() === data.getMonth() ? 'text-[#120308]' : 'text-[#C7977D]'}`}>{data.toLocaleDateString('pt-BR', { month: 'short' }).replace('.','')}</span>
                           </button>
                         ))}
                       </div>
@@ -969,7 +1123,7 @@ export default function LandingPage() {
                       {horariosLivres.length === 0 ? (
                          <div className="bg-[#180A0D] border border-red-500/20 p-4 rounded-xl text-center">
                            <Ban size={24} className="text-red-400/50 mx-auto mb-2" />
-                           <p className="text-xs text-red-400">Nenhum horário livre suficiente para este serviço no dia selecionado.</p>
+                           <p className="text-xs text-red-400">Nenhum horário livre para essa data.</p>
                          </div>
                       ) : (
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -980,16 +1134,25 @@ export default function LandingPage() {
                       )}
                     </div>
                   )}
-                  <button disabled={!dataEscolhida || !horaEscolhida} onClick={() => setStep(3)} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">Continuar</button>
+                  
+                  <button disabled={!dataEscolhida || !horaEscolhida} onClick={avancarData} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
+                    {servicoEscolhido?.is_pacote && sessoesSelecionadas.length + 1 < servicoEscolhido.qtd_sessoes ? 'Salvar Horário e Escolher o Próximo' : 'Continuar'}
+                  </button>
                 </div>
               )}
               {step === 3 && (
                 <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
-                  <div className="glass-card p-5 rounded-2xl border border-[#3a2522] mb-6 flex items-center justify-between">
-                    <div>
-                      <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Resumo do Horário</p>
-                      <p className="text-white font-serif text-lg mb-1">{servicoEscolhido.nome}</p>
-                      <p className="text-gray-400 text-xs">{dataEscolhida?.toLocaleDateString('pt-BR')} às {horaEscolhida}</p>
+                  <div className="glass-card p-5 rounded-2xl border border-[#3a2522] mb-6">
+                    <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Resumo do Horário</p>
+                    <p className="text-white font-serif text-lg mb-3 leading-tight">{servicoEscolhido.nome}</p>
+                    
+                    <div className="space-y-2">
+                       {sessoesSelecionadas.map((sessao, index) => (
+                         <div key={index} className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-[#DCAE96]/10">
+                           <span className="text-gray-400">Sessão {index + 1}</span>
+                           <span className="font-bold text-[#F8D1BE]">{new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</span>
+                         </div>
+                       ))}
                     </div>
                   </div>
                   <div>
@@ -1016,7 +1179,6 @@ export default function LandingPage() {
                     </div>
                   </div>
 
-                  {/* 🛡️ BOTÃO QUE VALIDA A DÍVIDA */}
                   <button disabled={!clienteDados.nome || !clienteDados.telefone || isProcessando} onClick={validarEAvancarPagamento} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform flex justify-center items-center gap-2">
                     {isProcessando ? <Loader2 className="animate-spin" size={20} /> : 'Confirmar Agendamento'}
                   </button>
@@ -1025,7 +1187,6 @@ export default function LandingPage() {
               {step === 4 && (
                 <div className="animate-in fade-in slide-in-from-right-4">
                   
-                  {/* 🛡️ AVISO DE DÍVIDA (SE ELA TIVER FALTADO DA ÚLTIMA VEZ) */}
                   {dividaPendente > 0 && (
                     <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
                       <p className="text-red-400 font-bold text-sm flex items-center gap-2 mb-1"><AlertTriangle size={18}/> Débito Pendente de Falta</p>
@@ -1085,7 +1246,7 @@ export default function LandingPage() {
                       </div>
 
                       <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">
-                        <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do Serviço</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
+                        <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do {servicoEscolhido?.is_pacote ? 'Pacote' : 'Serviço'}</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
                         <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinalBase().toFixed(2).replace('.', ',')}</span></div>
                         {dividaPendente > 0 && <div className="flex justify-between text-sm text-red-400 font-bold mt-2 pt-2 border-t border-red-500/20"><span>Dívida de Falta Adicionada</span><span>+ R$ {dividaPendente.toFixed(2).replace('.', ',')}</span></div>}
                       </div>
@@ -1129,13 +1290,21 @@ export default function LandingPage() {
                   </div>
                   <h2 className="font-serif text-2xl text-white mb-2">Confirmado!</h2>
                   <p className="text-gray-400 mb-8 text-sm">Te enviamos os detalhes no WhatsApp.</p>
+                  
                   <div className="bg-[#180A0D] border border-[#3a2522] p-5 rounded-2xl w-full text-left mb-8">
-                    <p className="text-white font-bold mb-1 text-sm">{servicoEscolhido.nome}</p>
-                    <p className="text-[#C7977D] text-xs mb-4 font-medium">{dataEscolhida?.toLocaleDateString('pt-BR')} às {horaEscolhida}</p>
+                    <p className="text-white font-bold mb-3 text-sm">{servicoEscolhido.nome}</p>
+                    
+                    <div className="space-y-1 mb-4">
+                       {sessoesSelecionadas.map((sessao, index) => (
+                         <p key={index} className="text-[#C7977D] text-xs font-medium bg-black/30 p-2 rounded-lg border border-[#DCAE96]/10">Sessão {index + 1}: {new Date(sessao.data).toLocaleDateString('pt-BR')} às {sessao.hora}</p>
+                       ))}
+                    </div>
+
                     <div className="bg-[#0a0204] p-3 rounded-lg border border-[#3a2522]">
-                      <p className="text-[10px] md:text-xs text-gray-400">Restará pagar <strong className="text-white">R$ {(servicoEscolhido.preco - calcularSinalBase()).toFixed(2).replace('.', ',')}</strong> no dia do atendimento.</p>
+                      <p className="text-[10px] md:text-xs text-gray-400">Restará pagar <strong className="text-white">R$ {(servicoEscolhido.preco - calcularSinalBase()).toFixed(2).replace('.', ',')}</strong> no momento do atendimento.</p>
                     </div>
                   </div>
+
                   <button onClick={() => {setIsModalOpen(false); setStep(1);}} className="bg-[#DCAE96] text-[#120308] px-8 py-3.5 rounded-full font-bold w-full text-sm shadow-lg hover:scale-105 transition-transform">Concluir</button>
                 </div>
               )}

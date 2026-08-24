@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { CalendarDays, Crown, ArrowLeft, LogOut, Loader2, Sparkles, Clock, History, Award, Gift, HeartHandshake, CheckCircle2, AlertTriangle, CalendarX, MessageCircle } from 'lucide-react';
+import { CalendarDays, Crown, ArrowLeft, LogOut, Loader2, Sparkles, Clock, History, Award, Gift, HeartHandshake, CheckCircle2, AlertTriangle, CalendarX, MessageCircle, Package } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AreaClientePage() {
@@ -31,7 +31,6 @@ export default function AreaClientePage() {
       let clienteId = null;
       let clienteStats = null;
       
-      // 🛡️ Busca Blindada Simples: Procura o último cliente com este telefone
       if (telefoneUsuario) {
           const { data: cData } = await supabase.from('clientes')
               .select('*')
@@ -45,7 +44,6 @@ export default function AreaClientePage() {
           }
       } 
       
-      // 🛡️ Fallback Simples: Se não achou por telefone, procura pelo nome
       if (!clienteId && nomeUsuario) {
           const { data: cData } = await supabase.from('clientes')
               .select('*')
@@ -64,12 +62,42 @@ export default function AreaClientePage() {
       if (clienteId) {
         const { data: agendaData } = await supabase
           .from('agendamentos')
-          .select(`*, servicos ( nome, preco, duracao, taxa_sinal )`)
+          .select(`*, servicos ( nome, preco, duracao, taxa_sinal, is_pacote, qtd_sessoes )`)
           .eq('cliente_id', clienteId)
           .neq('tipo', 'cancelado')
           .order('inicio', { ascending: false });
           
-        if (agendaData) setAgendamentos(agendaData);
+        if (agendaData) {
+          // 🛡️ MOTOR DE AGRUPAMENTO DE PACOTES
+          const agendamentosAgrupados: any[] = [];
+          const pacotesMap = new Map();
+
+          agendaData.forEach(ag => {
+            if (ag.grupo_pacote_id) {
+              if (!pacotesMap.has(ag.grupo_pacote_id)) {
+                pacotesMap.set(ag.grupo_pacote_id, {
+                  id: ag.grupo_pacote_id,
+                  is_pacote: true,
+                  servico: ag.servicos,
+                  sessoes: []
+                });
+                agendamentosAgrupados.push(pacotesMap.get(ag.grupo_pacote_id));
+              }
+              pacotesMap.get(ag.grupo_pacote_id).sessoes.push(ag);
+            } else {
+              agendamentosAgrupados.push({ ...ag, is_pacote: false });
+            }
+          });
+
+          // Ordena as sessões de cada pacote pela data mais antiga primeiro (Sessão 1, 2, etc)
+          agendamentosAgrupados.forEach(item => {
+            if(item.is_pacote) {
+               item.sessoes.sort((a: any, b: any) => new Date(a.inicio).getTime() - new Date(b.inicio).getTime());
+            }
+          });
+
+          setAgendamentos(agendamentosAgrupados);
+        }
       }
     } catch (error) {
       console.error("Erro ao carregar dados VIP:", error);
@@ -83,7 +111,6 @@ export default function AreaClientePage() {
     window.location.href = '/';
   };
 
-  // 🛡️ AÇÃO: CANCELAR COM MAIS DE 48H (ESTORNO 100%)
   const cancelarComEstorno = async (ag: any) => {
     if (!window.confirm('Deseja realmente cancelar este agendamento? Como você está avisando com mais de 48h de antecedência, o valor do seu sinal será estornado.')) return;
     
@@ -109,10 +136,9 @@ export default function AreaClientePage() {
     }
   };
 
-  // 🛡️ AÇÃO: REAGENDAR ENTRE 24H E 48H (RETÉM SINAL)
   const solicitarReagendamento = (ag: any) => {
     const dataFormatada = new Date(ag.inicio).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
-    const mensagem = `Olá Débora! Preciso reagendar meu horário de *${ag.servicos?.nome}* marcado para o dia *${dataFormatada}*.\n\nComo estou avisando com antecedência (entre 24h e 48h), gostaria de manter o meu sinal retido para a nova data. Podemos ver um novo horário?`;
+    const mensagem = `Olá Débora! Preciso reagendar meu horário de *${ag.servicos?.nome}* marcado para o dia *${dataFormatada}*.\n\nComo estou avisando com antecedência, gostaria de manter o meu sinal retido para a nova data. Podemos ver um novo horário?`;
     window.open(`https://wa.me/5547996987519?text=${encodeURIComponent(mensagem)}`, '_blank');
   };
 
@@ -239,24 +265,69 @@ export default function AreaClientePage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {agendamentos.map((ag) => {
-              const dataObj = new Date(ag.inicio);
+            {agendamentos.map((item) => {
+
+              // 🛡️ SE FOR UM PACOTE
+              if (item.is_pacote) {
+                return (
+                  <div key={item.id} className="bg-gradient-to-br from-[#180A0D] to-[#120308] border border-[#DCAE96]/30 rounded-2xl p-6 hover:border-[#DCAE96]/50 transition-colors shadow-[0_0_20px_rgba(199,151,125,0.05)] relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-[#DCAE96]/10 rounded-bl-full rounded-tr-2xl pointer-events-none"></div>
+                    
+                    <div className="flex justify-between items-start mb-4 relative z-10">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded border border-[#DCAE96]/40 text-[#DCAE96] bg-[#DCAE96]/10 mb-3 inline-flex items-center gap-1.5">
+                          <Package size={12}/> Assinatura VIP
+                        </span>
+                        <h4 className="font-serif text-xl text-white leading-tight">{item.servico?.nome}</h4>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3 mb-6 relative z-10">
+                      {item.sessoes.map((sessao: any, index: number) => {
+                        const dataObj = new Date(sessao.inicio);
+                        const isPast = dataObj < new Date();
+                        return (
+                          <div key={sessao.id} className="flex justify-between items-center bg-black/40 border border-[#3a2522] p-3 rounded-xl">
+                             <div className="flex items-center gap-3">
+                               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${isPast || sessao.tipo === 'concluido' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-[#DCAE96]/20 text-[#DCAE96]'}`}>
+                                  {isPast || sessao.tipo === 'concluido' ? <CheckCircle2 size={12}/> : index + 1}
+                               </div>
+                               <div>
+                                 <p className={`text-sm font-bold ${isPast || sessao.tipo === 'concluido' ? 'text-gray-500' : 'text-[#F8D1BE]'}`}>{dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</p>
+                                 <p className="text-[9px] text-gray-500 uppercase tracking-widest">{isPast || sessao.tipo === 'concluido' ? 'Concluída' : 'Agendada'}</p>
+                               </div>
+                             </div>
+                             {(!isPast && sessao.tipo !== 'concluido') && (
+                                <button onClick={() => solicitarReagendamento(sessao)} className="text-orange-400 hover:text-white transition-colors bg-orange-500/10 p-2 rounded-lg border border-orange-500/20" title="Remarcar esta sessão">
+                                  <MessageCircle size={14}/>
+                                </button>
+                             )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              }
+
+              // 🛡️ SE FOR UM SERVIÇO COMUM (AVULSO)
+              const dataObj = new Date(item.inicio);
               const dataFormatada = dataObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' });
               const horaFormatada = dataObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
               
               const isFuture = dataObj > new Date();
               const hoursDifference = isFuture ? (dataObj.getTime() - new Date().getTime()) / (1000 * 60 * 60) : 0;
               
-              const statusCor = ag.tipo === 'concluido' ? 'text-gray-500 bg-gray-900/50 border-gray-800' : ag.tipo === 'em_andamento' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-[#F8D1BE] bg-[#DCAE96]/10 border-[#DCAE96]/30';
+              const statusCor = item.tipo === 'concluido' ? 'text-gray-500 bg-gray-900/50 border-gray-800' : item.tipo === 'em_andamento' ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-[#F8D1BE] bg-[#DCAE96]/10 border-[#DCAE96]/30';
 
               return (
-                <div key={ag.id} className="bg-[#180A0D] border border-[#3a2522] rounded-2xl p-6 hover:border-[#DCAE96]/30 transition-colors flex flex-col shadow-lg relative overflow-hidden">
+                <div key={item.id} className="bg-[#180A0D] border border-[#3a2522] rounded-2xl p-6 hover:border-[#DCAE96]/30 transition-colors flex flex-col shadow-lg relative overflow-hidden">
                   <div className="flex justify-between items-start mb-4">
                     <div>
                       <span className={`text-[10px] uppercase font-bold tracking-widest px-2.5 py-1 rounded border ${statusCor} mb-3 inline-block`}>
-                        {ag.tipo.replace('_', ' ')}
+                        {item.tipo.replace('_', ' ')}
                       </span>
-                      <h4 className="font-serif text-xl text-white leading-tight">{ag.servicos?.nome || 'Serviço Personalizado'}</h4>
+                      <h4 className="font-serif text-xl text-white leading-tight">{item.servicos?.nome || 'Serviço Personalizado'}</h4>
                     </div>
                   </div>
                   
@@ -264,25 +335,24 @@ export default function AreaClientePage() {
                     <div className="flex items-center gap-2 text-gray-300 font-medium bg-[#120308] px-3 py-1.5 rounded-lg border border-[#3a2522]">
                       <Clock size={14} className="text-[#C7977D]"/> {dataFormatada} às {horaFormatada}
                     </div>
-                    {ag.servicos?.preco && (
-                      <span className="font-bold text-xl text-[#DCAE96]">R$ {ag.servicos.preco.toFixed(2).replace('.', ',')}</span>
+                    {item.servicos?.preco && (
+                      <span className="font-bold text-xl text-[#DCAE96]">R$ {item.servicos.preco.toFixed(2).replace('.', ',')}</span>
                     )}
                   </div>
 
-                  {/* 🛡️ REGRAS DE CANCELAMENTO PARA AGENDAMENTOS FUTUROS */}
-                  {ag.tipo === 'agendado' && isFuture && (
+                  {item.tipo === 'agendado' && isFuture && (
                     <div className="mt-auto pt-4 border-t border-[#3a2522]">
                       {hoursDifference >= 48 ? (
                         <div className="flex flex-col gap-2">
                           <p className="text-[10px] text-emerald-400 font-medium mb-1">✅ Estorno garantido (Mais de 48h restantes)</p>
-                          <button onClick={() => cancelarComEstorno(ag)} className="w-full bg-red-500/10 text-red-400 border border-red-500/30 py-2.5 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-colors flex justify-center items-center gap-2">
+                          <button onClick={() => cancelarComEstorno(item)} className="w-full bg-red-500/10 text-red-400 border border-red-500/30 py-2.5 rounded-xl text-sm font-bold hover:bg-red-500/20 transition-colors flex justify-center items-center gap-2">
                             <CalendarX size={16}/> Cancelar e Solicitar Estorno
                           </button>
                         </div>
                       ) : hoursDifference >= 24 ? (
                         <div className="flex flex-col gap-2">
                           <p className="text-[10px] text-orange-400 font-medium mb-1">⚠️ Prazo de estorno encerrado (Menos de 48h). Permite apenas remarcação.</p>
-                          <button onClick={() => solicitarReagendamento(ag)} className="w-full bg-orange-500/10 text-orange-400 border border-orange-500/30 py-2.5 rounded-xl text-sm font-bold hover:bg-orange-500/20 transition-colors flex justify-center items-center gap-2">
+                          <button onClick={() => solicitarReagendamento(item)} className="w-full bg-orange-500/10 text-orange-400 border border-orange-500/30 py-2.5 rounded-xl text-sm font-bold hover:bg-orange-500/20 transition-colors flex justify-center items-center gap-2">
                             <MessageCircle size={16}/> Reagendar Via WhatsApp
                           </button>
                         </div>

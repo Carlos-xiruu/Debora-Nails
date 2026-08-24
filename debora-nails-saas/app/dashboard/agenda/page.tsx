@@ -185,7 +185,6 @@ export default function AgendaPage() {
     const inicioMins = converterParaMinutos(horaEscolhida);
     const fimAtendimentoMin = inicioMins + duracaoMins;
 
-    // 🛡️ CORREÇÃO: Pega a regra específica do dia escolhido no modal
     const diaDaSemanaModal = new Date(dataEscolhida + "T00:00:00").getDay();
     const regraModal = configuracoes.disponibilidade[diaDaSemanaModal];
 
@@ -200,7 +199,6 @@ export default function AgendaPage() {
     
     const fechamentoMin = converterParaMinutos(regraModal?.fechamento || '18:00');
     if (fimAtendimentoMin > fechamentoMin) {
-      // 🛡️ CORREÇÃO: PODER DE ADMIN (Aviso em vez de bloqueio absoluto)
       const confirmacao = window.confirm(`⚠️ Atenção: O serviço demora ${servicoInfo.duracao}. Se começar às ${horaEscolhida}, vai passar do horário de fechamento (${regraModal.fechamento}).\n\nComo você é a dona da agenda, deseja FORÇAR este agendamento mesmo assim?`);
       if (!confirmacao) {
         setIsSaving(false); return;
@@ -236,22 +234,56 @@ export default function AgendaPage() {
     }
 
     let cliente_id = formData.get('cliente_id') as string;
+    let clienteNome = '';
+    let clienteTelefone = '';
 
     if (abaCliente === 'nova') {
+      clienteNome = formData.get('nome_nova') as string;
+      clienteTelefone = formData.get('telefone_nova') as string;
+      
       const { data: novoClienteData, error: erroCliente } = await supabase.from('clientes')
-        .insert([{ nome: formData.get('nome_nova'), telefone: formData.get('telefone_nova'), status: 'Novo' }])
+        .insert([{ nome: clienteNome, telefone: clienteTelefone, status: 'Novo' }])
         .select().single();
 
       if (erroCliente) { alert(`ERRO: Não foi possível criar cliente. ${erroCliente.message}`); setIsSaving(false); return; }
       cliente_id = novoClienteData.id;
+    } else {
+      const clienteEncontrado = clientes.find(c => c.id === cliente_id);
+      if (clienteEncontrado) {
+        clienteNome = clienteEncontrado.nome;
+        clienteTelefone = clienteEncontrado.telefone;
+      }
     }
 
     const { error: erroAgenda } = await supabase.from('agendamentos').insert([{
       cliente_id: cliente_id, servico_id: servicoId, tipo: 'agendado', status_pagamento: formData.get('status_pagamento') as string, inicio: dataInicio.toISOString(), fim: dataFim.toISOString()
     }]);
 
-    if (erroAgenda) { alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); } 
-    else { await fetchDados(); setIsModalOpen(false); alert("✅ Agendamento forçado/criado com sucesso!"); }
+    if (erroAgenda) { 
+      alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); 
+    } else { 
+      await fetchDados(); 
+      setIsModalOpen(false); 
+      alert("✅ Agendamento criado com sucesso!"); 
+
+      // 🚀 GATILHO WHATSAPP: Confirmação Imediata
+      if (clienteTelefone) {
+        try {
+          const primeiroNome = clienteNome.split(' ')[0];
+          const dataFormatada = dataInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          
+          const mensagem = `Oii, ${primeiroNome}! Tudo bem? ✨\n\nSeu agendamento de *${servicoInfo?.nome}* foi confirmado para o dia *${dataFormatada}* às *${horaEscolhida}*!\n\nEstamos preparando tudo com muito carinho te esperando no Debora Nails Studio. 💖`;
+
+          await fetch('/api/whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone: clienteTelefone, mensagem })
+          });
+        } catch (err) {
+          console.error("Erro ao enviar mensagem de WhatsApp:", err);
+        }
+      }
+    }
     
     setIsSaving(false);
   };
@@ -310,8 +342,34 @@ export default function AgendaPage() {
       inicio: dataInicio.toISOString(), fim: dataFim.toISOString(), status_pagamento: formData.get('status_pagamento') as string
     }).eq('id', agendamentoEditando.id);
 
-    if (error) { alert(`ERRO: ${error.message}`); } 
-    else { await fetchDados(); setAgendamentoEditando(null); alert('Horário remarcado com sucesso!'); }
+    if (error) { 
+      alert(`ERRO: ${error.message}`); 
+    } else { 
+      await fetchDados(); 
+      alert('Horário remarcado com sucesso!'); 
+
+      // 🚀 GATILHO WHATSAPP: Aviso de Remarcação
+      const clienteRemarcado = agendamentoEditando.clientes;
+      if (clienteRemarcado && clienteRemarcado.telefone) {
+        try {
+          const primeiroNome = clienteRemarcado.nome.split(' ')[0];
+          const dataFormatada = dataInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+          const servicoNome = agendamentoEditando.servicos.nome;
+          
+          const mensagem = `Oii, ${primeiroNome}! ✨\n\nPassando para te avisar que seu horário de *${servicoNome}* foi REMARCADO com sucesso para o dia *${dataFormatada}* às *${novaHora}*.\n\nQualquer dúvida, é só nos chamar! 💖`;
+
+          await fetch('/api/whatsapp', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ telefone: clienteRemarcado.telefone, mensagem })
+          });
+        } catch (err) {
+          console.error("Erro ao enviar WhatsApp de remarcação:", err);
+        }
+      }
+
+      setAgendamentoEditando(null); 
+    }
     setIsSaving(false);
   };
 
@@ -319,7 +377,6 @@ export default function AgendaPage() {
     e.preventDefault();
     setIsSaving(true);
     
-    // 🛡️ CORREÇÃO: Usando update absoluto para garantir que salve no banco
     const { error } = await supabase.from('configuracoes').update({
       disponibilidade: configuracoes.disponibilidade,
       bloqueios: configuracoes.bloqueios
@@ -335,7 +392,6 @@ export default function AgendaPage() {
     setIsSaving(false);
   };
 
-  // 🛡️ MOTOR DE CANCELAMENTO COM GERAÇÃO DE DÍVIDA
   const processarCancelamento = async (tipo: 'falta' | 'reembolso_total' | 'reembolso_parcial') => {
     setIsSaving(true);
     try {

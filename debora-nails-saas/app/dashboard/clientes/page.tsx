@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Plus, Search, Calendar, ShieldAlert, X, Users, Loader2, Ban, MessageCircle, Clock, Edit2, FileText, Sparkles } from 'lucide-react';
+import { Plus, Search, Calendar, ShieldAlert, X, Users, Loader2, Ban, MessageCircle, Clock, Edit2, FileText, Sparkles, CheckCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase'; 
 
 export default function ClientesPage() {
@@ -132,6 +132,30 @@ export default function ClientesPage() {
     await supabase.from('clientes').update({ bloqueado: !statusAtual }).eq('id', id);
   };
 
+  // 🛡️ NOVA FUNÇÃO: MOTOR DE PERDÃO / LIMPAR NOME
+  const perdoarCliente = async (clienteId: string) => {
+    const confirmar = window.confirm("Tem certeza que deseja perdoar a dívida e zerar as faltas desta cliente?");
+    if (!confirmar) return;
+
+    try {
+      const response = await fetch('/api/clientes/limpar-historico', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cliente_id: clienteId })
+      });
+
+      if (response.ok) {
+        alert("✅ Nome limpo com sucesso! A cliente já pode agendar novamente.");
+        // Atualiza a tela na mesma hora sem recarregar a página
+        setClientes(clientes.map(c => c.id === clienteId ? { ...c, faltas: 0 } : c));
+      } else {
+        alert("🚨 Erro ao limpar o histórico.");
+      }
+    } catch (error) {
+      console.error("Erro na comunicação com a API:", error);
+    }
+  };
+
   const clientesFiltrados = clientes.filter(c => {
     const nomeMatch = c.nome.toLowerCase().includes(busca.toLowerCase());
     const buscaNumeros = busca.replace(/\D/g, '');
@@ -240,6 +264,18 @@ export default function ClientesPage() {
                   <button onClick={() => abrirModalEdicao(cliente)} className="p-2.5 bg-[#DCAE96]/10 text-[#F8D1BE] border border-[#DCAE96]/30 hover:bg-[#DCAE96]/20 rounded-lg transition-colors" title="Editar Perfil / Observações">
                     <Edit2 size={16} />
                   </button>
+
+                  {/* 🛡️ NOVO BOTÃO: Perdoar Dívida (Só aparece se tiver faltas) */}
+                  {!cliente.bloqueado && cliente.faltas > 0 && (
+                    <button 
+                      onClick={() => perdoarCliente(cliente.id)}
+                      className="p-2.5 rounded-lg border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10 transition-colors flex items-center justify-center shrink-0"
+                      title="Perdoar Dívida / Limpar Faltas"
+                    >
+                      <CheckCircle size={16} />
+                    </button>
+                  )}
+
                   <button 
                     onClick={() => toggleBloqueio(cliente.id, cliente.bloqueado)}
                     className={`p-2.5 rounded-lg border transition-colors flex items-center justify-center shrink-0 ${cliente.bloqueado ? 'bg-red-500/20 text-red-400 border-red-500/50 hover:bg-red-500/30' : 'bg-transparent text-gray-500 border-[#DCAE96]/30 hover:border-red-500/50 hover:text-red-500 hover:bg-red-500/10'}`}

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban } from 'lucide-react';
+import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Package, Crown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const DISPONIBILIDADE_PADRAO = {
@@ -32,11 +32,11 @@ export default function MonitorPage() {
   const [isGerandoPix, setIsGerandoPix] = useState(false);
 
   const [servicosDb, setServicosDb] = useState<any[]>([]);
+  const [pacotesDb, setPacotesDb] = useState<any[]>([]); 
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
   const [imagemAtualIndex, setImagemAtualIndex] = useState(0);
   
-  // 🛡️ SLIDES COM O VÍDEO VERTICAL
   const slides = [
     { bg: '/trabalho.mp4', tipo: 'video' }, 
     { bg: '/01.jpg', tipo: 'intro' },
@@ -123,8 +123,11 @@ export default function MonitorPage() {
 
   useEffect(() => {
     const fetchInicial = async () => {
-      const { data: servicos } = await supabase.from('servicos').select('*').eq('ativo', true).order('nome');
-      if (servicos) setServicosDb(servicos);
+      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('preco');
+      if (servs) {
+        setServicosDb(servs.filter(s => !s.is_pacote));
+        setPacotesDb(servs.filter(s => s.is_pacote));
+      }
 
       const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
       if (config) {
@@ -184,15 +187,14 @@ export default function MonitorPage() {
     let d = new Date();
     let count = 0;
     
-    while (count < 14) {
+    // 🛡️ MOTOR EXPANDIDO: 45 DIAS PARA FRENTE NO MONITOR TAMBÉM
+    while (count < 45) {
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
-      
       if (regra && regra.ativo) {
         dias.push(new Date(d));
         count++;
       }
-      
       d.setDate(d.getDate() + 1);
     }
     setDiasDisponiveis(dias);
@@ -444,12 +446,10 @@ export default function MonitorPage() {
       {!atendimentoAtivo && (
         <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           
-          {/* 🛡️ RENDERIZADOR DE SLIDES (VOLTAMOS PARA OS 3 VÍDEOS COM PRELOAD) */}
           {slides.map((slide, idx) => {
             if (slide.tipo === 'video') {
               return (
                 <div key={idx} className="absolute inset-0 flex gap-2 sm:gap-4 p-2 sm:p-4" style={{ opacity: idx === imagemAtualIndex ? 0.4 : 0, transition: 'opacity 2s ease-in-out' }}>
-                  {/* Tríptico: 3 Colunas com preload="auto" para carregar junto e evitar engasgos */}
                   <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl">
                     <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
                   </div>
@@ -467,7 +467,6 @@ export default function MonitorPage() {
             );
           })}
           
-          {/* EFEITO FUMÊ GERAL */}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0A0205] via-[#0A0205]/40 to-[#0A0205]/90 z-10 pointer-events-none"></div>
           
           <header className="w-full p-4 md:px-8 flex justify-between items-center z-30 shrink-0">
@@ -538,10 +537,10 @@ export default function MonitorPage() {
                 <Sparkles size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Atendimento</span>
               </button>
               <button onClick={() => setActiveTab('cardapio')} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <ImageIcon size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Serviços</span>
+                <ImageIcon size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Serviços VIP</span>
               </button>
               <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <CalendarDays size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Agendar</span>
+                <CalendarDays size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Agendar Retorno</span>
               </button>
             </nav>
 
@@ -578,7 +577,6 @@ export default function MonitorPage() {
 
                   <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-4 w-full min-h-0">
                     
-                    {/* ESQUERDA: CRONÔMETRO */}
                     <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col justify-between min-h-0 overflow-hidden">
                       <div>
                         <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
@@ -590,35 +588,51 @@ export default function MonitorPage() {
                       </div>
                     </div>
 
-                    {/* DIREITA: RESUMO FINANCEIRO (BLINDADO CONTRA SCROLL) */}
                     {dadosServicoSessao && (
                       <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                         
-                        <div className="flex justify-between items-center mb-1 border-b border-[#DCAE96]/10 pb-1 shrink-0">
-                          <h3 className="font-serif text-sm sm:text-base text-white">Resumo</h3>
-                          {valorRestante <= 0 || statusPagamento === 'pago' ? (
-                             <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 size={10}/> Pago</span>
-                          ) : null}
-                        </div>
-                        
-                        <div className="space-y-1 text-[10px] sm:text-xs shrink-0">
-                          <div className="flex justify-between text-gray-400">
-                            <span>Total:</span>
-                            <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
+                        <div>
+                          <div className="flex justify-between items-center mb-1 border-b border-[#DCAE96]/10 pb-1 shrink-0">
+                            <h3 className="font-serif text-sm sm:text-base text-white">Resumo</h3>
+                            {valorRestante <= 0 || statusPagamento === 'pago' ? (
+                               <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 size={10}/> Pago</span>
+                            ) : null}
                           </div>
-                          {taxaSinal > 0 && (
-                            <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1">
-                              <span>Sinal ({taxaSinal}%):</span>
-                              <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
+                          
+                          <div className="space-y-1 text-[10px] sm:text-xs shrink-0">
+                            <div className="flex justify-between text-gray-400">
+                              <span>Total:</span>
+                              <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
                             </div>
-                          )}
-                          <div className="flex justify-between text-[#F8D1BE] text-sm sm:text-base font-bold pt-1">
-                            <span>Restante:</span>
-                            <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
+                            {taxaSinal > 0 && (
+                              <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1">
+                                <span>Sinal ({taxaSinal}%):</span>
+                                <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
+                              </div>
+                            )}
+                            <div className="flex justify-between text-[#F8D1BE] text-sm sm:text-base font-bold pt-1">
+                              <span>Restante:</span>
+                              <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
+                            </div>
                           </div>
                         </div>
 
-                        {/* CAIXA DE PAGAMENTO EXTREMAMENTE COMPACTA */}
+                        {/* 🛡️ BANNER INTELIGENTE DE UPSELL NO MONITOR VIP */}
+                        {!dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
+                          <div className="mt-4 bg-gradient-to-r from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-2xl p-3 sm:p-4 flex items-center justify-between shrink-0 shadow-[0_0_15px_rgba(220,174,150,0.05)]">
+                             <div className="flex items-center gap-3">
+                                <div className="p-2 bg-[#DCAE96]/20 rounded-full"><Crown size={16} className="text-[#C7977D]" /></div>
+                                <div className="text-left">
+                                  <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm leading-tight">Sabia que você pode economizar?</p>
+                                  <p className="text-gray-400 text-[9px] sm:text-[10px] mt-0.5">Transforme esse serviço avulso em um pacote mensal e garanta descontos.</p>
+                                </div>
+                             </div>
+                             <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform shadow-[0_0_10px_rgba(248,209,190,0.3)] shrink-0">
+                               Ver Pacotes
+                             </button>
+                          </div>
+                        )}
+
                         <div className="mt-auto pt-2 shrink-0">
                           {valorRestante > 0 && statusPagamento === 'pendente' && (
                             <div className="bg-black/40 border border-[#DCAE96]/20 rounded-xl p-1.5 sm:p-2 flex flex-row items-center gap-2 shadow-inner h-16 sm:h-20">
@@ -664,39 +678,69 @@ export default function MonitorPage() {
               {abaAtiva === 'cardapio' && (
                 <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0">
                   <div className="mb-2 sm:mb-4 shrink-0">
-                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Menu de Serviços</h2>
-                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Inspire-se para a sua próxima visita.</p>
+                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Catálogo Exclusivo</h2>
+                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Inspire-se para a sua próxima visita ou assine um Clube VIP.</p>
                   </div>
                   
-                  <div className="grid grid-cols-1 gap-2 sm:gap-3 overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-0">
-                    {servicosDb.length === 0 ? (
-                      <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
-                    ) : (
-                      servicosDb.map(serv => (
-                        <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-20 sm:h-24 hover:border-[#DCAE96]/50 transition-colors shrink-0">
-                          <div className="w-[30%] bg-black relative shrink-0">
-                            {serv.imagens?.[0] ? (
-                              <img src={serv.imagens[0]} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
-                            ) : (
-                              <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
-                            )}
-                            <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
-                          </div>
-                          
-                          <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
-                            <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
-                            <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
-                            
-                            <div className="flex justify-between items-center mt-auto">
-                              <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                              <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="text-[#C7977D] flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:text-white transition-colors shrink-0">
-                                Agendar <ChevronRight size={10}/>
+                  <div className="overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-0 space-y-6">
+                    
+                    {pacotesDb.length > 0 && (
+                      <div>
+                        <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><Crown size={14}/> Assinaturas VIP</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {pacotesDb.map(pacote => (
+                            <div key={pacote.id} className="flex flex-col bg-gradient-to-b from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/30 rounded-xl overflow-hidden shadow-lg p-3 sm:p-4 hover:border-[#DCAE96]/60 transition-colors">
+                              <div className="flex justify-between items-start mb-2">
+                                <div>
+                                  <h4 className="font-serif text-sm text-[#F8D1BE]">{pacote.nome}</h4>
+                                  <span className="text-[9px] text-[#C7977D] uppercase tracking-widest font-bold">{pacote.qtd_sessoes} Sessões</span>
+                                </div>
+                                <span className="text-white font-bold text-sm">R$ {pacote.preco.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                              <p className="text-gray-400 text-[10px] italic leading-relaxed mb-4 flex-1">{pacote.descricao}</p>
+                              <button onClick={() => {setServicoEscolhido(pacote); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="w-full bg-[#DCAE96]/10 border border-[#DCAE96]/40 text-[#DCAE96] py-1.5 rounded-lg text-[10px] font-bold uppercase hover:bg-[#DCAE96] hover:text-[#120308] transition-colors">
+                                Quero este pacote
                               </button>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                      ))
+                      </div>
                     )}
+
+                    <div>
+                      <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><ImageIcon size={14}/> Serviços Avulsos</h3>
+                      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                        {servicosDb.length === 0 ? (
+                          <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
+                        ) : (
+                          servicosDb.map(serv => (
+                            <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-20 sm:h-24 hover:border-[#DCAE96]/50 transition-colors shrink-0">
+                              <div className="w-[30%] bg-black relative shrink-0">
+                                {serv.imagens?.[0] ? (
+                                  <img src={serv.imagens[0]} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
+                                ) : (
+                                  <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
+                                )}
+                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
+                              </div>
+                              
+                              <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
+                                <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
+                                <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
+                                
+                                <div className="flex justify-between items-center mt-auto">
+                                  <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                                  <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="text-[#C7977D] flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:text-white transition-colors shrink-0">
+                                    Agendar <ChevronRight size={10}/>
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
                   </div>
                 </div>
               )}
@@ -715,10 +759,13 @@ export default function MonitorPage() {
                         <div className="w-full sm:w-1/2 flex flex-col gap-2 sm:gap-3 sm:pr-4 sm:border-r border-[#DCAE96]/10 shrink-0">
                           <div>
                             <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">1. Qual o serviço?</label>
-                            <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido(servicosDb.find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:border-[#F8D1BE]">
-                              <option value="">Selecione o serviço...</option>
-                              {servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}
+                            
+                            <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:border-[#F8D1BE]">
+                              <option value="">Selecione...</option>
+                              {pacotesDb.length > 0 && <optgroup label="👑 Pacotes VIP">{pacotesDb.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.qtd_sessoes}x)</option>)}</optgroup>}
+                              {servicosDb.length > 0 && <optgroup label="💅 Serviços Avulsos">{servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</optgroup>}
                             </select>
+                            
                           </div>
                           <div className="flex-1 flex flex-col min-h-0">
                             <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">2. Data</label>
