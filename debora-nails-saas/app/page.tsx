@@ -81,6 +81,7 @@ export default function LandingPage() {
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
 
+  // 🛡️ CORREÇÃO 1: BLINDAGEM DE FUSO HORÁRIO
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
     const [h, m] = horaStr.split(':').map(Number);
@@ -105,7 +106,9 @@ export default function LandingPage() {
   };
 
   const formatarDataLocalStr = (d: Date) => {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const tzOffset = d.getTimezoneOffset() * 60000; 
+    const localISOTime = new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
+    return localISOTime;
   };
 
   useEffect(() => {
@@ -128,7 +131,7 @@ export default function LandingPage() {
       }
 
       const hojeStr = formatarDataLocalStr(new Date());
-      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`).neq('tipo', 'cancelado');
+      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00-03:00`).neq('tipo', 'cancelado');
       if (agends) setAgendamentos(agends);
     };
 
@@ -141,6 +144,7 @@ export default function LandingPage() {
     if (!configuracoes) return;
     const dias = [];
     let d = new Date();
+    d.setHours(0,0,0,0);
     let count = 0;
     
     while (count < 45) {
@@ -379,8 +383,10 @@ export default function LandingPage() {
       
       if (dataSugerida) {
          setTimeout(() => {
-           const element = document.getElementById(`dia-${dataSugerida.getTime()}`);
-           if(element) element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+           try {
+             const element = document.getElementById(`dia-${dataSugerida.getTime()}`);
+             if(element) element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+           } catch(e) { console.log('Scroll interceptado') }
          }, 100);
       }
     } else {
@@ -404,25 +410,34 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
 
+  // 🛡️ CORREÇÃO 2: BLINDAGEM DE PAGAMENTO (Previne Múltiplos Cliques)
   const validarEAvancarPagamento = async () => {
+    if (isProcessando) return;
     setIsProcessando(true);
     let dividaAtual = 0;
 
-    const numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
-    if (numeroLimpo.length >= 10) {
-      const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', clienteDados.telefone).limit(1).single();
-      if (cli && cli.divida_pendente > 0) {
-        dividaAtual = cli.divida_pendente;
+    try {
+      let numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
+      if (numeroLimpo.length >= 10) {
+        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+           numeroLimpo = '55' + numeroLimpo;
+        }
+        const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', numeroLimpo).limit(1).single();
+        if (cli && cli.divida_pendente > 0) {
+          dividaAtual = cli.divida_pendente;
+        }
       }
-    }
-    
-    setDividaPendente(dividaAtual);
-    setIsProcessando(false);
-
-    if (calcularSinalBase() > 0 || dividaAtual > 0) {
-      setStep(4);
-    } else {
-      processarPagamento(); 
+      
+      setDividaPendente(dividaAtual);
+      
+      if (calcularSinalBase() > 0 || dividaAtual > 0) {
+        setStep(4);
+        setIsProcessando(false);
+      } else {
+        processarPagamento(); 
+      }
+    } catch (e) {
+      setIsProcessando(false);
     }
   };
 
@@ -504,12 +519,18 @@ export default function LandingPage() {
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
-      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', dados.clienteDados.telefone).limit(1);
+      
+      let numeroLimpo = dados.clienteDados.telefone.replace(/\D/g, '');
+      if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+         numeroLimpo = '55' + numeroLimpo;
+      }
+      
+      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', numeroLimpo).limit(1);
       
       if (clientesEncontrados && clientesEncontrados.length > 0) {
         cliente_id = clientesEncontrados[0].id;
       } else {
-        const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: dados.clienteDados.telefone, status: 'Novo' }]).select().limit(1);
+        const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: numeroLimpo, status: 'Novo' }]).select().limit(1);
         if (errCli) { alert("🚨 Erro ao salvar Cliente."); return; }
         if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
@@ -573,7 +594,7 @@ export default function LandingPage() {
           await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone: dados.clienteDados.telefone, mensagem: mensagemCliente })
+            body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
           });
         } catch (errWhatsApp) {
           console.error('Erro ao chamar API do WhatsApp:', errWhatsApp);
@@ -768,67 +789,96 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* 🛡️ CORREÇÃO 3: CARD VIP PROTEGIDO NO MOBILE */}
       {pacotes.length > 0 && (
         <section id="pacotes" className="py-24 px-6 relative z-10 bg-gradient-to-b from-[#0a0204] to-[#120308] border-t border-[#3a2522]">
           <div className="max-w-7xl mx-auto">
             <div className="text-center mb-16">
-              <span className="inline-flex items-center gap-2 bg-[#DCAE96]/10 border border-[#DCAE96]/30 text-[#DCAE96] px-4 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold mb-4">
-                <Crown size={14} /> Clube VIP
+              <span className="inline-flex items-center gap-2 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-4 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold mb-4 shadow-[0_0_15px_rgba(220,174,150,0.3)]">
+                Clube VIP
               </span>
-              <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Pacotes & Assinaturas</h2>
+              <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Assinaturas Exclusivas</h2>
               <p className="text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
-                Por que pagar mais caro agendando toda semana se você pode ter um plano inteligente? Garanta sua vaga, mantenha suas unhas impecáveis e economize assinando nossos pacotes mensais.
+                A experiência definitiva. Garanta suas vagas fixas para o mês inteiro, mantenha suas mãos impecáveis e garanta a sua prioridade no estúdio.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center">
-              {pacotes.map(pacote => (
-                <div key={pacote.id} className="relative bg-[#0a0204] rounded-3xl p-8 border border-[#DCAE96]/30 shadow-[0_0_30px_rgba(199,151,125,0.1)] hover:-translate-y-2 transition-transform duration-500 flex flex-col group">
-                  <div className="absolute top-0 right-0 w-32 h-32 bg-[#DCAE96]/10 rounded-bl-full rounded-tr-3xl -z-10 transition-all duration-500 group-hover:bg-[#DCAE96]/20"></div>
-                  
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#DCAE96] to-[#C7977D] flex items-center justify-center shadow-lg">
-                      <Package className="text-[#120308]" size={24} />
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-serif text-white leading-tight">{pacote.nome}</h3>
-                      <p className="text-xs text-[#DCAE96] font-bold uppercase tracking-wider">{pacote.qtd_sessoes} Sessões no Mês</p>
-                    </div>
-                  </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center mt-12 items-center">
+              {pacotes.map((pacote, index) => {
+                const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
+                const isDestaque = index === 1;
 
-                  <div className="mb-6 pb-6 border-b border-[#3a2522]">
-                    <div className="flex items-end gap-2">
-                      <span className="text-4xl font-bold text-white">R$ {pacote.preco.toFixed(2).replace('.', ',')}</span>
-                      <span className="text-gray-500 text-sm mb-1">/mês</span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1 space-y-4 mb-8">
-                    <p className="text-sm text-gray-400 italic leading-relaxed">{pacote.descricao}</p>
-                    <ul className="space-y-3">
-                      <li className="flex items-start gap-2 text-sm text-gray-300">
-                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Agende {pacote.qtd_sessoes} horários de uma vez</span>
-                      </li>
-                      <li className="flex items-start gap-2 text-sm text-gray-300">
-                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Vagas fixas e prioridade na agenda</span>
-                      </li>
-                      <li className="flex items-start gap-2 text-sm text-gray-300">
-                        <Check size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                        <span>Muito mais econômico que o avulso</span>
-                      </li>
-                    </ul>
-                  </div>
-
-                  <button 
-                    onClick={() => iniciarAgendamento(pacote)}
-                    className="w-full bg-transparent border-2 border-[#C7977D] text-[#DCAE96] py-4 rounded-xl font-bold uppercase tracking-wider text-xs hover:bg-[#C7977D] hover:text-[#120308] transition-colors"
+                return (
+                  <div 
+                    key={pacote.id} 
+                    onClick={() => setServicoDetalhe(pacote)} 
+                    className={`relative rounded-3xl overflow-hidden group flex flex-col bg-[#180A0D] transition-all duration-500 cursor-pointer ${isDestaque ? 'border-2 border-[#C7977D] shadow-[0_0_40px_rgba(199,151,125,0.4)] scale-100 md:scale-105 z-10' : 'border border-[#3a2522] hover:border-[#DCAE96]/50 shadow-2xl'}`}
                   >
-                    Assinar e Agendar Datas
-                  </button>
-                </div>
-              ))}
+                    
+                    {isDestaque && (
+                      <div className="absolute top-4 right-4 z-30 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-[0_0_20px_rgba(220,174,150,0.8)] animate-pulse" style={{ animationDuration: '3s' }}>
+                        🔥 Mais Popular
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#DCAE96]/10 rounded-bl-full rounded-tr-3xl -z-10 transition-all duration-500 group-hover:bg-[#DCAE96]/20"></div>
+
+                    <div className="h-48 relative overflow-hidden bg-black shrink-0">
+                      {imagem ? (
+                        <Image src={imagem} alt={pacote.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={40} className="text-[#C7977D]" /></div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/50 to-transparent"></div>
+                      
+                      <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#DCAE96]/30 flex items-center gap-1.5 shadow-lg">
+                         <span className="text-[10px] text-[#F8D1BE] uppercase font-bold tracking-widest">
+                           {pacote.qtd_sessoes} Sessões Mensais
+                         </span>
+                      </div>
+                    </div>
+
+                    <div className="p-6 relative z-10 flex flex-col flex-1 mt-2">
+                      <h3 className="text-2xl font-serif text-white leading-tight mb-4 group-hover:text-[#F8D1BE] transition-colors min-h-[56px] line-clamp-2">{pacote.nome}</h3>
+                      
+                      <ul className="space-y-3 mb-6 flex-1 min-h-[90px]">
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Direito a <strong>{pacote.qtd_sessoes} horários</strong> no mês</span>
+                        </li>
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Vagas fixas e prioritárias</span>
+                        </li>
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Mais econômico que avulso</span>
+                        </li>
+                      </ul>
+
+                      <div className="flex items-end gap-1 mb-4 border-t border-[#3a2522] pt-4">
+                        <span className="text-[#C7977D] text-sm font-bold mb-1">R$</span>
+                        <span className="text-4xl font-bold text-white tracking-tight break-all">{pacote.preco.toFixed(2).replace('.', ',')}</span>
+                        <span className="text-gray-500 text-xs mb-1.5">/mês</span>
+                      </div>
+
+                      <div className="flex justify-center mb-4 mt-2 h-[18px]">
+                        <span className="text-[9px] text-[#C7977D] uppercase tracking-widest font-bold flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                          <Info size={10} /> Clique na foto para detalhes
+                        </span>
+                      </div>
+
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); iniciarAgendamento(pacote); }}
+                        className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-4 rounded-xl font-bold text-sm uppercase tracking-wider hover:scale-[1.03] transition-transform shadow-[0_0_20px_rgba(220,174,150,0.3)] flex justify-center items-center gap-2 mt-auto relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+                        <Crown size={18} className="relative z-10" /> <span className="relative z-10">Garantir Minhas Vagas</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -1013,6 +1063,7 @@ export default function LandingPage() {
         </div>
       )}
 
+      {/* 🛡️ MODAL DE DETALHES (Agora com Persuasão VIP para Pacotes) */}
       {servicoDetalhe && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
           <div className="bg-[#120308] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] flex flex-col animate-in zoom-in-95 max-h-full">
@@ -1023,19 +1074,48 @@ export default function LandingPage() {
               ) : <div className="flex items-center justify-center h-full"><Sparkles size={50} className="text-[#C7977D]" /></div>}
               <div className="absolute inset-0 bg-gradient-to-t from-[#120308] via-[#120308]/40 to-transparent"></div>
             </div>
+            
             <div className="p-8 -mt-12 relative z-20 bg-gradient-to-b from-transparent to-[#120308] overflow-y-auto hide-scroll flex-1">
               <h2 className="font-serif text-2xl text-white mb-3 leading-tight">{servicoDetalhe.nome}</h2>
               <div className="flex flex-wrap gap-2 mb-4">
+                {servicoDetalhe.is_pacote && (
+                   <span className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] border border-[#DCAE96]/30 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider flex items-center gap-1"><Crown size={12}/> Clube VIP</span>
+                )}
                 <span className="bg-[#180A0D] text-[#E8D3C8] border border-[#3a2522] px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider"><Clock size={12} className="inline mr-1"/> {servicoDetalhe.duracao}</span>
                 {servicoDetalhe.taxa_sinal > 0 && <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider">Sinal {servicoDetalhe.taxa_sinal}%</span>}
               </div>
+              
               <p className="text-gray-400 text-sm mb-6 leading-relaxed font-light">{servicoDetalhe.descricao}</p>
+
+              {/* 🛡️ CARTA DE VENDAS DENTRO DO MODAL PARA PACOTES */}
+              {servicoDetalhe.is_pacote && (
+                <div className="bg-gradient-to-br from-[#2D0A12] to-[#180A0D] border border-[#DCAE96]/30 p-5 rounded-2xl mb-6 shadow-inner">
+                  <h4 className="text-[#F8D1BE] font-serif text-lg mb-3 flex items-center gap-2"><Award size={18} className="text-[#C7977D]"/> Por que assinar o Clube VIP?</h4>
+                  <ul className="space-y-3">
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Zero Preocupação:</strong> Suas {servicoDetalhe.qtd_sessoes} sessões já ficam garantidas sem precisar disputar agenda todo mês.</span>
+                     </li>
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Economia Real:</strong> Valor com desconto aplicado exclusivamente para assinantes do clube.</span>
+                     </li>
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Status VIP:</strong> Prioridade máxima no atendimento no nosso estúdio.</span>
+                     </li>
+                  </ul>
+                </div>
+              )}
+
               <div className="flex justify-between items-center border-t border-[#3a2522] pt-6 mt-auto">
                 <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-0.5">Valor Total</p>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-0.5">{servicoDetalhe.is_pacote ? 'Valor Mensal' : 'Valor Total'}</p>
                   <p className="text-xl font-bold text-[#F8D1BE]">R$ {servicoDetalhe.preco.toFixed(2).replace('.', ',')}</p>
                 </div>
-                <button onClick={() => iniciarAgendamento(servicoDetalhe)} className="bg-[#DCAE96] text-[#120308] px-6 py-2.5 rounded-full font-bold shadow-[0_0_15px_rgba(220,174,150,0.4)] hover:scale-105 transition-transform text-sm">Agendar</button>
+                <button onClick={() => iniciarAgendamento(servicoDetalhe)} className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-6 py-2.5 rounded-xl font-bold shadow-[0_0_20px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform text-sm uppercase tracking-wider">
+                  {servicoDetalhe.is_pacote ? 'Assinar Agora' : 'Agendar'}
+                </button>
               </div>
             </div>
           </div>
@@ -1070,7 +1150,6 @@ export default function LandingPage() {
               {step === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
                   
-                  {/* 🛡️ A MÁGICA DOS PACOTES: TÍTULO DINÂMICO E MINI-CARRINHO */}
                   <div className="text-center mb-4">
                     <h3 className="text-[#F8D1BE] font-serif text-xl">{servicoEscolhido?.nome}</h3>
                     {servicoEscolhido?.is_pacote && (
@@ -1078,7 +1157,6 @@ export default function LandingPage() {
                     )}
                   </div>
 
-                  {/* 🛡️ MINI-RESUMO DAS SESSÕES ANTERIORES */}
                   {sessoesSelecionadas.length > 0 && (
                     <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-3 rounded-xl animate-in fade-in">
                       <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Sessões já escolhidas:</p>
@@ -1296,7 +1374,7 @@ export default function LandingPage() {
                     
                     <div className="space-y-1 mb-4">
                        {sessoesSelecionadas.map((sessao, index) => (
-                         <p key={index} className="text-[#C7977D] text-xs font-medium bg-black/30 p-2 rounded-lg border border-[#DCAE96]/10">Sessão {index + 1}: {new Date(sessao.data).toLocaleDateString('pt-BR')} às {sessao.hora}</p>
+                         <p key={index} className="text-[#C7977D] text-xs font-medium bg-black/30 p-2 rounded-lg border border-[#DCAE96]/10">Sessão {index + 1}: {new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</p>
                        ))}
                     </div>
 

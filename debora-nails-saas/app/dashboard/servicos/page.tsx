@@ -97,7 +97,6 @@ export default function ServicosPage() {
       taxa_sinal: taxaSinal,
       sinal: sinalCalc,
       imagens: imagensSelecionadas.length > 0 ? imagensSelecionadas : ['/01.jpg'],
-      // 🛡️ SALVANDO OS NOVOS CAMPOS DO PACOTE
       is_pacote: isPacote,
       qtd_sessoes: isPacote ? qtdSessoes : 1
     };
@@ -125,13 +124,13 @@ export default function ServicosPage() {
   };
 
   const deletarServico = async (id: string) => {
-    if (!window.confirm('Excluir este serviço? Esta ação não pode ser desfeita.')) return;
+    if (!window.confirm('Excluir este item? Esta ação não pode ser desfeita.')) return;
     
     const { error } = await supabase.from('servicos').delete().eq('id', id);
     
     if (error) {
       if (error.code === '23503') {
-        alert("⚠️ ATENÇÃO: Você não pode excluir este serviço porque ele já está vinculado a agendamentos ou ao histórico financeiro do sistema. \n\nEm vez de excluí-lo, recomendamos usar o botão 'Desativar' para que ele não apareça mais para os clientes.");
+        alert("⚠️ ATENÇÃO: Você não pode excluir este item porque ele já está vinculado a agendamentos ou ao histórico financeiro do sistema. \n\nEm vez de excluí-lo, recomendamos usar o botão 'Desativar' para que ele não apareça mais para os clientes.");
       } else {
         alert(`Erro ao excluir: ${error.message}`);
       }
@@ -143,6 +142,10 @@ export default function ServicosPage() {
   const toggleImagem = (img: string) => {
     setImagensSelecionadas(prev => prev.includes(img) ? prev.filter(i => i !== img) : [...prev, img]);
   };
+
+  // 🛡️ SEPARAÇÃO DAS LISTAS
+  const pacotesVip = servicos.filter(s => s.is_pacote);
+  const servicosComuns = servicos.filter(s => !s.is_pacote);
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
@@ -159,67 +162,129 @@ export default function ServicosPage() {
       {isLoading ? (
         <div className="flex justify-center py-20 text-[#C7977D]"><Loader2 className="animate-spin" size={40} /></div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {servicos.length === 0 ? (
-             <div className="col-span-full py-16 text-center text-gray-400 border border-dashed border-[#DCAE96]/20 rounded-xl bg-[#2D0A12]/20">
-               Nenhum serviço cadastrado ainda.
-             </div>
-          ) : (
-            servicos.map(servico => {
-              const fotos = servico.imagens || [];
-              return (
-                <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
-                  
-                  {/* 🛡️ BANNER VIP PARA PACOTES */}
-                  {servico.is_pacote && (
-                    <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                      <Crown size={12} /> {servico.qtd_sessoes} Sessões
-                    </div>
-                  )}
+        <div className="space-y-12">
+          
+          {/* 🛡️ PRATELEIRA 1: PACOTES VIP */}
+          <div>
+            <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2 mb-6 border-b border-[#DCAE96]/20 pb-3">
+              <Crown size={22} className="text-[#C7977D]"/> Assinaturas & Pacotes VIP
+            </h2>
+            
+            {pacotesVip.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 border border-dashed border-[#DCAE96]/20 rounded-xl bg-[#2D0A12]/20">
+                Nenhum pacote cadastrado. Use o botão "Adicionar Novo" para criar suas assinaturas.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {pacotesVip.map(servico => {
+                  const fotos = servico.imagens || [];
+                  return (
+                    <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
+                      
+                      <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
+                        <Crown size={12} /> {servico.qtd_sessoes} Sessões
+                      </div>
 
-                  <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
-                    {fotos.length > 0 ? (
-                      <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
-                    ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
-                    <div className="absolute top-4 right-4 z-10">
-                      {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
-                    </div>
-                  </div>
+                      <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
+                        {fotos.length > 0 ? (
+                          <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                        ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
+                        <div className="absolute top-4 right-4 z-10">
+                          {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
+                        </div>
+                      </div>
 
-                  <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
-                    <h3 className={`text-2xl font-serif mb-2 ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
-                    <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
-                    
-                    <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10 shrink-0">
-                      <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
-                      <span className="text-gray-600">|</span>
-                      <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
-                    </div>
+                      <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
+                        <h3 className={`text-2xl font-serif mb-2 leading-tight ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
+                        <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
+                        
+                        <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10 shrink-0">
+                          <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
+                          <span className="text-gray-600">|</span>
+                          <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
+                        </div>
 
-                    <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5 self-start">
-                      <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
-                    </div>
+                        <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5 self-start">
+                          <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
+                        </div>
 
-                    <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20 mt-auto">
-                      <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium hover:bg-[#DCAE96]/10 transition-colors">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
-                      <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl hover:bg-[#DCAE96]/20 transition-colors"><Edit2 size={18} /></button>
-                      <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"><Trash2 size={18} /></button>
+                        <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20 mt-auto">
+                          <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium hover:bg-[#DCAE96]/10 transition-colors">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
+                          <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl hover:bg-[#DCAE96]/20 transition-colors"><Edit2 size={18} /></button>
+                          <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"><Trash2 size={18} /></button>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })
-          )}
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* 🛡️ PRATELEIRA 2: SERVIÇOS AVULSOS */}
+          <div>
+            <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2 mb-6 border-b border-[#DCAE96]/20 pb-3">
+              <Sparkles size={22} className="text-[#C7977D]"/> Serviços Avulsos
+            </h2>
+            
+            {servicosComuns.length === 0 ? (
+              <div className="py-12 text-center text-gray-500 border border-dashed border-[#DCAE96]/20 rounded-xl bg-[#2D0A12]/20">
+                Nenhum serviço avulso cadastrado.
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                {servicosComuns.map(servico => {
+                  const fotos = servico.imagens || [];
+                  return (
+                    <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
+                      
+                      <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
+                        {fotos.length > 0 ? (
+                          <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                        ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
+                        <div className="absolute top-4 right-4 z-10">
+                          {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
+                        </div>
+                      </div>
+
+                      <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
+                        <h3 className={`text-2xl font-serif mb-2 leading-tight ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
+                        <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
+                        
+                        <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10 shrink-0">
+                          <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
+                          <span className="text-gray-600">|</span>
+                          <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
+                        </div>
+
+                        <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5 self-start">
+                          <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
+                        </div>
+
+                        <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20 mt-auto">
+                          <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium hover:bg-[#DCAE96]/10 transition-colors">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
+                          <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl hover:bg-[#DCAE96]/20 transition-colors"><Edit2 size={18} /></button>
+                          <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"><Trash2 size={18} /></button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
         </div>
       )}
 
+      {/* 🛡️ Z-INDEX 999 E SCROLL SEGURO NO MODAL DE SERVIÇOS */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
           <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90dvh]">
             
             <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
               <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2">
-                {servicoEditando ? <><Edit2 size={20}/> Editar Serviço</> : <><Sparkles size={20}/> Adicionar Novo</>}
+                {servicoEditando ? <><Edit2 size={20}/> Editar Catálogo</> : <><Sparkles size={20}/> Adicionar Novo</>}
               </h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
             </div>
@@ -260,8 +325,8 @@ export default function ServicosPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   
                   <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Nome do Pacote *' : 'Nome do Serviço *'}</label>
-                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} placeholder={isPacote ? "Ex: Pacote 2x Banho de Gel" : "Ex: Banho de Gel Tradicional"} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
+                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Nome da Assinatura/Pacote *' : 'Nome do Serviço *'}</label>
+                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} placeholder={isPacote ? "Ex: Assinatura: Banho de Gel" : "Ex: Banho de Gel Tradicional"} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
                   </div>
                   
                   <div className="col-span-1 md:col-span-2">
@@ -333,7 +398,7 @@ export default function ServicosPage() {
               </div>
               <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
                 <button type="submit" disabled={isSaving || isUploading} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform shadow-lg disabled:opacity-50">
-                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar Serviço'}
+                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar no Catálogo'}
                 </button>
               </div>
             </form>

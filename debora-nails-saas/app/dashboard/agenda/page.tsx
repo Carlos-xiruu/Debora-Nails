@@ -264,9 +264,8 @@ export default function AgendaPage() {
     } else { 
       await fetchDados(); 
       setIsModalOpen(false); 
-      alert("✅ Agendamento criado com sucesso!"); 
+      alert("✅ Agendamento forçado/criado com sucesso!"); 
 
-      // 🚀 GATILHO WHATSAPP: Confirmação Imediata
       if (clienteTelefone) {
         try {
           const primeiroNome = clienteNome.split(' ')[0];
@@ -274,10 +273,16 @@ export default function AgendaPage() {
           
           const mensagem = `Oii, ${primeiroNome}! Tudo bem? ✨\n\nSeu agendamento de *${servicoInfo?.nome}* foi confirmado para o dia *${dataFormatada}* às *${horaEscolhida}*!\n\nEstamos preparando tudo com muito carinho te esperando no Debora Nails Studio. 💖`;
 
+          // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO (Resolve o Erro de Timeout no Robô)
+          let numeroLimpo = clienteTelefone.replace(/\D/g, '');
+          if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+            numeroLimpo = '55' + numeroLimpo;
+          }
+
           await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone: clienteTelefone, mensagem })
+            body: JSON.stringify({ telefone: numeroLimpo, mensagem })
           });
         } catch (err) {
           console.error("Erro ao enviar mensagem de WhatsApp:", err);
@@ -348,7 +353,6 @@ export default function AgendaPage() {
       await fetchDados(); 
       alert('Horário remarcado com sucesso!'); 
 
-      // 🚀 GATILHO WHATSAPP: Aviso de Remarcação
       const clienteRemarcado = agendamentoEditando.clientes;
       if (clienteRemarcado && clienteRemarcado.telefone) {
         try {
@@ -358,10 +362,16 @@ export default function AgendaPage() {
           
           const mensagem = `Oii, ${primeiroNome}! ✨\n\nPassando para te avisar que seu horário de *${servicoNome}* foi REMARCADO com sucesso para o dia *${dataFormatada}* às *${novaHora}*.\n\nQualquer dúvida, é só nos chamar! 💖`;
 
+          // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO (Resolve o Erro de Timeout no Robô)
+          let numeroLimpo = clienteRemarcado.telefone.replace(/\D/g, '');
+          if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+            numeroLimpo = '55' + numeroLimpo;
+          }
+
           await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone: clienteRemarcado.telefone, mensagem })
+            body: JSON.stringify({ telefone: numeroLimpo, mensagem })
           });
         } catch (err) {
           console.error("Erro ao enviar WhatsApp de remarcação:", err);

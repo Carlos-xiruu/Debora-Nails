@@ -187,7 +187,6 @@ export default function MonitorPage() {
     let d = new Date();
     let count = 0;
     
-    // 🛡️ MOTOR EXPANDIDO: 45 DIAS PARA FRENTE NO MONITOR TAMBÉM
     while (count < 45) {
       const diaDaSemana = d.getDay();
       const regra = configuracoes.disponibilidade[diaDaSemana];
@@ -412,10 +411,16 @@ export default function MonitorPage() {
         const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
         const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
         
+        // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO
+        let numeroLimpo = clienteData.telefone.replace(/\D/g, '');
+        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+           numeroLimpo = '55' + numeroLimpo;
+        }
+
         try {
           await fetch('/api/whatsapp', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone: clienteData.telefone, mensagem: mensagemCliente })
+            body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
           });
         } catch (e) {}
       }
@@ -424,6 +429,11 @@ export default function MonitorPage() {
     setEtapaAgendamento(3); 
     setTimeout(() => { setActiveTab('inicio'); setEtapaAgendamento(1); }, 5000);
   };
+
+  const abrirWppParaPacote = (nomePacote: string) => {
+    const url = `https://wa.me/5547996987519?text=${encodeURIComponent(`Oii! Estava olhando o menu de vocês e me interessei pela assinatura do *${nomePacote}*. Como faço para começar?`)}`;
+    window.open(url, '_blank');
+  }
 
   const ativarTelaCheia = () => { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); };
   const formatarTempo = (s: number) => {
@@ -580,7 +590,8 @@ export default function MonitorPage() {
                     <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col justify-between min-h-0 overflow-hidden">
                       <div>
                         <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
-                        <h2 className="font-serif text-base sm:text-xl text-white leading-tight drop-shadow-md truncate">{sessaoData.servico_nome}</h2>
+                        {/* 🛡️ CORREÇÃO DE UI: line-clamp-2 permite quebrar linha sem esmagar tudo */}
+                        <h2 className="font-serif text-lg sm:text-2xl text-white leading-tight drop-shadow-md line-clamp-2">{sessaoData.servico_nome}</h2>
                       </div>
                       <div className="bg-black/50 border border-[#DCAE96]/10 rounded-xl p-2 flex flex-col items-center justify-center mt-auto shadow-inner min-h-[60px] shrink-0">
                         <PlayCircle size={14} className="text-[#F8D1BE] mb-1 animate-pulse" />
@@ -617,18 +628,18 @@ export default function MonitorPage() {
                           </div>
                         </div>
 
-                        {/* 🛡️ BANNER INTELIGENTE DE UPSELL NO MONITOR VIP */}
+                        {/* 🛡️ CORREÇÃO DE UX: BANNER INTELIGENTE DE UPSELL */}
                         {!dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
-                          <div className="mt-4 bg-gradient-to-r from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-2xl p-3 sm:p-4 flex items-center justify-between shrink-0 shadow-[0_0_15px_rgba(220,174,150,0.05)]">
-                             <div className="flex items-center gap-3">
-                                <div className="p-2 bg-[#DCAE96]/20 rounded-full"><Crown size={16} className="text-[#C7977D]" /></div>
+                          <div className="mt-4 bg-gradient-to-br from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-xl p-3 sm:p-4 flex flex-col gap-3 shrink-0 shadow-[0_0_15px_rgba(220,174,150,0.05)]">
+                             <div className="flex items-start gap-3">
+                                <div className="p-2 bg-[#DCAE96]/20 rounded-full shrink-0"><Crown size={14} className="text-[#C7977D]" /></div>
                                 <div className="text-left">
-                                  <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm leading-tight">Sabia que você pode economizar?</p>
-                                  <p className="text-gray-400 text-[9px] sm:text-[10px] mt-0.5">Transforme esse serviço avulso em um pacote mensal e garanta descontos.</p>
+                                  <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm leading-tight mb-1">Sabia que você pode economizar?</p>
+                                  <p className="text-gray-400 text-[9px] sm:text-[10px] leading-relaxed">Transforme esse serviço avulso em um pacote mensal e garanta descontos e vagas fixas.</p>
                                 </div>
                              </div>
-                             <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-3 py-1.5 rounded-lg text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform shadow-[0_0_10px_rgba(248,209,190,0.3)] shrink-0">
-                               Ver Pacotes
+                             <button onClick={() => setActiveTab('cardapio')} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform shadow-md">
+                               Ver Pacotes VIP
                              </button>
                           </div>
                         )}
