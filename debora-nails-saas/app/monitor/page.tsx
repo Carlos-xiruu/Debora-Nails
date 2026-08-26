@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Package, Crown } from 'lucide-react';
+import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Package, Crown, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 const DISPONIBILIDADE_PADRAO = {
@@ -86,7 +86,9 @@ export default function MonitorPage() {
   };
 
   const formatarDataLocalStr = (d: Date) => {
-    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    const tzOffset = d.getTimezoneOffset() * 60000; 
+    const localISOTime = new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
+    return localISOTime;
   };
 
   useEffect(() => {
@@ -139,7 +141,7 @@ export default function MonitorPage() {
       }
 
       const hojeStr = formatarDataLocalStr(new Date());
-      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00`);
+      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00-03:00`);
       if (agends) setAgendamentos(agends);
 
       const { data: sessao } = await supabase.from('sessao_monitor').select('*').eq('id', 1).single();
@@ -185,6 +187,7 @@ export default function MonitorPage() {
     if (!configuracoes) return;
     const dias = [];
     let d = new Date();
+    d.setHours(0,0,0,0);
     let count = 0;
     
     while (count < 45) {
@@ -411,7 +414,6 @@ export default function MonitorPage() {
         const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
         const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
         
-        // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO
         let numeroLimpo = clienteData.telefone.replace(/\D/g, '');
         if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
            numeroLimpo = '55' + numeroLimpo;
@@ -444,6 +446,13 @@ export default function MonitorPage() {
 
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+      
+      {/* 🛡️ O RELÓGIO FLUTUANTE QUE RESOLVE O ESPAÇAMENTO */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full shadow-lg pointer-events-none">
+        <Clock size={12} className="text-[#C7977D]" />
+        <span className="text-white font-medium text-xs sm:text-sm tracking-widest">{horaAtual}</span>
+      </div>
+
       <button onClick={ativarTelaCheia} className="absolute top-2 left-2 z-50 p-2 text-[#C7977D] opacity-20 hover:opacity-100 bg-black/40 rounded-full transition-opacity"><Maximize size={16} /></button>
       
       {deferredPrompt && (
@@ -486,10 +495,6 @@ export default function MonitorPage() {
                 <span className="font-serif text-[#F8D1BE] text-xl leading-tight drop-shadow-md">Debora Nails</span>
                 <span className="text-[#E8D3C8] text-[9px] tracking-[0.2em] uppercase font-bold opacity-80">Studio de Alto Padrão</span>
               </div>
-            </div>
-            <div className="flex items-center gap-2 bg-black/40 backdrop-blur-md px-4 py-2 rounded-full border border-[#DCAE96]/20 shadow-lg">
-              <Clock size={16} className="text-[#C7977D]" />
-              <span className="text-white font-medium text-lg tracking-wider">{horaAtual}</span>
             </div>
           </header>
 
@@ -566,13 +571,7 @@ export default function MonitorPage() {
             </div>
           </aside>
 
-          <main className="flex-1 relative z-10 flex flex-col h-[100dvh] overflow-hidden min-h-0">
-            <header className="p-2 sm:p-4 flex justify-end shrink-0">
-              <div className="flex items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full shadow-lg">
-                <Clock size={12} className="text-[#C7977D]" />
-                <span className="text-white font-medium text-xs sm:text-sm tracking-widest">{horaAtual}</span>
-              </div>
-            </header>
+          <main className="flex-1 relative z-10 flex flex-col h-[100dvh] overflow-hidden min-h-0 pt-10 sm:pt-14">
 
             <div className="flex-1 px-4 pb-4 sm:px-6 sm:pb-6 overflow-hidden flex flex-col min-h-0">
               
@@ -587,22 +586,36 @@ export default function MonitorPage() {
 
                   <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-4 w-full min-h-0">
                     
-                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col justify-between min-h-0 overflow-hidden">
-                      <div>
+                    {/* ESQUERDA: CRONÔMETRO COM UPSELL */}
+                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden relative">
+                      <div className="shrink-0 mb-2">
                         <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
-                        {/* 🛡️ CORREÇÃO DE UI: line-clamp-2 permite quebrar linha sem esmagar tudo */}
                         <h2 className="font-serif text-lg sm:text-2xl text-white leading-tight drop-shadow-md line-clamp-2">{sessaoData.servico_nome}</h2>
                       </div>
+
+                      {/* 🛡️ O NOVO LUGAR DO BANNER DE UPSELL: NO CARD DO CRONÔMETRO */}
+                      {dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
+                        <div className="my-auto mx-2 sm:mx-4 bg-[#120308]/60 border border-[#DCAE96]/30 rounded-xl p-3 flex flex-col items-center justify-center shadow-[0_0_15px_rgba(220,174,150,0.1)]">
+                           <Crown size={16} className="text-[#C7977D] mb-1.5" />
+                           <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm text-center leading-tight mb-1">Sabia que você pode economizar?</p>
+                           <p className="text-gray-400 text-[9px] sm:text-[10px] leading-tight text-center mt-1 mb-3">Transforme esse serviço avulso em um pacote mensal e garanta descontos e vagas fixas.</p>
+                           <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider w-full hover:scale-105 transition-transform shadow-lg">
+                             Ver Assinaturas VIP
+                           </button>
+                        </div>
+                      )}
+
                       <div className="bg-black/50 border border-[#DCAE96]/10 rounded-xl p-2 flex flex-col items-center justify-center mt-auto shadow-inner min-h-[60px] shrink-0">
                         <PlayCircle size={14} className="text-[#F8D1BE] mb-1 animate-pulse" />
                         <span className="font-mono text-2xl sm:text-3xl text-white tracking-widest font-light drop-shadow-[0_0_10px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
                       </div>
                     </div>
 
+                    {/* DIREITA: RESUMO E PIX (LIMPO E FOCADO NO PAGAMENTO) */}
                     {dadosServicoSessao && (
-                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
+                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                         
-                        <div>
+                        <div className="shrink-0">
                           <div className="flex justify-between items-center mb-1 border-b border-[#DCAE96]/10 pb-1 shrink-0">
                             <h3 className="font-serif text-sm sm:text-base text-white">Resumo</h3>
                             {valorRestante <= 0 || statusPagamento === 'pago' ? (
@@ -610,7 +623,7 @@ export default function MonitorPage() {
                             ) : null}
                           </div>
                           
-                          <div className="space-y-1 text-[10px] sm:text-xs shrink-0">
+                          <div className="space-y-1 text-[10px] sm:text-xs shrink-0 pt-1">
                             <div className="flex justify-between text-gray-400">
                               <span>Total:</span>
                               <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
@@ -628,42 +641,26 @@ export default function MonitorPage() {
                           </div>
                         </div>
 
-                        {/* 🛡️ CORREÇÃO DE UX: BANNER INTELIGENTE DE UPSELL */}
-                        {!dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
-                          <div className="mt-4 bg-gradient-to-br from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-xl p-3 sm:p-4 flex flex-col gap-3 shrink-0 shadow-[0_0_15px_rgba(220,174,150,0.05)]">
-                             <div className="flex items-start gap-3">
-                                <div className="p-2 bg-[#DCAE96]/20 rounded-full shrink-0"><Crown size={14} className="text-[#C7977D]" /></div>
-                                <div className="text-left">
-                                  <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm leading-tight mb-1">Sabia que você pode economizar?</p>
-                                  <p className="text-gray-400 text-[9px] sm:text-[10px] leading-relaxed">Transforme esse serviço avulso em um pacote mensal e garanta descontos e vagas fixas.</p>
-                                </div>
-                             </div>
-                             <button onClick={() => setActiveTab('cardapio')} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-2 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform shadow-md">
-                               Ver Pacotes VIP
-                             </button>
-                          </div>
-                        )}
-
                         <div className="mt-auto pt-2 shrink-0">
                           {valorRestante > 0 && statusPagamento === 'pendente' && (
-                            <div className="bg-black/40 border border-[#DCAE96]/20 rounded-xl p-1.5 sm:p-2 flex flex-row items-center gap-2 shadow-inner h-16 sm:h-20">
+                            <div className="bg-black/40 border border-[#DCAE96]/20 rounded-xl p-2 flex flex-col items-center justify-center gap-2 shadow-inner min-h-[4rem] sm:min-h-[5rem]">
                               {isGerandoPix ? (
                                 <div className="flex flex-col items-center justify-center w-full">
                                   <Loader2 className="animate-spin text-[#C7977D] mb-1" size={14} />
                                   <p className="text-[8px] text-gray-400 uppercase tracking-widest">Gerando PIX...</p>
                                 </div>
                               ) : qrCodeImagem ? (
-                                <>
-                                  <div className="bg-white p-1 rounded-lg shrink-0 shadow-lg h-full aspect-square flex items-center justify-center">
+                                <div className="flex flex-row items-center gap-4 w-full h-full">
+                                  <div className="bg-white p-1 rounded-lg shrink-0 shadow-lg h-20 w-20 flex items-center justify-center">
                                     <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
                                   </div>
                                   <div className="flex flex-col justify-center min-w-0 flex-1">
-                                    <p className="text-[#E8D3C8] text-[9px] sm:text-[10px] leading-tight mb-0.5 font-bold truncate">Pagar Restante</p>
-                                    <p className="text-emerald-400/70 text-[7px] sm:text-[8px] uppercase tracking-widest flex items-center gap-1">
-                                      <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando
+                                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs leading-tight mb-1 font-bold truncate">Pagar Restante</p>
+                                    <p className="text-emerald-400/70 text-[8px] sm:text-[9px] uppercase tracking-widest flex items-center gap-1">
+                                      <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando...
                                     </p>
                                   </div>
-                                </>
+                                </div>
                               ) : (
                                  <p className="text-[9px] text-red-400 w-full text-center">Falha de conexão.</p>
                               )}
@@ -687,67 +684,91 @@ export default function MonitorPage() {
               )}
 
               {abaAtiva === 'cardapio' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0">
-                  <div className="mb-2 sm:mb-4 shrink-0">
+                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
+                  <div className="mb-4 shrink-0">
                     <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Catálogo Exclusivo</h2>
                     <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Inspire-se para a sua próxima visita ou assine um Clube VIP.</p>
                   </div>
                   
                   <div className="overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-0 space-y-6">
                     
+                    {/* 🛡️ A NOVA SEÇÃO DE PACOTES NO MONITOR (VISUAL BLACK CARD DE LUXO) */}
                     {pacotesDb.length > 0 && (
                       <div>
                         <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><Crown size={14}/> Assinaturas VIP</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {pacotesDb.map(pacote => (
-                            <div key={pacote.id} className="flex flex-col bg-gradient-to-b from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/30 rounded-xl overflow-hidden shadow-lg p-3 sm:p-4 hover:border-[#DCAE96]/60 transition-colors">
-                              <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <h4 className="font-serif text-sm text-[#F8D1BE]">{pacote.nome}</h4>
-                                  <span className="text-[9px] text-[#C7977D] uppercase tracking-widest font-bold">{pacote.qtd_sessoes} Sessões</span>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {pacotesDb.map(pacote => {
+                            const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
+                            return (
+                              <div key={pacote.id} className="relative rounded-2xl overflow-hidden group flex flex-col bg-[#180A0D] border border-[#3a2522] hover:border-[#DCAE96]/50 transition-all duration-300 shadow-xl">
+                                {/* Image Header */}
+                                <div className="h-32 relative overflow-hidden bg-black shrink-0">
+                                  {imagem ? (
+                                    <img src={imagem} alt={pacote.nome} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={30} className="text-[#C7977D]" /></div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/40 to-transparent"></div>
+                                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-[#DCAE96]/30 flex items-center gap-1 shadow-lg">
+                                     <Crown size={10} className="text-[#C7977D]"/>
+                                     <span className="text-[8px] text-[#F8D1BE] uppercase font-bold tracking-widest">{pacote.qtd_sessoes} Sessões</span>
+                                  </div>
                                 </div>
-                                <span className="text-white font-bold text-sm">R$ {pacote.preco.toFixed(2).replace('.', ',')}</span>
+                                
+                                {/* Content */}
+                                <div className="p-4 flex flex-col flex-1 relative z-10 -mt-2">
+                                  <h3 className="font-serif text-base text-white leading-tight mb-2 group-hover:text-[#F8D1BE] transition-colors line-clamp-2">{pacote.nome}</h3>
+                                  <div className="flex items-end gap-1 mb-3 border-b border-[#3a2522] pb-3">
+                                    <span className="text-[#C7977D] text-[10px] font-bold mb-0.5">R$</span>
+                                    <span className="text-2xl font-bold text-white tracking-tight">{pacote.preco.toFixed(2).replace('.', ',')}</span>
+                                    <span className="text-gray-500 text-[9px] mb-0.5">/mês</span>
+                                  </div>
+                                  <p className="text-gray-400 text-[9px] italic leading-relaxed mb-4 flex-1 line-clamp-3">{pacote.descricao}</p>
+                                  
+                                  <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider hover:scale-[1.02] transition-transform shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5">
+                                    <Crown size={14} /> Assinar VIP
+                                  </button>
+                                </div>
                               </div>
-                              <p className="text-gray-400 text-[10px] italic leading-relaxed mb-4 flex-1">{pacote.descricao}</p>
-                              <button onClick={() => {setServicoEscolhido(pacote); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="w-full bg-[#DCAE96]/10 border border-[#DCAE96]/40 text-[#DCAE96] py-1.5 rounded-lg text-[10px] font-bold uppercase hover:bg-[#DCAE96] hover:text-[#120308] transition-colors">
-                                Quero este pacote
-                              </button>
-                            </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
 
                     <div>
                       <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><ImageIcon size={14}/> Serviços Avulsos</h3>
-                      <div className="grid grid-cols-1 gap-2 sm:gap-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                         {servicosDb.length === 0 ? (
                           <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
                         ) : (
-                          servicosDb.map(serv => (
-                            <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-20 sm:h-24 hover:border-[#DCAE96]/50 transition-colors shrink-0">
-                              <div className="w-[30%] bg-black relative shrink-0">
-                                {serv.imagens?.[0] ? (
-                                  <img src={serv.imagens[0]} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
-                                ) : (
-                                  <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
-                                )}
-                                <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
-                              </div>
-                              
-                              <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
-                                <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
-                                <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
+                          servicosDb.map(serv => {
+                            const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
+                            return (
+                              <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
+                                <div className="w-[35%] bg-black relative shrink-0">
+                                  {imagem ? (
+                                    <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
+                                  ) : (
+                                    <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
+                                  )}
+                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
+                                </div>
                                 
-                                <div className="flex justify-between items-center mt-auto">
-                                  <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                                  <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="text-[#C7977D] flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:text-white transition-colors shrink-0">
-                                    Agendar <ChevronRight size={10}/>
-                                  </button>
+                                <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
+                                  <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
+                                  <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
+                                  
+                                  <div className="flex justify-between items-center mt-auto">
+                                    <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                                    <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-2 py-1 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
+                                      Agendar <ChevronRight size={10}/>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          ))
+                            )
+                          })
                         )}
                       </div>
                     </div>
@@ -757,7 +778,7 @@ export default function MonitorPage() {
               )}
 
               {abaAtiva === 'agendar' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0">
+                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
                   <div className="mb-2 shrink-0">
                     <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Agende seu Retorno</h2>
                     <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Garante sua próxima vaga e pague o sinal agora mesmo.</p>

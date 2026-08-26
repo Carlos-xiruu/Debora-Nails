@@ -1,13 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Package, Crown, Info } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { useRouter } from 'next/navigation';
+import Image from 'next/image'; 
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight, AlertTriangle, Package, Check } from 'lucide-react';
+import { supabase } from './lib/supabase';
+import Link from 'next/link';
 
 const DISPONIBILIDADE_PADRAO = {
   0: { ativo: false, abertura: '08:00', fechamento: '12:00' },
@@ -19,54 +17,71 @@ const DISPONIBILIDADE_PADRAO = {
   6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
 };
 
-export default function MonitorPage() {
-  const [horaAtual, setHoraAtual] = useState('');
-  const [saudacao, setSaudacao] = useState('Olá');
-  
-  const [abaAtiva, setActiveTab] = useState<'inicio' | 'cardapio' | 'agendar'>('inicio');
-  const [atendimentoAtivo, setAtendimentoAtivo] = useState(false);
-  
-  const [sessaoData, setSessaoData] = useState<any>(null);
-  const [dadosServicoSessao, setDadosServicoSessao] = useState<any>(null);
-  const [tempoDecorrido, setTempoDecorrido] = useState(0);
-  
-  const [statusPagamento, setStatusPagamento] = useState('pendente');
-  const [qrCodeImagem, setQrCodeImagem] = useState<string | null>(null);
-  const [qrCodeCopiaCola, setQrCodeCopiaCola] = useState<string | null>(null);
-  const [pagamentoMercadoPagoId, setPagamentoMercadoPagoId] = useState<string | null>(null);
-  const [isGerandoPix, setIsGerandoPix] = useState(false);
+const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisSrc: string }) => {
+  const [posicao, setPosicao] = useState(50);
 
-  const [servicosDb, setServicosDb] = useState<any[]>([]);
-  const [pacotesDb, setPacotesDb] = useState<any[]>([]); 
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  return (
+    <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden group border border-[#DCAE96]/20 select-none shadow-xl">
+      <Image src={antesSrc} alt="Antes" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
+      <div className="absolute inset-0 z-10 pointer-events-none" style={{ clipPath: `polygon(0 0, ${posicao}% 0, ${posicao}% 100%, 0 100%)` }}>
+        <Image src={depoisSrc} alt="Depois" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
+      </div>
+      <div className="absolute top-0 bottom-0 z-20 w-[2px] bg-white cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.8)] pointer-events-none" style={{ left: `calc(${posicao}% - 1px)` }}>
+        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-200">
+          <div className="flex gap-0.5">
+            <ChevronLeft size={14} className="text-[#C7977D]" />
+            <ChevronRight size={14} className="text-[#C7977D]" />
+          </div>
+        </div>
+      </div>
+      <input type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))} className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize" />
+      <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
+      <div className="absolute top-4 right-4 z-20 bg-[#DCAE96]/80 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
+    </div>
+  );
+};
 
-  const [imagemAtualIndex, setImagemAtualIndex] = useState(0);
+export default function LandingPage() {
+  const router = useRouter();
   
-  const slides = [
-    { bg: '/trabalho.mp4', tipo: 'video' }, 
-    { bg: '/01.jpg', tipo: 'intro' },
-    { bg: '/debora.jpg', tipo: 'sobre' }, 
-    { bg: '/02.jpg', tipo: 'intro' },
-    { bg: '/make01.jpeg', tipo: 'intro' },
-    { bg: '/vermelha.jpeg', tipo: 'intro' },
-    { bg: '/branca-nude.jpeg', tipo: 'intro' },
-    { bg: '/nude-dourada.jpeg', tipo: 'intro' }
-  ];
-
-  const [configuracoes, setConfiguracoes] = useState<any>(null);
-  const [agendamentos, setAgendamentos] = useState<any[]>([]);
-  const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
-  const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
+  const [servicosComuns, setServicosComuns] = useState<any[]>([]);
+  const [pacotes, setPacotes] = useState<any[]>([]);
   
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false); 
+  const [servicoDetalhe, setServicoDetalhe] = useState<any>(null);
+  
+  const [usuarioLogado, setUsuarioLogado] = useState<any>(null);
+  const [dadosFidelidade, setDadosFidelidade] = useState({ atendimentos: 0, isVip: false });
+  
+  const [step, setStep] = useState(1);
   const [servicoEscolhido, setServicoEscolhido] = useState<any>(null);
+  
+  const [sessoesSelecionadas, setSessoesSelecionadas] = useState<{data: Date, hora: string}[]>([]);
   const [dataEscolhida, setDataEscolhida] = useState<Date | null>(null);
   const [horaEscolhida, setHoraEscolhida] = useState('');
   
-  const [etapaAgendamento, setEtapaAgendamento] = useState(1);
-  const [isProcessandoAgendamento, setIsProcessandoAgendamento] = useState(false);
-  const [qrCodeAgendamento, setQrCodeAgendamento] = useState<string | null>(null);
-  const [pixIdAgendamento, setPixIdAgendamento] = useState<string | null>(null);
+  const [clienteDados, setClienteDados] = useState({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
+  const [dividaPendente, setDividaPendente] = useState(0); 
 
+  const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
+  const [tempoRestante, setTempoRestante] = useState(300);
+  const [isProcessando, setIsProcessando] = useState(false);
+
+  const [agendamentos, setAgendamentos] = useState<any[]>([]);
+  const [configuracoes, setConfiguracoes] = useState<any>(null);
+  const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
+  const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
+
+  const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
+  const [pixId, setPixId] = useState<string | null>(null);
+  const [pixManualFallback, setPixManualFallback] = useState(false);
+
+  const [faqAberto, setFaqAberto] = useState<number | null>(null);
+  const [showWaBubble, setShowWaBubble] = useState(false);
+  const [bubbleFechado, setBubbleFechado] = useState(false);
+
+  // 🛡️ CORREÇÃO 1: BLINDAGEM DE FUSO HORÁRIO
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
     const [h, m] = horaStr.split(':').map(Number);
@@ -97,95 +112,32 @@ export default function MonitorPage() {
   };
 
   useEffect(() => {
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      setDeferredPrompt(e);
-    });
-
-    const atualizarRelogio = () => {
-      const agora = new Date();
-      setHoraAtual(agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
-      const hora = agora.getHours();
-      if (hora >= 5 && hora < 12) setSaudacao('Bom dia');
-      else if (hora >= 12 && hora < 18) setSaudacao('Boa tarde');
-      else setSaudacao('Boa noite');
-    };
-    atualizarRelogio();
-    const intervalo = setInterval(atualizarRelogio, 1000);
-    return () => clearInterval(intervalo);
-  }, []);
-
-  const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      const { outcome } = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') setDeferredPrompt(null);
-    }
-  };
-
-  const carregarDetalhesServico = async (nomeServico: string) => {
-    const { data } = await supabase.from('servicos').select('*').eq('nome', nomeServico).single();
-    if (data) setDadosServicoSessao(data);
-  };
-
-  useEffect(() => {
-    const fetchInicial = async () => {
-      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('preco');
+    const fetchDadosGerais = async () => {
+      const { data: servs } = await supabase.from('servicos').select('*').eq('ativo', true).order('preco', { ascending: true });
       if (servs) {
-        setServicosDb(servs.filter(s => !s.is_pacote));
-        setPacotesDb(servs.filter(s => s.is_pacote));
+        setServicosComuns(servs.filter(s => !s.is_pacote));
+        setPacotes(servs.filter(s => s.is_pacote));
       }
 
       const { data: config } = await supabase.from('configuracoes').select('*').eq('id', 1).single();
       if (config) {
-        setConfiguracoes({ 
-          disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO, 
+        setConfiguracoes({
+          disponibilidade: Object.keys(config.disponibilidade).length > 0 ? config.disponibilidade : DISPONIBILIDADE_PADRAO,
           bloqueios: config.bloqueios || [],
+          chave_pix: config.chave_pix,
+          tipo_chave_pix: config.tipo_chave_pix,
           mensagem_confirmacao: config.mensagem_confirmacao
         });
       }
 
       const hojeStr = formatarDataLocalStr(new Date());
-      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00-03:00`);
+      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00-03:00`).neq('tipo', 'cancelado');
       if (agends) setAgendamentos(agends);
-
-      const { data: sessao } = await supabase.from('sessao_monitor').select('*').eq('id', 1).single();
-      if (sessao) {
-        setAtendimentoAtivo(sessao.ativo);
-        setSessaoData(sessao);
-        setStatusPagamento(sessao.status_pagamento || 'pendente');
-        if (sessao.ativo && sessao.servico_nome) {
-          carregarDetalhesServico(sessao.servico_nome);
-        }
-      }
     };
-    fetchInicial();
 
-    const canal = supabase
-      .channel('monitor_updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessao_monitor' }, (payload) => {
-        const novaSessao = payload.new;
-        setAtendimentoAtivo(novaSessao.ativo);
-        setSessaoData(novaSessao);
-        setStatusPagamento(novaSessao.status_pagamento || 'pendente');
-        
-        if (novaSessao.ativo && novaSessao.servico_nome) {
-          carregarDetalhesServico(novaSessao.servico_nome);
-        } else {
-          setActiveTab('inicio');
-          setDadosServicoSessao(null);
-          setDataEscolhida(null);
-          setHoraEscolhida('');
-          setServicoEscolhido(null);
-          setEtapaAgendamento(1);
-          setQrCodeImagem(null);
-          setQrCodeCopiaCola(null);
-          setPagamentoMercadoPagoId(null);
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(canal); };
+    fetchDadosGerais();
+    const waTimer = setTimeout(() => setShowWaBubble(true), 20000); 
+    return () => clearTimeout(waTimer);
   }, []);
 
   useEffect(() => {
@@ -209,11 +161,14 @@ export default function MonitorPage() {
 
   useEffect(() => {
     if (!dataEscolhida || !servicoEscolhido || !configuracoes) return;
+
     const dataStr = formatarDataLocalStr(dataEscolhida);
     const diaDaSemana = dataEscolhida.getDay();
     const regraDoDia = configuracoes.disponibilidade[diaDaSemana];
 
-    if (!regraDoDia || !regraDoDia.ativo) { setHorariosLivres([]); return; }
+    if (!regraDoDia || !regraDoDia.ativo) {
+      setHorariosLivres([]); return;
+    }
 
     const aberturaMin = converterParaMinutos(regraDoDia.abertura);
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
@@ -224,656 +179,1234 @@ export default function MonitorPage() {
     const blocksDoDia = configuracoes.bloqueios.filter((b: any) => b.data === dataStr);
 
     const slotsLivres = [];
+    const hojeStrBase = formatarDataLocalStr(new Date());
+    const isHoje = dataStr === hojeStrBase;
+    const dataAtualLocal = new Date();
+    const minutosAtualReal = dataAtualLocal.getHours() * 60 + dataAtualLocal.getMinutes();
+
     for (let minAtual = aberturaMin; minAtual <= (fechamentoMin - duracaoServicoMin); minAtual += passoIntervalo) {
       const fimMin = minAtual + duracaoServicoMin;
+
       const conflitoAgendamento = agendsDoDia.some(a => {
         const dInicio = new Date(a.inicio); const dFim = new Date(a.fim);
         const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes(); const minFim = dFim.getHours() * 60 + dFim.getMinutes();
         return (minAtual < minFim) && (fimMin > minInicio);
       });
+
       const conflitoBloqueio = blocksDoDia.some((b: any) => {
         const minInicio = converterParaMinutos(b.inicio); const minFim = converterParaMinutos(b.fim);
         return (minAtual < minFim) && (fimMin > minInicio);
       });
-      if (!conflitoAgendamento && !conflitoBloqueio) slotsLivres.push(converterParaHoraStr(minAtual));
+      
+      const conflitoNoCarrinho = sessoesSelecionadas.some(s => {
+          if(formatarDataLocalStr(new Date(s.data)) !== dataStr) return false;
+          const minCarrinho = converterParaMinutos(s.hora);
+          const fimCarrinho = minCarrinho + duracaoServicoMin;
+          return (minAtual < fimCarrinho) && (fimMin > minCarrinho);
+      });
+
+      const tempoJaPassou = isHoje && (minAtual < minutosAtualReal);
+
+      if (!conflitoAgendamento && !conflitoBloqueio && !conflitoNoCarrinho && !tempoJaPassou) {
+        slotsLivres.push(converterParaHoraStr(minAtual));
+      }
     }
+
     setHorariosLivres(slotsLivres);
     setHoraEscolhida('');
-  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
-
+  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos, sessoesSelecionadas]);
 
   useEffect(() => {
-    let cronometro: NodeJS.Timeout;
-    if (atendimentoAtivo && sessaoData?.inicio) {
-      cronometro = setInterval(() => {
-        const agora = new Date().getTime();
-        const inicio = new Date(sessaoData.inicio).getTime();
-        setTempoDecorrido(Math.floor((agora - inicio) / 1000));
-      }, 1000);
+    const verificarSessaoEIntencao = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const userRole = session.user.user_metadata?.role;
+        if (userRole === 'admin') { router.push('/dashboard'); return; } 
+        else if (userRole === 'monitor') { router.push('/monitor'); return; }
+
+        setUsuarioLogado(session.user);
+        setClienteDados(prev => ({...prev, nome: session.user.user_metadata?.nome_completo || prev.nome}));
+        
+        const telefoneUser = session.user.user_metadata?.telefone;
+        if (telefoneUser) {
+          setClienteDados(prev => ({...prev, telefone: telefoneUser}));
+          const { data: clienteBanco } = await supabase.from('clientes').select('atendimentos, divida_pendente').eq('telefone', telefoneUser).single();
+          if (clienteBanco) {
+            setDadosFidelidade({ atendimentos: clienteBanco.atendimentos, isVip: clienteBanco.atendimentos >= 10 });
+            setDividaPendente(clienteBanco.divida_pendente || 0);
+          }
+        }
+        
+        const intencao = localStorage.getItem('intencao_agendamento');
+        if (intencao) {
+          localStorage.removeItem('intencao_agendamento');
+          if (intencao === 'geral') iniciarAgendamento(null, true);
+          else {
+            try { iniciarAgendamento(JSON.parse(intencao), true); } 
+            catch (e) { iniciarAgendamento(null, true); }
+          }
+        }
+      }
+    };
+    verificarSessaoEIntencao();
+  }, [router]);
+
+  useEffect(() => {
+    setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const statusPagamento = params.get('pagamento');
+
+      if (statusPagamento === 'sucesso') {
+        const reservaSalva = localStorage.getItem('reserva_temp_debora');
+        if (reservaSalva) {
+          try {
+            const dados = JSON.parse(reservaSalva);
+            setServicoEscolhido(dados.servicoEscolhido);
+            setSessoesSelecionadas(dados.sessoesSelecionadas);
+            setClienteDados(dados.clienteDados);
+            setMetodoPagamento(dados.metodoPagamento);
+            setDividaPendente(dados.dividaPendente); 
+            
+            salvarAgendamentoOficial(dados);
+            
+            setStep(5);
+            setIsModalOpen(true);
+            localStorage.removeItem('reserva_temp_debora');
+          } catch(e) {
+            console.error("Erro ao ler cache do agendamento", e);
+          }
+        }
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (statusPagamento === 'erro') {
+        alert("O pagamento via cartão foi recusado pelo banco. Tente novamente.");
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }, 500); 
+  }, []);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (step === 4 && tempoRestante > 0) {
+      timer = setInterval(() => setTempoRestante(prev => prev - 1), 1000);
+    } else if (step === 4 && tempoRestante === 0) {
+      alert("O tempo limite para pagamento expirou. A vaga foi liberada para outras clientes.");
+      setIsModalOpen(false);
+      setStep(1);
+    }
+    return () => clearInterval(timer);
+  }, [step, tempoRestante]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (pixId && step === 4 && !pixManualFallback) {
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch('/api/checar-pagamento', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: pixId })
+          });
+          const data = await res.json();
+          if (data.status === 'approved') {
+            clearInterval(interval);
+            const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
+            await salvarAgendamentoOficial(dados);
+            setStep(5);
+          }
+        } catch (e) {
+           console.error("Erro ao checar PIX", e);
+        }
+      }, 5000);
+    }
+    return () => clearInterval(interval);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setUsuarioLogado(null);
+    setDadosFidelidade({ atendimentos: 0, isVip: false });
+    setClienteDados({ nome: '', telefone: '', observacoes: '', prefere_silencio: false });
+    setDividaPendente(0);
+  };
+
+  const iniciarAgendamento = (servico: any = null, forceLogado = false) => {
+    if (usuarioLogado || forceLogado) {
+      setServicoDetalhe(null);
+      setServicoEscolhido(servico);
+      setSessoesSelecionadas([]); 
+      setDataEscolhida(null);
+      setHoraEscolhida('');
+      setStep(servico ? 2 : 1);
+      setIsModalOpen(true);
+      setTempoRestante(300);
+      setQrCodePix(null);
+      setPixId(null);
+      setPixManualFallback(false);
     } else {
-      setTempoDecorrido(0);
+      localStorage.setItem('intencao_agendamento', servico ? JSON.stringify(servico) : 'geral');
+      setServicoDetalhe(null);
+      setIsAuthModalOpen(true); 
     }
-    return () => clearInterval(cronometro);
-  }, [atendimentoAtivo, sessaoData]);
+  };
 
-  useEffect(() => {
-    let carrossel: NodeJS.Timeout;
-    if (!atendimentoAtivo) {
-      carrossel = setInterval(() => setImagemAtualIndex((prev) => (prev + 1) % slides.length), 10000); 
+  const continuarComoConvidada = () => {
+    setIsAuthModalOpen(false);
+    const intencao = localStorage.getItem('intencao_agendamento');
+    localStorage.removeItem('intencao_agendamento');
+    if (intencao && intencao !== 'geral') {
+      try { iniciarAgendamento(JSON.parse(intencao), true); } catch(e) { iniciarAgendamento(null, true); }
+    } else {
+      iniciarAgendamento(null, true);
     }
-    return () => clearInterval(carrossel);
-  }, [atendimentoAtivo, slides.length]);
+  };
 
+  const avancarData = () => {
+    const novaSessao = { data: dataEscolhida!, hora: horaEscolhida };
+    const numSessoes = servicoEscolhido?.qtd_sessoes || 1;
 
-  const precoTotal = dadosServicoSessao?.preco || 0;
-  const taxaSinal = dadosServicoSessao?.taxa_sinal || 0;
-  const valorRestante = precoTotal - (precoTotal * (taxaSinal / 100));
+    if (sessoesSelecionadas.length + 1 < numSessoes) {
+      const proximaDataAlvo = new Date(dataEscolhida!);
+      proximaDataAlvo.setDate(proximaDataAlvo.getDate() + 15);
+      proximaDataAlvo.setHours(0,0,0,0);
 
-  useEffect(() => {
-    const gerarPixFinal = async () => {
-      if (!dadosServicoSessao || !sessaoData || qrCodeImagem || isGerandoPix) return;
-      if (valorRestante <= 0 || statusPagamento === 'pago') return;
+      let dataSugerida = null;
+      for (const dia of diasDisponiveis) {
+        if (dia.getTime() >= proximaDataAlvo.getTime()) {
+          dataSugerida = dia;
+          break;
+        }
+      }
+
+      setSessoesSelecionadas([...sessoesSelecionadas, novaSessao]);
+      setDataEscolhida(dataSugerida); 
+      setHoraEscolhida('');
       
-      setIsGerandoPix(true);
+      if (dataSugerida) {
+         setTimeout(() => {
+           try {
+             const element = document.getElementById(`dia-${dataSugerida.getTime()}`);
+             if(element) element.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+           } catch(e) { console.log('Scroll interceptado') }
+         }, 100);
+      }
+    } else {
+      setSessoesSelecionadas([...sessoesSelecionadas, novaSessao]);
+      setStep(3);
+    }
+  };
+
+  const voltarData = () => {
+    const sessoesSalvas = [...sessoesSelecionadas];
+    const ultimaSessao = sessoesSalvas.pop();
+    if (ultimaSessao) {
+      setSessoesSelecionadas(sessoesSalvas);
+      setDataEscolhida(ultimaSessao.data);
+      setHoraEscolhida(ultimaSessao.hora);
+    }
+  };
+
+  const calcularSinalBase = (servicoAtual = servicoEscolhido) => servicoAtual ? servicoAtual.preco * ((servicoAtual.taxa_sinal || 0) / 100) : 0;
+  const calcularTotalSinalEDivida = () => calcularSinalBase() + dividaPendente;
+  const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
+  const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
+
+  // 🛡️ CORREÇÃO 2: BLINDAGEM DE PAGAMENTO (Previne Múltiplos Cliques)
+  const validarEAvancarPagamento = async () => {
+    if (isProcessando) return;
+    setIsProcessando(true);
+    let dividaAtual = 0;
+
+    try {
+      let numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
+      if (numeroLimpo.length >= 10) {
+        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+           numeroLimpo = '55' + numeroLimpo;
+        }
+        const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', numeroLimpo).limit(1).single();
+        if (cli && cli.divida_pendente > 0) {
+          dividaAtual = cli.divida_pendente;
+        }
+      }
+      
+      setDividaPendente(dividaAtual);
+      
+      if (calcularSinalBase() > 0 || dividaAtual > 0) {
+        setStep(4);
+        setIsProcessando(false);
+      } else {
+        processarPagamento(); 
+      }
+    } catch (e) {
+      setIsProcessando(false);
+    }
+  };
+
+  const processarPagamento = async () => {
+    setIsProcessando(true);
+    
+    for (const sessao of sessoesSelecionadas) {
+      const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
+      const hojeStrBase = formatarDataLocalStr(new Date());
+      
+      if (dataFiltroBase === hojeStrBase) {
+         const agora = new Date();
+         const minAtual = agora.getHours() * 60 + agora.getMinutes();
+         const inicioMins = converterParaMinutos(sessao.hora);
+         if (inicioMins < minAtual) {
+           alert(`🚨 O horário ${sessao.hora} acabou de passar! Volte e escolha um novo horário.`);
+           setIsProcessando(false); setIsModalOpen(false); setStep(1); return;
+         }
+      }
+
+      const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
+      const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
+      const fimDate = new Date(inicioDate);
+      fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+
+      const { data: vagaOcupada } = await supabase
+        .from('agendamentos')
+        .select('id')
+        .neq('tipo', 'cancelado')
+        .lt('inicio', fimDate.toISOString())
+        .gt('fim', inicioDate.toISOString());
+
+      if (vagaOcupada && vagaOcupada.length > 0) {
+        alert("Poxa! 😢 Alguém acabou de reservar uma de suas datas escolhidas. Por favor, reinicie o agendamento.");
+        setIsProcessando(false); setIsModalOpen(false); setStep(1); return; 
+      }
+    }
+    
+    if (metodoPagamento === 'pix') {
       try {
         const res = await fetch('/api/pagamento-monitor', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ valor: valorRestante, descricao: `Pagamento Final - ${sessaoData.servico_nome} (${sessaoData.cliente_nome})` })
+          body: JSON.stringify({ valor: valorTotalCobrar, descricao: `Sinal - ${servicoEscolhido.nome}` })
         });
         const data = await res.json();
-        if (data.qr_code_base64 && data.id) {
-          setQrCodeImagem(data.qr_code_base64); 
-          setQrCodeCopiaCola(data.qr_code);
-          setPagamentoMercadoPagoId(data.id);
-        }
-      } catch (error) {
-        console.error("Erro ao gerar PIX", error);
-      } finally {
-        setIsGerandoPix(false);
-      }
-    };
-
-    if (atendimentoAtivo) gerarPixFinal();
-  }, [dadosServicoSessao, atendimentoAtivo, statusPagamento, valorRestante]);
-
-  useEffect(() => {
-    let intervalo: NodeJS.Timeout;
-    const checarPagamento = async () => {
-      if (!pagamentoMercadoPagoId) return;
-      try {
-        const res = await fetch('/api/checar-pagamento', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: pagamentoMercadoPagoId })
-        });
-        const data = await res.json();
-
-        if (data.status === 'approved') {
-          setPagamentoMercadoPagoId(null); 
-          setStatusPagamento('pago'); 
-          await supabase.from('sessao_monitor').update({ status_pagamento: 'pago' }).eq('id', 1);
-          await supabase.from('transacoes').insert([{
-            descricao: `Pagamento Restante PIX (Tablet): ${sessaoData.cliente_nome}`,
-            tipo: 'entrada', valor: valorRestante, categoria: 'Atendimento'
-          }]);
-        }
-      } catch (err) {}
-    };
-
-    if (pagamentoMercadoPagoId && statusPagamento === 'pendente') {
-      intervalo = setInterval(checarPagamento, 5000); 
-    }
-    return () => clearInterval(intervalo);
-  }, [pagamentoMercadoPagoId, statusPagamento, sessaoData, valorRestante]);
-
-
-  const iniciarProcessoAgendamento = async () => {
-    if (!servicoEscolhido || !dataEscolhida || !horaEscolhida) return;
-    setIsProcessandoAgendamento(true);
-
-    const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
-    const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
-    const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
-    const fimDate = new Date(inicioDate);
-    fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
-
-    const { data: vagaOcupada } = await supabase.from('agendamentos').select('id')
-      .lt('inicio', fimDate.toISOString()).gt('fim', inicioDate.toISOString());
-
-    if (vagaOcupada && vagaOcupada.length > 0) {
-      alert("Poxa! 😢 Alguém acabou de reservar esse horário online. Por favor, escolha outro.");
-      setIsProcessandoAgendamento(false);
-      setEtapaAgendamento(1);
-      return; 
-    }
-
-    const valorSinal = servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100);
-
-    if (valorSinal > 0) {
-      try {
-        const res = await fetch('/api/pagamento-monitor', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ valor: valorSinal, descricao: `Sinal Retorno - ${servicoEscolhido.nome}` })
-        });
-        const data = await res.json();
+        
         if (data.id) {
-          setQrCodeAgendamento(data.qr_code_base64);
-          setPixIdAgendamento(data.id);
-          setEtapaAgendamento(2); 
+          setQrCodePix({ base64: data.qr_code_base64, copiaCola: data.qr_code });
+          setPixId(data.id);
+        } else {
+          if (configuracoes?.chave_pix) setPixManualFallback(true);
+          else alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
         }
-      } catch (e) { alert("Erro ao gerar QR Code de reserva."); }
+      } catch (e) {
+        if (configuracoes?.chave_pix) setPixManualFallback(true);
+        else alert("Ocorreu um erro ao processar. Tente novamente.");
+      } finally {
+        setIsProcessando(false);
+      }
+
     } else {
-      salvarAgendamentoRetornoBD(inicioDate, fimDate, 0);
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
+      try {
+        const resposta = await fetch('/api/pagamento', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalCobrar, clienteNome: clienteDados.nome })
+        });
+        const data = await resposta.json();
+        if (data.init_point) window.location.href = data.init_point;
+        else { alert("Ocorreu um erro ao gerar o link. Tente novamente."); setIsProcessando(false); }
+      } catch (erro) {
+        alert("Erro de conexão. Verifique sua internet."); setIsProcessando(false);
+      }
     }
-    setIsProcessandoAgendamento(false);
   };
 
-  useEffect(() => {
-    let intervaloRetorno: NodeJS.Timeout;
-    if (pixIdAgendamento && etapaAgendamento === 2) {
-      intervaloRetorno = setInterval(async () => {
-        try {
-          const res = await fetch('/api/checar-pagamento', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: pixIdAgendamento })
-          });
-          const data = await res.json();
-          if (data.status === 'approved') {
-            clearInterval(intervaloRetorno);
-            setPixIdAgendamento(null);
-            
-            const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida!));
-            const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
-            const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
-            const fimDate = new Date(inicioDate);
-            fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
-            const valorSinal = servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100);
-            
-            salvarAgendamentoRetornoBD(inicioDate, fimDate, valorSinal);
-          }
-        } catch (e) {}
-      }, 5000);
-    }
-    return () => clearInterval(intervaloRetorno);
-  }, [pixIdAgendamento, etapaAgendamento, servicoEscolhido, dataEscolhida, horaEscolhida]);
-
-  const salvarAgendamentoRetornoBD = async (inicioDate: Date, fimDate: Date, valorSinal: number) => {
-    const { data: clienteData } = await supabase.from('clientes').select('id, telefone').eq('nome', sessaoData.cliente_nome).limit(1).single();
-    
-    if (clienteData) {
-      await supabase.from('agendamentos').insert([{
-        cliente_id: clienteData.id, servico_id: servicoEscolhido.id,
-        tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString()
-      }]);
-
-      if (valorSinal > 0) {
-        await supabase.from('transacoes').insert([{
-          descricao: `Sinal Retorno PIX (Tablet): ${sessaoData.cliente_nome}`,
-          tipo: 'entrada', valor: valorSinal, categoria: 'Sinal'
-        }]);
+  const salvarAgendamentoOficial = async (dados: any) => {
+    try {
+      let cliente_id;
+      
+      let numeroLimpo = dados.clienteDados.telefone.replace(/\D/g, '');
+      if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
+         numeroLimpo = '55' + numeroLimpo;
+      }
+      
+      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', numeroLimpo).limit(1);
+      
+      if (clientesEncontrados && clientesEncontrados.length > 0) {
+        cliente_id = clientesEncontrados[0].id;
+      } else {
+        const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: numeroLimpo, status: 'Novo' }]).select().limit(1);
+        if (errCli) { alert("🚨 Erro ao salvar Cliente."); return; }
+        if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
 
-      if (clienteData.telefone) {
-        const dataFormatada = inicioDate.toLocaleDateString('pt-BR');
-        const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu retorno.";
-        const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
-        const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
-        
-        let numeroLimpo = clienteData.telefone.replace(/\D/g, '');
-        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-           numeroLimpo = '55' + numeroLimpo;
+      if (cliente_id) {
+        if (dados.dividaPendente > 0) {
+          await supabase.from('clientes').update({ divida_pendente: 0 }).eq('id', cliente_id);
+          await supabase.from('transacoes').insert([{
+            descricao: `Pagamento Dívida (Falta Anterior) - ${dados.clienteDados.nome}`, 
+            tipo: 'entrada', valor: dados.dividaPendente, categoria: 'Outros', data_pagamento: new Date().toISOString()
+          }]);
         }
+
+        const grupoPacoteId = dados.servicoEscolhido.is_pacote ? crypto.randomUUID() : null;
+        const agendamentosParaInserir = [];
+
+        for (const sessao of dados.sessoesSelecionadas) {
+          const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
+          const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
+          const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
+          const fimDate = new Date(inicioDate);
+          fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+
+          agendamentosParaInserir.push({
+            cliente_id: cliente_id, 
+            servico_id: dados.servicoEscolhido.id, 
+            tipo: 'agendado', 
+            inicio: inicioDate.toISOString(), 
+            fim: fimDate.toISOString(), 
+            observacoes: dados.clienteDados.observacoes, 
+            prefere_silencio: dados.clienteDados.prefere_silencio,
+            grupo_pacote_id: grupoPacoteId
+          });
+        }
+
+        const { error: errAgendamento } = await supabase.from('agendamentos').insert(agendamentosParaInserir);
+        if (errAgendamento) { alert("🚨 Erro ao salvar na Agenda."); return; }
+
+        const valorSinalPago = dados.metodoPagamento === 'cartao' 
+            ? calcularSinalBase(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinalBase(dados.servicoEscolhido)) 
+            : calcularSinalBase(dados.servicoEscolhido);
+
+        if (valorSinalPago > 0) {
+          await supabase.from('transacoes').insert([{
+            descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
+            tipo: 'entrada', valor: valorSinalPago, categoria: 'Sinal', data_pagamento: new Date().toISOString()
+          }]);
+        }
+
+        const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
+        const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
+        const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
+
+        const datasFormatadasMsg = dados.sessoesSelecionadas.map((s: any, i: number) => {
+           return `🔹 Sessão ${i + 1}: ${new Date(s.data).toLocaleDateString('pt-BR')} às ${s.hora}`;
+        }).join('\n');
+
+        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
           await fetch('/api/whatsapp', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
           });
-        } catch (e) {}
+        } catch (errWhatsApp) {
+          console.error('Erro ao chamar API do WhatsApp:', errWhatsApp);
+        }
       }
+    } catch (e) {
+      console.error("Erro geral na função de salvamento", e);
     }
-    
-    setEtapaAgendamento(3); 
-    setTimeout(() => { setActiveTab('inicio'); setEtapaAgendamento(1); }, 5000);
   };
 
-  const abrirWppParaPacote = (nomePacote: string) => {
-    const url = `https://wa.me/5547996987519?text=${encodeURIComponent(`Oii! Estava olhando o menu de vocês e me interessei pela assinatura do *${nomePacote}*. Como faço para começar?`)}`;
-    window.open(url, '_blank');
-  }
-
-  const ativarTelaCheia = () => { if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen(); };
-  const formatarTempo = (s: number) => {
-    if (s < 0) return "00:00";
-    const h = Math.floor(s / 3600); const m = Math.floor((s % 3600) / 60); const sec = s % 60;
-    return `${h > 0 ? h.toString().padStart(2, '0') + ':' : ''}${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  const formatarTempo = (segundos: number) => `${Math.floor(segundos / 60).toString().padStart(2, '0')}:${(segundos % 60).toString().padStart(2, '0')}`;
+  const rolarPara = (id: string) => {
+    const elemento = document.getElementById(id);
+    if (elemento) {
+      const offset = 80;
+      const bodyRect = document.body.getBoundingClientRect().top;
+      const elementRect = elemento.getBoundingClientRect().top;
+      window.scrollTo({ top: elementRect - bodyRect - offset, behavior: 'smooth' });
+    }
   };
 
   return (
-    <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
+    <main className="min-h-screen bg-[#0a0204] text-white font-sans selection:bg-[#C7977D] selection:text-[#120308] relative overflow-x-hidden">
       
-      {/* 🛡️ O RELÓGIO FLUTUANTE QUE RESOLVE O ESPAÇAMENTO */}
-      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full shadow-lg pointer-events-none">
-        <Clock size={12} className="text-[#C7977D]" />
-        <span className="text-white font-medium text-xs sm:text-sm tracking-widest">{horaAtual}</span>
-      </div>
+      <div className="fixed inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(199, 151, 125, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.15) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#DCAE96]/5 rounded-full blur-[150px] pointer-events-none"></div>
 
-      <button onClick={ativarTelaCheia} className="absolute top-2 left-2 z-50 p-2 text-[#C7977D] opacity-20 hover:opacity-100 bg-black/40 rounded-full transition-opacity"><Maximize size={16} /></button>
-      
-      {deferredPrompt && (
-        <button onClick={handleInstallClick} className="absolute top-2 right-2 z-50 flex items-center gap-1.5 bg-[#00B1EA] text-white px-3 py-1.5 rounded-full text-[10px] font-bold shadow-[0_0_15px_rgba(0,177,234,0.4)] animate-pulse">
-          <Download size={12} /> Instalar
-        </button>
+      <nav className="fixed w-full top-0 left-0 z-[100] bg-[#0a0204]/90 backdrop-blur-xl border-b border-[#3a2522] px-5 py-3 md:px-8 md:py-4 flex justify-between items-center shadow-lg">
+        <div className="flex items-center gap-3 cursor-pointer group" onClick={() => window.scrollTo({top: 0, behavior: 'smooth'})}>
+          <Image src="/debora.card.PNG" alt="Logo Debora Nails" width={48} height={48} priority className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border border-[#C7977D]/40 shadow-[0_0_10px_rgba(199,151,125,0.2)]" />
+          <div className="flex flex-col">
+            <span className="font-serif text-[18px] md:text-[22px] text-[#E8D3C8] leading-none mb-0.5">Debora Nails</span>
+            <span className="text-[8px] md:text-[10px] text-gray-400 tracking-[0.15em] uppercase font-bold">Studio de Alto Padrão</span>
+          </div>
+        </div>
+        
+        <div className="hidden lg:flex items-center gap-2">
+          <button onClick={() => rolarPara('sobre')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Quem sou eu?</button>
+          <button onClick={() => rolarPara('servicos')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Serviços</button>
+          {pacotes.length > 0 && <button onClick={() => rolarPara('pacotes')} className="px-5 py-2 rounded-full text-sm font-medium text-[#DCAE96] hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all flex items-center gap-1.5"><Crown size={14}/> Pacotes VIP</button>}
+          <button onClick={() => rolarPara('portfolio')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">Portfólio</button>
+          <button onClick={() => rolarPara('espaco')} className="px-5 py-2 rounded-full text-sm font-medium text-gray-300 hover:text-[#F8D1BE] hover:bg-[#DCAE96]/10 transition-all">O Espaço</button>
+        </div>
+
+        <div className="flex items-center gap-3 md:gap-5">
+          {usuarioLogado ? (
+            <div className="flex items-center gap-2 md:gap-4 md:border-r border-[#3a2522] md:pr-5">
+              <Link href="/area-cliente" className="hidden md:flex items-center gap-1.5 text-[#C7977D] hover:text-white transition-colors text-xs font-bold uppercase tracking-wider bg-[#180A0D] border border-[#3a2522] px-3 py-1.5 rounded-full">
+                {dadosFidelidade.isVip ? <Crown size={14} className="drop-shadow-[0_0_5px_#DCAE96]"/> : <User size={14}/>} Painel VIP
+              </Link>
+              <Link href="/area-cliente" className="md:hidden text-[#C7977D] p-2 bg-[#180A0D] border border-[#3a2522] rounded-full">
+                {dadosFidelidade.isVip ? <Crown size={16}/> : <User size={16}/>}
+              </Link>
+              <button onClick={handleLogout} className="text-gray-500 hover:text-red-400 transition-colors p-2 bg-[#180A0D] rounded-full border border-[#3a2522]" title="Sair da Conta">
+                <LogOut size={16} className="md:w-4 md:h-4" />
+              </button>
+            </div>
+          ) : (
+            <Link href="/login" className="text-xs font-medium text-gray-500 hover:text-[#C7977D] transition-colors border-r border-[#3a2522] pr-3 md:pr-5">Login</Link>
+          )}
+
+          <button onClick={() => iniciarAgendamento()} className="bg-[#DCAE96] text-[#2D0A12] px-4 md:px-6 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold shadow-[0_0_15px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform">
+            Agendar
+          </button>
+        </div>
+      </nav>
+
+      <header className="relative pt-32 pb-20 md:pt-48 md:pb-32 px-6 flex flex-col lg:flex-row items-center justify-between max-w-7xl mx-auto gap-12 z-10 overflow-visible">
+        <div className="flex-1 text-center lg:text-left animate-in fade-in slide-in-from-left-8 duration-1000 fill-mode-both">
+          <span className="inline-flex items-center gap-2 border border-[#C7977D]/30 bg-transparent px-5 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold text-[#DCAE96] mb-8">
+            <Award size={14} /> Design & Durabilidade
+          </span>
+          
+          <h1 className="font-serif text-[42px] md:text-7xl text-white mb-6 leading-tight drop-shadow-lg">
+            Sua melhor<br/>versão<br className="md:hidden"/> reflete nas suas<br/>
+            <span className="text-[#F8D1BE] italic" style={{ textShadow: '0 0 25px rgba(248,209,190,0.6)' }}>mãos.</span>
+          </h1>
+          
+          <p className="text-[17px] md:text-xl text-gray-300 max-w-xl mx-auto lg:mx-0 mb-10 leading-relaxed font-light">
+            Beleza com elegância e precisão. Alongamentos sofisticados com acabamento natural, simetria perfeita e durabilidade impecável. Agende uma experiência exclusiva.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 mb-14">
+            <button onClick={() => iniciarAgendamento()} className="w-full sm:w-auto bg-[#DCAE96] text-[#2D0A12] px-8 py-4 rounded-full font-bold text-lg flex items-center justify-center gap-2 hover:scale-105 transition-transform shadow-[0_0_20px_rgba(220,174,150,0.4)]">
+              Agendar Horário <ArrowRight size={20} />
+            </button>
+            <button onClick={() => rolarPara('portfolio')} className="w-full sm:w-auto bg-transparent border border-[#3a2522] text-white px-8 py-4 rounded-full font-bold text-lg flex items-center justify-center gap-2 hover:bg-[#120308] transition-colors">
+              <Sparkles size={20} className="text-[#C7977D]" /> Explorar Galeria
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center lg:justify-start gap-4 md:gap-8 text-sm text-gray-400">
+            <span className="flex flex-col items-center lg:items-start"><strong className="text-[#F8D1BE] text-lg font-serif">21 a 25 dias</strong> Durabilidade</span>
+            <div className="w-px h-10 bg-[#3a2522]"></div>
+            <span className="flex flex-col items-center lg:items-start"><strong className="text-[#F8D1BE] text-lg font-serif">100%</strong> Esterilizado</span>
+            <div className="w-px h-10 bg-[#3a2522]"></div>
+            <span className="flex flex-col items-center lg:items-start"><strong className="text-[#F8D1BE] text-lg font-serif">Premium</strong> Produtos</span>
+          </div>
+        </div>
+
+        <div className="flex-1 relative w-full max-w-md h-[500px] hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300 fill-mode-both">
+          <div className="absolute top-10 right-0 w-64 glass-card neon-border rounded-3xl p-6 flex flex-col items-center text-center shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-20 hover:-translate-y-2 transition-transform duration-500">
+            <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-[#C7977D] mb-4 shadow-[0_0_15px_rgba(199,151,125,0.5)] relative">
+              <Image src="/debora.jpg" alt="Débora" fill priority sizes="(max-width: 768px) 100vw, 96px" className="object-cover" />
+            </div>
+            <strong className="text-[#F8D1BE] text-xl font-serif mb-1">Debora Nails Studio</strong>
+            <span className="text-gray-400 text-xs uppercase tracking-widest mb-5">Beauty & Nail Design</span>
+            <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 text-[10px] px-3 py-1 rounded-full uppercase flex items-center gap-1.5 font-bold"><span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Atendendo</span>
+          </div>
+
+          <div className="absolute bottom-10 left-0 w-72 glass-card rounded-3xl p-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-10 border border-[#DCAE96]/20 hover:-translate-y-2 transition-transform duration-500">
+            <div className="flex items-center gap-1.5 mb-5 border-b border-[#DCAE96]/10 pb-4">
+              <div className="w-3 h-3 rounded-full bg-red-400/80"></div><div className="w-3 h-3 rounded-full bg-yellow-400/80"></div><div className="w-3 h-3 rounded-full bg-emerald-400/80"></div>
+              <span className="text-xs text-gray-500 ml-2 font-mono">deboranails.com.br</span>
+            </div>
+            <div className="inline-flex items-center gap-2 text-xs text-[#C7977D] font-bold uppercase tracking-wider mb-2">
+              <Award size={14} /> Assinatura de Estilo
+            </div>
+            <h3 className="font-serif text-white text-2xl mb-3">Realce sua beleza</h3>
+            <p className="text-sm text-gray-400 leading-relaxed">Técnicas avançadas para alongamentos com aspecto incrivelmente natural.</p>
+          </div>
+        </div>
+      </header>
+
+      <section id="sobre" className="py-20 px-6 relative z-10">
+        <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
+          <div className="w-full md:w-1/3 relative group">
+            <div className="w-full aspect-square md:aspect-[4/5] relative rounded-2xl overflow-hidden border border-[#DCAE96]/20 z-10">
+               <Image src="/fotonova.jpeg" alt="Debora Silva" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
+            </div>
+            <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
+              <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
+              <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
+            </div>
+          </div>
+          <div className="w-full md:w-2/3">
+            <span className="text-[#C7977D] text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-2"><Heart size={14}/> A Especialista</span>
+            <h2 className="font-serif text-4xl text-white mb-5">Muito prazer, sou a <span className="italic text-[#DCAE96]">Debora.</span></h2>
+            <div className="space-y-4 text-gray-300 text-base leading-relaxed font-light">
+              <p>Por trás de cada detalhe, existe uma mulher que ama transformar beleza em autoestima.</p>
+              <p>Há mais de 6 anos venho aperfeiçoando minhas técnicas, aprendendo, evoluindo e construindo um trabalho que carrega muito de quem eu sou: <strong>dedicação, delicadeza, perfeccionismo e amor pelo que faço</strong>.<br/>Para mim, cada cliente é única, e cada atendimento é uma oportunidade de fazer você se olhar no espelho e pensar: “uau, era exatamente isso que eu queria.” Mais do que unhas, eu entrego cuidado, confiança e uma experiência feita para você. </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="servicos" className="py-24 pl-6 md:pl-0 max-w-7xl mx-auto relative z-10">
+        <div className="text-left md:text-center mb-12 md:px-6">
+          <span className="glow-text text-sm font-bold uppercase tracking-widest">Nossos Serviços</span>
+          <h2 className="font-serif text-4xl md:text-5xl text-white mt-2">Especialidades do Studio</h2>
+        </div>
+
+        <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-12 pr-6 md:px-6 hide-scroll">
+          {servicosComuns.length === 0 ? (
+            <div className="w-full py-10 text-center"><Loader2 className="animate-spin text-[#C7977D] mx-auto" size={40} /></div>
+          ) : (
+            servicosComuns.map((serv) => (
+              <article 
+                key={serv.id} 
+                onClick={() => setServicoDetalhe(serv)} 
+                className="shrink-0 w-[300px] md:w-[350px] snap-center h-[420px] rounded-3xl overflow-hidden relative cursor-pointer neon-hover transition-all duration-300 group border border-[#3a2522] shadow-xl"
+              >
+                {serv.imagens && serv.imagens.length > 0 ? (
+                  <Image src={serv.imagens[0]} alt={serv.nome} fill sizes="(max-width: 768px) 100vw, 350px" className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                ) : (
+                  <div className="w-full h-full bg-[#120308] flex items-center justify-center"><Sparkles size={40} className="text-[#C7977D] opacity-30" /></div>
+                )}
+                
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0204] via-[#0a0204]/70 to-transparent pointer-events-none"></div>
+                
+                {serv.taxa_sinal > 0 && (
+                  <div className="absolute top-4 left-4 glass-card border border-[#DCAE96]/30 px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
+                    <ShieldCheck size={14} className="text-[#E8D3C8]" />
+                    <span className="text-[10px] uppercase font-bold text-[#E8D3C8] tracking-wider">Requer Sinal ({serv.taxa_sinal}%)</span>
+                  </div>
+                )}
+
+                <div className="absolute bottom-0 left-0 w-full p-6 flex flex-col justify-end z-10">
+                  <h3 className="font-serif text-2xl text-white mb-2 leading-tight group-hover:text-[#F8D1BE] transition-colors">{serv.nome}</h3>
+                  <p className="text-gray-300 text-sm line-clamp-3 leading-relaxed mb-4">{serv.descricao}</p>
+                  
+                  <div className="flex justify-between items-center border-t border-white/20 pt-4">
+                    <span className="text-[#F8D1BE] font-bold text-xl">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                    <button className="bg-[#25D366] text-white w-10 h-10 rounded-full flex items-center justify-center shadow-[0_0_15px_rgba(37,211,102,0.4)] group-hover:scale-110 transition-transform">
+                      <ArrowRight size={20} />
+                    </button>
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
+
+      {/* 🛡️ CORREÇÃO 3: CARD VIP PROTEGIDO NO MOBILE */}
+      {pacotes.length > 0 && (
+        <section id="pacotes" className="py-24 px-6 relative z-10 bg-gradient-to-b from-[#0a0204] to-[#120308] border-t border-[#3a2522]">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center mb-16">
+              <span className="inline-flex items-center gap-2 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-4 py-1.5 rounded-full text-xs uppercase tracking-widest font-bold mb-4 shadow-[0_0_15px_rgba(220,174,150,0.3)]">
+                Clube VIP
+              </span>
+              <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Assinaturas Exclusivas</h2>
+              <p className="text-gray-400 max-w-2xl mx-auto font-light leading-relaxed">
+                A experiência definitiva. Garanta suas vagas fixas para o mês inteiro, mantenha suas mãos impecáveis e garanta a sua prioridade no estúdio.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 justify-center mt-12 items-center">
+              {pacotes.map((pacote, index) => {
+                const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
+                const isDestaque = index === 1;
+
+                return (
+                  <div 
+                    key={pacote.id} 
+                    onClick={() => setServicoDetalhe(pacote)} 
+                    className={`relative rounded-3xl overflow-hidden group flex flex-col bg-[#180A0D] transition-all duration-500 cursor-pointer ${isDestaque ? 'border-2 border-[#C7977D] shadow-[0_0_40px_rgba(199,151,125,0.4)] scale-100 md:scale-105 z-10' : 'border border-[#3a2522] hover:border-[#DCAE96]/50 shadow-2xl'}`}
+                  >
+                    
+                    {isDestaque && (
+                      <div className="absolute top-4 right-4 z-30 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-lg text-[9px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-[0_0_20px_rgba(220,174,150,0.8)] animate-pulse" style={{ animationDuration: '3s' }}>
+                        🔥 Mais Popular
+                      </div>
+                    )}
+                    
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#DCAE96]/10 rounded-bl-full rounded-tr-3xl -z-10 transition-all duration-500 group-hover:bg-[#DCAE96]/20"></div>
+
+                    <div className="h-48 relative overflow-hidden bg-black shrink-0">
+                      {imagem ? (
+                        <Image src={imagem} alt={pacote.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-105 transition-transform duration-700 opacity-90 group-hover:opacity-100" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={40} className="text-[#C7977D]" /></div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/50 to-transparent"></div>
+                      
+                      <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-lg border border-[#DCAE96]/30 flex items-center gap-1.5 shadow-lg">
+                         <span className="text-[10px] text-[#F8D1BE] uppercase font-bold tracking-widest">
+                           {pacote.qtd_sessoes} Sessões Mensais
+                         </span>
+                      </div>
+                    </div>
+
+                    <div className="p-6 relative z-10 flex flex-col flex-1 mt-2">
+                      <h3 className="text-2xl font-serif text-white leading-tight mb-4 group-hover:text-[#F8D1BE] transition-colors min-h-[56px] line-clamp-2">{pacote.nome}</h3>
+                      
+                      <ul className="space-y-3 mb-6 flex-1 min-h-[90px]">
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Direito a <strong>{pacote.qtd_sessoes} horários</strong> no mês</span>
+                        </li>
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Vagas fixas e prioritárias</span>
+                        </li>
+                        <li className="flex items-start gap-2 text-sm text-gray-300">
+                          <CheckCircle2 size={18} className="text-[#C7977D] shrink-0 mt-0.5" />
+                          <span className="line-clamp-2">Mais econômico que avulso</span>
+                        </li>
+                      </ul>
+
+                      <div className="flex items-end gap-1 mb-4 border-t border-[#3a2522] pt-4">
+                        <span className="text-[#C7977D] text-sm font-bold mb-1">R$</span>
+                        <span className="text-4xl font-bold text-white tracking-tight break-all">{pacote.preco.toFixed(2).replace('.', ',')}</span>
+                        <span className="text-gray-500 text-xs mb-1.5">/mês</span>
+                      </div>
+
+                      <div className="flex justify-center mb-4 mt-2 h-[18px]">
+                        <span className="text-[9px] text-[#C7977D] uppercase tracking-widest font-bold flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                          <Info size={10} /> Clique na foto para detalhes
+                        </span>
+                      </div>
+
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); iniciarAgendamento(pacote); }}
+                        className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-4 rounded-xl font-bold text-sm uppercase tracking-wider hover:scale-[1.03] transition-transform shadow-[0_0_20px_rgba(220,174,150,0.3)] flex justify-center items-center gap-2 mt-auto relative overflow-hidden"
+                      >
+                        <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-500 ease-out"></div>
+                        <Crown size={18} className="relative z-10" /> <span className="relative z-10">Garantir Minhas Vagas</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </section>
       )}
 
-      {/* MODO DESCANSO */}
-      {!atendimentoAtivo && (
-        <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+      <section id="portfolio" className="py-20 px-6 bg-[#050102] border-y border-[#3a2522] relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <span className="glow-text text-sm font-bold uppercase tracking-widest">Galeria de Arte</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Transformações Reais</h2>
+          </div>
+
+          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Nails Design</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
+            {['/01.jpg', '/vermelha.jpeg', '/02.jpg','/nude-branca.jpeg','/delicada.jpeg','/branca-nude.jpeg','/roxa.jpeg','/nude-dourada.jpeg'].map((img, i) => (
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer relative">
+                <Image src={img} alt="Trabalho Debora Nails" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
+              </article>
+            ))}
+          </div>
+
+          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4 mt-20">Maquiagem Profissional</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
+            {['/make01.jpeg','/make-loira.jpeg','/make-rabico.jpeg', '/make02.jpeg', '/make-batomv.jpeg' , '/make03.jpeg','/make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
+              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer relative">
+                <Image src={img} alt="Maquiagem Profissional" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
+              </article>
+            ))}
+          </div>
+
+          <div className="pt-16 border-t border-[#3a2522]">
+            <div className="text-center mb-10">
+              <span className="glow-text text-sm font-bold uppercase tracking-widest">O Poder da Maquiagem</span>
+              <h3 className="font-serif text-3xl md:text-4xl text-white mt-2">Antes & Depois</h3>
+              <p className="text-gray-400 text-sm mt-3 font-light">Arraste a linha para ver a transformação completa.</p>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <AntesEDepoisSlider antesSrc="/make-antes1.jpeg" depoisSrc="/make-depois1.jpeg" />
+              <AntesEDepoisSlider antesSrc="/make-antes2.jpeg" depoisSrc="/make-depois2.jpeg" />
+            </div>
+          </div>
           
-          {slides.map((slide, idx) => {
-            if (slide.tipo === 'video') {
-              return (
-                <div key={idx} className="absolute inset-0 flex gap-2 sm:gap-4 p-2 sm:p-4" style={{ opacity: idx === imagemAtualIndex ? 0.4 : 0, transition: 'opacity 2s ease-in-out' }}>
-                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl">
-                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden sm:block">
-                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="flex-1 rounded-3xl overflow-hidden border border-[#DCAE96]/20 shadow-2xl hidden md:block">
-                    <video src={slide.bg} autoPlay loop muted playsInline preload="auto" className="w-full h-full object-cover" />
-                  </div>
-                </div>
-              );
-            }
-            return (
-              <div key={idx} className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[2000ms]" style={{ backgroundImage: `url('${slide.bg}')`, opacity: idx === imagemAtualIndex ? 0.4 : 0, transform: idx === imagemAtualIndex ? 'scale(1.03)' : 'scale(1)', transition: 'opacity 2s ease-in-out, transform 10s ease-out' }} />
-            );
-          })}
-          
-          <div className="absolute inset-0 bg-gradient-to-t from-[#0A0205] via-[#0A0205]/40 to-[#0A0205]/90 z-10 pointer-events-none"></div>
-          
-          <header className="w-full p-4 md:px-8 flex justify-between items-center z-30 shrink-0">
-            <div className="flex items-center gap-3 pl-8">
-              <img src="/fotonova.jpeg" className="h-10 w-10 rounded-full object-cover border border-[#C7977D]" alt="Débora Silva" />
-              <div className="flex flex-col">
-                <span className="font-serif text-[#F8D1BE] text-xl leading-tight drop-shadow-md">Debora Nails</span>
-                <span className="text-[#E8D3C8] text-[9px] tracking-[0.2em] uppercase font-bold opacity-80">Studio de Alto Padrão</span>
+        </div>
+      </section>
+
+      <section id="espaco" className="py-24 px-6 relative z-10">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+          <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
+            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group relative">
+               <Image src="/cadeiras.png" alt="Interior do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
+               <video autoPlay loop muted playsInline className="w-full h-full object-cover">
+                  <source src="/espaco.mp4" type="video/mp4" />
+               </video>
+            </div>
+            <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group relative">
+               <Image src="/mesa.png" alt="Detalhe do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+            </div>
+          </div>
+
+          <div className="order-1 lg:order-2 text-center lg:text-left">
+            <span className="glow-text text-xs md:text-sm font-bold uppercase tracking-widest mb-2 block">Onde a Mágica Acontece</span>
+            <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">Seu momento de <span className="text-[#F8D1BE] italic">paz e luxo.</span></h2>
+            <p className="text-gray-400 text-sm md:text-lg mb-10 leading-relaxed font-light px-4 lg:px-0">
+              Muito mais do que fazer as unhas, oferecemos uma experiência de relaxamento completa. 
+              Nosso ateliê foi projetado para ser o seu refúgio da rotina corrida, com atendimento pontual e exclusivo.
+            </p>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 px-4 lg:px-0 text-left">
+              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
+                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Coffee className="text-[#C7977D]" size={18}/></div>
+                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Menu de Bebidas</span>
+              </div>
+              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
+                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Wifi className="text-[#C7977D]" size={18}/></div>
+                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Wi-Fi Exclusivo</span>
+              </div>
+              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
+                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><CarFront className="text-[#C7977D]" size={18}/></div>
+                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Estacionamento</span>
+              </div>
+              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
+                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Wind className="text-[#C7977D]" size={18}/></div>
+                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Climatização</span>
               </div>
             </div>
-          </header>
 
-          <main className="flex-1 flex flex-col items-center justify-center text-center z-30 px-4 overflow-hidden w-full">
-            {(slides[imagemAtualIndex].tipo === 'intro' || slides[imagemAtualIndex].tipo === 'video') ? (
-              <div className="animate-in zoom-in-95 duration-700 fade-in my-auto py-4">
-                <div className="flex items-center justify-center gap-4 mb-4">
-                  <div className="w-12 md:w-20 h-[1px] bg-gradient-to-r from-transparent to-[#C7977D]/80"></div>
-                  <Sparkles size={24} className="text-[#C7977D] opacity-90 animate-pulse" />
-                  <div className="w-12 md:w-20 h-[1px] bg-gradient-to-l from-transparent to-[#C7977D]/80"></div>
-                </div>
-                <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
-                  Cuidado em cada <span className="text-[#F8D1BE] italic">detalhe</span>.
-                </h1>
-                <p className="text-sm md:text-xl text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                  Uma pausa merecida para o seu bem-estar começará em breve.
-                </p>
+            <div className="glass-card p-5 md:p-6 rounded-[24px] border border-[#DCAE96]/20 shadow-xl mx-4 lg:mx-0 text-left">
+              <h3 className="text-white font-bold mb-2 flex items-center gap-2 text-sm md:text-base"><MapPin className="text-[#C7977D]" size={18}/> Madalena Ateliê de Beleza</h3>
+              <p className="text-gray-400 text-xs md:text-sm mb-4">Rua Fritz Hasse, 38 - Centro<br/>Jaraguá do Sul - SC, 89251-180</p>
+              <div className="h-40 md:h-48 rounded-xl overflow-hidden border border-[#DCAE96]/10">
+                 <iframe 
+                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3570.9757661162407!2d-49.07930872662806!3d-26.4887251245534!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94de953cae7f01db%3A0x3b361fd6e7bd4a66!2sMadalena%20Ateli%C3%AA%20de%20Beleza!5e0!3m2!1spt-BR!2sbr!4v1785889183146!5m2!1spt-BR!2sbr" 
+                  width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"
+                  className="filter invert-[.9] hue-rotate-180 opacity-80"
+                ></iframe>
               </div>
-            ) : slides[imagemAtualIndex].tipo === 'sobre' ? (
-              <div className="animate-in zoom-in-95 duration-700 fade-in my-auto py-4 flex flex-col items-center">
-                <img src="/fotonova.jpeg" className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover border border-[#C7977D] mb-4 shadow-[0_0_20px_rgba(199,151,125,0.4)]" alt="Débora" />
-                <h2 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-white mb-4 tracking-wide drop-shadow-[0_2px_15px_rgba(0,0,0,1)]">
-                  Muito prazer, sou a <span className="text-[#F8D1BE] italic">Debora.</span>
-                </h2>
-                <p className="text-sm md:text-xl text-[#E8D3C8] font-light tracking-wide drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] max-w-2xl px-4 leading-relaxed">
-                  Há mais de 6 anos transformando autoestima com dedicação e amor. A verdadeira beleza mora na simplicidade de se sentir bem e confiante.
-                </p>
-              </div>
-            ) : null}
-          </main>
+            </div>
+          </div>
+        </div>
+      </section>
 
-          <footer className="w-full p-4 z-30 flex justify-center gap-2 shrink-0">
-            {slides.map((_, idx) => (
-              <div key={idx} className={`h-1 rounded-full transition-all duration-500 ${idx === imagemAtualIndex ? 'w-8 bg-[#F8D1BE] shadow-[0_0_10px_#F8D1BE]' : 'w-3 bg-white/20'}`}></div>
-            ))}
-          </footer>
+      <section className="py-20 px-6 max-w-3xl mx-auto relative z-10 border-t border-[#3a2522]">
+        <div className="text-center mb-10">
+          <span className="glow-text text-sm font-bold uppercase tracking-widest">FAQ</span>
+          <h2 className="font-serif text-3xl md:text-4xl text-white mt-2">Dúvidas Frequentes</h2>
+        </div>
+        <div className="space-y-4">
+          {[
+            { q: "Quanto tempo demora a aplicação da fibra?", a: "O procedimento leva em média de 2h a 2h30. Esse tempo é necessário para a preparação minuciosa e o acabamento impecável." },
+            { q: "Quanto tempo demora o Banho de gel e Esmaltação?", a: "A esmaltação leva de 1h a 1h30. O banho de gel em média de 1h30 a 2h15, dependendo da necessidade da unha natural." },
+            { q: "Quais os tipos de alongamento?", a: "Trabalhamos com técnica em molde F1 e Fibra de Vidro." },
+            { q: "Quanto tempo dura a esmaltação em gel?", a: "De 15 a 20 dias, dependendo do cuidado prestado. Para o Banho de gel, de 21 a 25 dias." },
+            { q: "Quais as formas de pagamento aceitas?", a: "Aceitamos pagamentos via PIX, cartão de crédito, débito e dinheiro." },
+          ].map((faq, index) => (
+            <article key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
+              <button onClick={() => setFaqAberto(faqAberto === index ? null : index)} className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors">
+                {faq.q}
+                <ChevronDown className={`transition-transform duration-300 shrink-0 ml-4 ${faqAberto === index ? 'rotate-180 text-[#C7977D]' : 'text-gray-500'}`} />
+              </button>
+              <div className={`px-4 md:px-6 overflow-hidden transition-all duration-300 ${faqAberto === index ? 'max-h-40 pb-4 md:pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
+                <p className="text-gray-400 text-sm md:text-base leading-relaxed font-light">{faq.a}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="py-24 px-6 relative z-10 border-t border-[#3a2522] bg-[#0a0204]">
+        <div className="max-w-4xl mx-auto text-center">
+          <h2 className="font-serif text-5xl md:text-6xl text-white mb-6">Tá esperando o quê?</h2>
+          <p className="text-xl text-[#E8D3C8] mb-10 font-light px-4">Suas unhas merecem esse nível de qualidade e durabilidade. As vagas da semana são limitadas, então não deixe para depois o autocuidado que você precisa hoje.</p>
+          <button onClick={() => iniciarAgendamento()} className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-8 py-4 md:px-12 md:py-5 rounded-full font-bold text-base md:text-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform shadow-[0_0_40px_rgba(220,174,150,0.4)] mx-auto animate-pulse" style={{ animationDuration: '3s' }}>
+            <CalendarDays size={20} className="md:w-6 md:h-6" /> Garantir Meu Horário
+          </button>
+        </div>
+      </section>
+
+      {!bubbleFechado && (
+        <div className="fixed bottom-6 right-4 md:right-6 z-50 flex flex-col items-end gap-3 pointer-events-none">
+          {showWaBubble && (
+            <div className="bg-[#1a0c0f] border border-[#DCAE96]/20 p-5 rounded-3xl shadow-[0_10px_40px_rgba(0,0,0,0.8)] w-[280px] animate-in slide-in-from-bottom-8 duration-700 relative pointer-events-auto">
+              <button onClick={() => setBubbleFechado(true)} className="absolute top-2 right-2 text-gray-500 hover:text-white transition-colors bg-[#0a0204] rounded-full p-1"><X size={14}/></button>
+              <div className="flex items-center gap-3 mb-3">
+                <Image src="/debora.card.PNG" width={48} height={48} alt="Débora" className="w-12 h-12 rounded-full border border-[#DCAE96]/40 object-cover shrink-0" />
+                <strong className="text-[#F8D1BE] text-lg font-serif">Oii! 👋🏼</strong>
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed font-light">Ficou com alguma dúvida ou não encontrou o horário ideal para o seu agendamento? Fale comigo pelo WhatsApp e vou te ajudar a encontrar a melhor opção para você. 💕</p>
+            </div>
+          )}
+          <a href="https://wa.me/5547996987519" target="_blank" className="w-16 h-16 bg-[#25D366] rounded-full flex items-center justify-center text-white shadow-[0_0_20px_rgba(37,211,102,0.4)] hover:scale-110 transition-all cursor-pointer pointer-events-auto relative">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.305-.88-.653-1.474-1.46-1.647-1.757-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z"/></svg>
+            {showWaBubble && <span className="absolute top-0 right-0 flex h-3 w-3"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-[#120308]"></span></span>}
+          </a>
+        </div>
+      )}
+      
+      <footer className="bg-[#050102] py-10 px-6 border-t border-[#3a2522] text-center md:text-left relative z-10">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
+          <div><span className="font-serif text-xl text-[#F8D1BE]">Debora Nails</span><p className="text-gray-500 text-xs mt-1">Qualidade e cuidado em cada detalhe.</p></div>
+          <div className="text-gray-500 text-xs md:text-center"><p>© 2026 Debora Nails.</p><p>Todos os direitos reservados.</p></div>
+        </div>
+      </footer>
+
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
+          <div className="bg-[#0a0204] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl flex flex-col animate-in zoom-in-95 p-8 text-center relative">
+            <button onClick={() => setIsAuthModalOpen(false)} className="absolute top-4 right-4 text-gray-500 hover:text-white bg-[#180A0D] p-2 rounded-full transition-colors"><X size={16} /></button>
+            <div className="w-16 h-16 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] rounded-full flex items-center justify-center mx-auto mb-6 shadow-[0_0_20px_rgba(220,174,150,0.4)]"><Sparkles size={28} className="text-[#120308]" /></div>
+            <h2 className="font-serif text-3xl text-white mb-3">Acesso VIP ✨</h2>
+            <p className="text-gray-400 text-sm leading-relaxed mb-8 font-light">Para ter acesso exclusivo ao seu histórico de agendamentos e fidelidade, crie sua conta.</p>
+            <div className="flex flex-col gap-3">
+               <Link href="/login?modo=cadastro" className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3.5 rounded-full font-bold shadow-lg hover:scale-105 transition-transform text-sm">Criar Conta Rápida</Link>
+               <Link href="/login" className="w-full bg-[#120308] border border-[#3a2522] text-white py-3.5 rounded-full font-bold hover:bg-[#180A0D] transition-colors text-sm">Fazer Login</Link>
+               <div className="w-full h-px bg-[#3a2522] my-2"></div>
+               <button onClick={continuarComoConvidada} className="w-full bg-transparent text-gray-400 py-2 rounded-full font-medium hover:text-white transition-colors text-xs underline underline-offset-4 mt-2">Continuar sem conta</button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* MODO SESSÃO VIP ATIVA */}
-      {atendimentoAtivo && sessaoData && (
-        <div className="absolute inset-0 z-40 flex flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
-          
-          <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
-          
-          <aside className="w-[30%] min-w-[140px] sm:min-w-[200px] max-w-[260px] bg-[#120308]/90 backdrop-blur-xl border-r border-[#DCAE96]/20 flex flex-col z-20 h-full shrink-0 shadow-2xl">
-            <div className="p-3 sm:p-5 border-b border-[#DCAE96]/10 flex flex-col items-start shrink-0">
-              <img src="/fotonova.jpeg" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover mb-2 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
-              <p className="text-[8px] sm:text-[9px] text-[#C7977D] uppercase tracking-[0.1em] sm:tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
-              <h2 className="font-serif text-base sm:text-xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
+      {/* 🛡️ MODAL DE DETALHES (Agora com Persuasão VIP para Pacotes) */}
+      {servicoDetalhe && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
+          <div className="bg-[#120308] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] flex flex-col animate-in zoom-in-95 max-h-full">
+            <div className="relative h-64 bg-[#2D0A12] shrink-0">
+              <button onClick={() => setServicoDetalhe(null)} className="absolute top-4 right-4 z-20 bg-black/50 text-white rounded-full p-2 hover:bg-black transition-colors"><X size={20}/></button>
+              {servicoDetalhe.imagens && servicoDetalhe.imagens.length > 0 ? (
+                <Image src={servicoDetalhe.imagens[0]} alt={servicoDetalhe.nome} fill sizes="(max-width: 768px) 100vw, 350px" className="object-cover" />
+              ) : <div className="flex items-center justify-center h-full"><Sparkles size={50} className="text-[#C7977D]" /></div>}
+              <div className="absolute inset-0 bg-gradient-to-t from-[#120308] via-[#120308]/40 to-transparent"></div>
             </div>
+            
+            <div className="p-8 -mt-12 relative z-20 bg-gradient-to-b from-transparent to-[#120308] overflow-y-auto hide-scroll flex-1">
+              <h2 className="font-serif text-2xl text-white mb-3 leading-tight">{servicoDetalhe.nome}</h2>
+              <div className="flex flex-wrap gap-2 mb-4">
+                {servicoDetalhe.is_pacote && (
+                   <span className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] border border-[#DCAE96]/30 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider flex items-center gap-1"><Crown size={12}/> Clube VIP</span>
+                )}
+                <span className="bg-[#180A0D] text-[#E8D3C8] border border-[#3a2522] px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider"><Clock size={12} className="inline mr-1"/> {servicoDetalhe.duracao}</span>
+                {servicoDetalhe.taxa_sinal > 0 && <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-wider">Sinal {servicoDetalhe.taxa_sinal}%</span>}
+              </div>
+              
+              <p className="text-gray-400 text-sm mb-6 leading-relaxed font-light">{servicoDetalhe.descricao}</p>
 
-            <nav className="flex-1 p-2 sm:p-3 flex flex-col gap-1 sm:gap-2 overflow-y-auto custom-scrollbar min-h-0">
-              <button onClick={() => setActiveTab('inicio')} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <Sparkles size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Atendimento</span>
-              </button>
-              <button onClick={() => setActiveTab('cardapio')} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <ImageIcon size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Serviços VIP</span>
-              </button>
-              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <CalendarDays size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Agendar Retorno</span>
-              </button>
-            </nav>
-
-            <div className="p-2 sm:p-4 border-t border-[#DCAE96]/10 shrink-0">
-              <div className="bg-black/40 p-2 sm:p-3 rounded-lg flex items-center justify-between border border-[#DCAE96]/10">
-                <div>
-                  <p className="text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
+              {/* 🛡️ CARTA DE VENDAS DENTRO DO MODAL PARA PACOTES */}
+              {servicoDetalhe.is_pacote && (
+                <div className="bg-gradient-to-br from-[#2D0A12] to-[#180A0D] border border-[#DCAE96]/30 p-5 rounded-2xl mb-6 shadow-inner">
+                  <h4 className="text-[#F8D1BE] font-serif text-lg mb-3 flex items-center gap-2"><Award size={18} className="text-[#C7977D]"/> Por que assinar o Clube VIP?</h4>
+                  <ul className="space-y-3">
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Zero Preocupação:</strong> Suas {servicoDetalhe.qtd_sessoes} sessões já ficam garantidas sem precisar disputar agenda todo mês.</span>
+                     </li>
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Economia Real:</strong> Valor com desconto aplicado exclusivamente para assinantes do clube.</span>
+                     </li>
+                     <li className="flex items-start gap-2 text-xs text-gray-300">
+                       <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                       <span><strong>Status VIP:</strong> Prioridade máxima no atendimento no nosso estúdio.</span>
+                     </li>
+                  </ul>
                 </div>
-                <Wifi className="text-[#C7977D] opacity-80" size={14} />
+              )}
+
+              <div className="flex justify-between items-center border-t border-[#3a2522] pt-6 mt-auto">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-widest font-bold mb-0.5">{servicoDetalhe.is_pacote ? 'Valor Mensal' : 'Valor Total'}</p>
+                  <p className="text-xl font-bold text-[#F8D1BE]">R$ {servicoDetalhe.preco.toFixed(2).replace('.', ',')}</p>
+                </div>
+                <button onClick={() => iniciarAgendamento(servicoDetalhe)} className="bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-6 py-2.5 rounded-xl font-bold shadow-[0_0_20px_rgba(220,174,150,0.3)] hover:scale-105 transition-transform text-sm uppercase tracking-wider">
+                  {servicoDetalhe.is_pacote ? 'Assinar Agora' : 'Agendar'}
+                </button>
               </div>
             </div>
-          </aside>
+          </div>
+        </div>
+      )}
 
-          <main className="flex-1 relative z-10 flex flex-col h-[100dvh] overflow-hidden min-h-0 pt-10 sm:pt-14">
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
+          <div className="bg-[#0a0204] border border-[#3a2522] rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh] animate-in zoom-in-95">
+            <div className="px-6 py-4 border-b border-[#3a2522] flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-3">
+                {step < 5 && <div className="bg-[#DCAE96] text-[#120308] w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">{step}</div>}
+                <h2 className="text-sm md:text-base font-serif text-white">{step === 1 ? 'Escolha o Serviço' : step === 2 ? 'Data e Hora' : step === 3 ? 'Seus Dados' : step === 4 ? 'Pagamento Seguro' : 'Pronto!'}</h2>
+              </div>
+              {step < 5 && <button onClick={() => { setIsModalOpen(false); setSessoesSelecionadas([]); }} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
+            </div>
 
-            <div className="flex-1 px-4 pb-4 sm:px-6 sm:pb-6 overflow-hidden flex flex-col min-h-0">
-              
-              {abaAtiva === 'inicio' && (
-                <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700 min-h-0">
-                  <div className="mb-2 shrink-0">
-                    <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white mb-0.5 leading-tight drop-shadow-lg">
-                      {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
-                    </h1>
-                    <p className="text-[10px] sm:text-xs text-[#E8D3C8] font-light opacity-80">Relaxe e aproveite o seu momento.</p>
+            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#120308]">
+              {step === 1 && (
+                <div className="space-y-3">
+                  {servicosComuns.map(s => (
+                    <div key={s.id} onClick={() => {setServicoEscolhido(s); setStep(2);}} className="glass-card neon-hover border border-[#3a2522] p-4 rounded-2xl cursor-pointer flex justify-between items-center group transition-all">
+                      <div>
+                        <h4 className="text-white font-serif text-base mb-1 group-hover:text-[#DCAE96] transition-colors">{s.nome}</h4>
+                        <p className="text-[10px] text-gray-400">{s.duracao} • Sinal {s.taxa_sinal}%</p>
+                      </div>
+                      <span className="text-[#F8D1BE] font-bold text-sm">R$ {s.preco.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {step === 2 && (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                  
+                  <div className="text-center mb-4">
+                    <h3 className="text-[#F8D1BE] font-serif text-xl">{servicoEscolhido?.nome}</h3>
+                    {servicoEscolhido?.is_pacote && (
+                       <p className="text-[#C7977D] text-xs uppercase tracking-widest font-bold mt-1">Agendando Sessão {sessoesSelecionadas.length + 1} de {servicoEscolhido.qtd_sessoes}</p>
+                    )}
                   </div>
 
-                  <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-4 w-full min-h-0">
-                    
-                    {/* ESQUERDA: CRONÔMETRO COM UPSELL */}
-                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden relative">
-                      <div className="shrink-0 mb-2">
-                        <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
-                        <h2 className="font-serif text-lg sm:text-2xl text-white leading-tight drop-shadow-md line-clamp-2">{sessaoData.servico_nome}</h2>
+                  {sessoesSelecionadas.length > 0 && (
+                    <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-3 rounded-xl animate-in fade-in">
+                      <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Sessões já escolhidas:</p>
+                      <div className="space-y-2">
+                        {sessoesSelecionadas.map((sessao, index) => (
+                          <div key={index} className="flex justify-between items-center text-xs border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                            <span className="text-[#E8D3C8] flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-400"/> Sessão {index + 1}</span>
+                            <span className="font-bold text-[#F8D1BE]">{new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</span>
+                          </div>
+                        ))}
                       </div>
+                    </div>
+                  )}
 
-                      {/* 🛡️ O NOVO LUGAR DO BANNER DE UPSELL: NO CARD DO CRONÔMETRO */}
-                      {dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
-                        <div className="my-auto mx-2 sm:mx-4 bg-[#120308]/60 border border-[#DCAE96]/30 rounded-xl p-3 flex flex-col items-center justify-center shadow-[0_0_15px_rgba(220,174,150,0.1)]">
-                           <Crown size={16} className="text-[#C7977D] mb-1.5" />
-                           <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm text-center leading-tight mb-1">Sabia que você pode economizar?</p>
-                           <p className="text-gray-400 text-[9px] sm:text-[10px] leading-tight text-center mt-1 mb-3">Transforme esse serviço avulso em um pacote mensal e garanta descontos e vagas fixas.</p>
-                           <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider w-full hover:scale-105 transition-transform shadow-lg">
-                             Ver Assinaturas VIP
-                           </button>
+                  <div>
+                    <div className="flex justify-between items-end mb-3">
+                      <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider">
+                        Dias Disponíveis
+                        {dataEscolhida && <span className="block text-[#C7977D] font-serif capitalize mt-0.5 text-sm">{dataEscolhida.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</span>}
+                      </label>
+                      {sessoesSelecionadas.length > 0 && (
+                        <button onClick={voltarData} className="text-[#C7977D] text-xs font-bold hover:text-white transition-colors underline underline-offset-2 mb-1">Desfazer Data</button>
+                      )}
+                    </div>
+                    {diasDisponiveis.length === 0 ? (
+                      <p className="text-xs text-red-400">Nenhuma data disponível na agenda no momento.</p>
+                    ) : (
+                      <div className="flex gap-2 overflow-x-auto hide-scroll pb-2">
+                        {diasDisponiveis.map((data, idx) => (
+                          <button key={idx} id={`dia-${data.getTime()}`} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 py-2.5 rounded-xl flex flex-col items-center justify-center transition-all border ${dataEscolhida?.getDate() === data.getDate() && dataEscolhida?.getMonth() === data.getMonth() ? 'bg-[#DCAE96] text-[#120308] border-transparent font-bold shadow-lg scale-105' : 'glass-card text-gray-400 border-[#3a2522] hover:border-[#DCAE96]/50'}`}>
+                            <span className="text-[8px] sm:text-[9px] uppercase opacity-70">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
+                            <span className="text-base sm:text-lg font-serif my-0.5">{data.getDate()}</span>
+                            <span className={`text-[8px] sm:text-[9px] uppercase font-bold ${dataEscolhida?.getDate() === data.getDate() && dataEscolhida?.getMonth() === data.getMonth() ? 'text-[#120308]' : 'text-[#C7977D]'}`}>{data.toLocaleDateString('pt-BR', { month: 'short' }).replace('.','')}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {dataEscolhida && (
+                    <div className="animate-in fade-in slide-in-from-bottom-4">
+                      <label className="block text-[10px] md:text-xs text-[#E8D3C8] font-bold uppercase tracking-wider mb-3">Horários Livres</label>
+                      {horariosLivres.length === 0 ? (
+                         <div className="bg-[#180A0D] border border-red-500/20 p-4 rounded-xl text-center">
+                           <Ban size={24} className="text-red-400/50 mx-auto mb-2" />
+                           <p className="text-xs text-red-400">Nenhum horário livre para essa data.</p>
+                         </div>
+                      ) : (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                          {horariosLivres.map(hora => (
+                            <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-3 rounded-xl transition-all border text-sm ${horaEscolhida === hora ? 'bg-[#DCAE96] text-[#120308] font-bold border-transparent shadow-lg' : 'glass-card border-[#3a2522] text-white hover:border-[#DCAE96]/50'}`}>{hora}</button>
+                          ))}
                         </div>
                       )}
-
-                      <div className="bg-black/50 border border-[#DCAE96]/10 rounded-xl p-2 flex flex-col items-center justify-center mt-auto shadow-inner min-h-[60px] shrink-0">
-                        <PlayCircle size={14} className="text-[#F8D1BE] mb-1 animate-pulse" />
-                        <span className="font-mono text-2xl sm:text-3xl text-white tracking-widest font-light drop-shadow-[0_0_10px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
-                      </div>
                     </div>
-
-                    {/* DIREITA: RESUMO E PIX (LIMPO E FOCADO NO PAGAMENTO) */}
-                    {dadosServicoSessao && (
-                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
-                        
-                        <div className="shrink-0">
-                          <div className="flex justify-between items-center mb-1 border-b border-[#DCAE96]/10 pb-1 shrink-0">
-                            <h3 className="font-serif text-sm sm:text-base text-white">Resumo</h3>
-                            {valorRestante <= 0 || statusPagamento === 'pago' ? (
-                               <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 size={10}/> Pago</span>
-                            ) : null}
-                          </div>
-                          
-                          <div className="space-y-1 text-[10px] sm:text-xs shrink-0 pt-1">
-                            <div className="flex justify-between text-gray-400">
-                              <span>Total:</span>
-                              <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
-                            </div>
-                            {taxaSinal > 0 && (
-                              <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1">
-                                <span>Sinal ({taxaSinal}%):</span>
-                                <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between text-[#F8D1BE] text-sm sm:text-base font-bold pt-1">
-                              <span>Restante:</span>
-                              <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="mt-auto pt-2 shrink-0">
-                          {valorRestante > 0 && statusPagamento === 'pendente' && (
-                            <div className="bg-black/40 border border-[#DCAE96]/20 rounded-xl p-2 flex flex-col items-center justify-center gap-2 shadow-inner min-h-[4rem] sm:min-h-[5rem]">
-                              {isGerandoPix ? (
-                                <div className="flex flex-col items-center justify-center w-full">
-                                  <Loader2 className="animate-spin text-[#C7977D] mb-1" size={14} />
-                                  <p className="text-[8px] text-gray-400 uppercase tracking-widest">Gerando PIX...</p>
-                                </div>
-                              ) : qrCodeImagem ? (
-                                <div className="flex flex-row items-center gap-4 w-full h-full">
-                                  <div className="bg-white p-1 rounded-lg shrink-0 shadow-lg h-20 w-20 flex items-center justify-center">
-                                    <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
-                                  </div>
-                                  <div className="flex flex-col justify-center min-w-0 flex-1">
-                                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs leading-tight mb-1 font-bold truncate">Pagar Restante</p>
-                                    <p className="text-emerald-400/70 text-[8px] sm:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                                      <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando...
-                                    </p>
-                                  </div>
-                                </div>
-                              ) : (
-                                 <p className="text-[9px] text-red-400 w-full text-center">Falha de conexão.</p>
-                              )}
-                            </div>
-                          )}
-
-                          {(valorRestante <= 0 || statusPagamento === 'pago') && (
-                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2 flex flex-row items-center justify-center gap-2 shadow-inner h-12 sm:h-16">
-                               <CheckCircle2 className="text-emerald-400 shrink-0" size={18} />
-                               <div className="flex flex-col text-left">
-                                 <p className="text-emerald-400 text-xs font-bold leading-tight">Confirmado!</p>
-                                 <p className="text-gray-400 text-[8px] sm:text-[9px]">Aguarde finalização.</p>
-                               </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  
+                  <button disabled={!dataEscolhida || !horaEscolhida} onClick={avancarData} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform">
+                    {servicoEscolhido?.is_pacote && sessoesSelecionadas.length + 1 < servicoEscolhido.qtd_sessoes ? 'Salvar Horário e Escolher o Próximo' : 'Continuar'}
+                  </button>
                 </div>
               )}
-
-              {abaAtiva === 'cardapio' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
-                  <div className="mb-4 shrink-0">
-                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Catálogo Exclusivo</h2>
-                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Inspire-se para a sua próxima visita ou assine um Clube VIP.</p>
+              {step === 3 && (
+                <div className="space-y-5 animate-in fade-in slide-in-from-right-4">
+                  <div className="glass-card p-5 rounded-2xl border border-[#3a2522] mb-6">
+                    <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Resumo do Horário</p>
+                    <p className="text-white font-serif text-lg mb-3 leading-tight">{servicoEscolhido.nome}</p>
+                    
+                    <div className="space-y-2">
+                       {sessoesSelecionadas.map((sessao, index) => (
+                         <div key={index} className="flex justify-between items-center text-xs bg-black/40 p-2 rounded-lg border border-[#DCAE96]/10">
+                           <span className="text-gray-400">Sessão {index + 1}</span>
+                           <span className="font-bold text-[#F8D1BE]">{new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</span>
+                         </div>
+                       ))}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Nome Completo</label>
+                    <input type="text" value={clienteDados.nome} onChange={e => setClienteDados({...clienteDados, nome: e.target.value})} placeholder="Como gosta de ser chamada?" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
+                  </div>
+                  <div>
+                    <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Seu WhatsApp</label>
+                    <input type="tel" value={clienteDados.telefone} onChange={e => setClienteDados({...clienteDados, telefone: e.target.value})} placeholder="(47) 99999-9999" className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE]"/>
                   </div>
                   
-                  <div className="overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-0 space-y-6">
-                    
-                    {/* 🛡️ A NOVA SEÇÃO DE PACOTES NO MONITOR (VISUAL BLACK CARD DE LUXO) */}
-                    {pacotesDb.length > 0 && (
-                      <div>
-                        <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><Crown size={14}/> Assinaturas VIP</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {pacotesDb.map(pacote => {
-                            const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
-                            return (
-                              <div key={pacote.id} className="relative rounded-2xl overflow-hidden group flex flex-col bg-[#180A0D] border border-[#3a2522] hover:border-[#DCAE96]/50 transition-all duration-300 shadow-xl">
-                                {/* Image Header */}
-                                <div className="h-32 relative overflow-hidden bg-black shrink-0">
-                                  {imagem ? (
-                                    <img src={imagem} alt={pacote.nome} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={30} className="text-[#C7977D]" /></div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/40 to-transparent"></div>
-                                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-[#DCAE96]/30 flex items-center gap-1 shadow-lg">
-                                     <Crown size={10} className="text-[#C7977D]"/>
-                                     <span className="text-[8px] text-[#F8D1BE] uppercase font-bold tracking-widest">{pacote.qtd_sessoes} Sessões</span>
-                                  </div>
-                                </div>
-                                
-                                {/* Content */}
-                                <div className="p-4 flex flex-col flex-1 relative z-10 -mt-2">
-                                  <h3 className="font-serif text-base text-white leading-tight mb-2 group-hover:text-[#F8D1BE] transition-colors line-clamp-2">{pacote.nome}</h3>
-                                  <div className="flex items-end gap-1 mb-3 border-b border-[#3a2522] pb-3">
-                                    <span className="text-[#C7977D] text-[10px] font-bold mb-0.5">R$</span>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{pacote.preco.toFixed(2).replace('.', ',')}</span>
-                                    <span className="text-gray-500 text-[9px] mb-0.5">/mês</span>
-                                  </div>
-                                  <p className="text-gray-400 text-[9px] italic leading-relaxed mb-4 flex-1 line-clamp-3">{pacote.descricao}</p>
-                                  
-                                  <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider hover:scale-[1.02] transition-transform shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5">
-                                    <Crown size={14} /> Assinar VIP
-                                  </button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
+                  <div>
+                    <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-1 font-medium">Observações (Opcional)</label>
+                    <textarea value={clienteDados.observacoes} onChange={e => setClienteDados({...clienteDados, observacoes: e.target.value})} placeholder="Ex: Unha encravada, sensibilidade a algum produto..." className="w-full bg-[#180A0D] border border-[#3a2522] rounded-xl px-4 py-3 text-base md:text-sm text-white focus:outline-none focus:border-[#F8D1BE] resize-none h-20 custom-scrollbar"/>
+                  </div>
+                  
+                  <div className="bg-[#180A0D] border border-[#3a2522] rounded-xl p-4 flex items-center justify-between cursor-pointer hover:border-[#DCAE96]/50 transition-colors" onClick={() => setClienteDados({...clienteDados, prefere_silencio: !clienteDados.prefere_silencio})}>
                     <div>
-                      <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><ImageIcon size={14}/> Serviços Avulsos</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {servicosDb.length === 0 ? (
-                          <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
-                        ) : (
-                          servicosDb.map(serv => {
-                            const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
-                            return (
-                              <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
-                                <div className="w-[35%] bg-black relative shrink-0">
-                                  {imagem ? (
-                                    <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
-                                </div>
-                                
-                                <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
-                                  <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
-                                  <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
-                                  
-                                  <div className="flex justify-between items-center mt-auto">
-                                    <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                                    <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-2 py-1 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
-                                      Agendar <ChevronRight size={10}/>
-                                    </button>
-                                  </div>
-                                </div>
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
+                      <p className="text-white text-sm font-bold flex items-center gap-2">Terapia Silenciosa 🤫</p>
+                      <p className="text-gray-500 text-[10px] mt-0.5">Prefiro um atendimento sem muita conversa para relaxar.</p>
                     </div>
-
+                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${clienteDados.prefere_silencio ? 'bg-[#DCAE96]' : 'bg-[#3a2522]'}`}>
+                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${clienteDados.prefere_silencio ? 'translate-x-6' : 'translate-x-0'}`}></div>
+                    </div>
                   </div>
+
+                  <button disabled={!clienteDados.nome || !clienteDados.telefone || isProcessando} onClick={validarEAvancarPagamento} className="w-full bg-[#DCAE96] text-[#120308] py-4 rounded-full font-bold mt-2 disabled:opacity-50 text-sm shadow-lg hover:scale-105 transition-transform flex justify-center items-center gap-2">
+                    {isProcessando ? <Loader2 className="animate-spin" size={20} /> : 'Confirmar Agendamento'}
+                  </button>
                 </div>
               )}
-
-              {abaAtiva === 'agendar' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
-                  <div className="mb-2 shrink-0">
-                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Agende seu Retorno</h2>
-                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Garante sua próxima vaga e pague o sinal agora mesmo.</p>
-                  </div>
+              {step === 4 && (
+                <div className="animate-in fade-in slide-in-from-right-4">
                   
-                  <div className="flex-1 flex bg-[#120308]/60 border border-[#DCAE96]/20 rounded-2xl shadow-xl min-h-0 overflow-hidden">
-                    
-                    {etapaAgendamento === 1 && (
-                      <div className="w-full flex flex-col sm:flex-row p-3 sm:p-4 gap-3 sm:gap-4 overflow-y-auto custom-scrollbar">
-                        <div className="w-full sm:w-1/2 flex flex-col gap-2 sm:gap-3 sm:pr-4 sm:border-r border-[#DCAE96]/10 shrink-0">
-                          <div>
-                            <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">1. Qual o serviço?</label>
-                            
-                            <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:border-[#F8D1BE]">
-                              <option value="">Selecione...</option>
-                              {pacotesDb.length > 0 && <optgroup label="👑 Pacotes VIP">{pacotesDb.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.qtd_sessoes}x)</option>)}</optgroup>}
-                              {servicosDb.length > 0 && <optgroup label="💅 Serviços Avulsos">{servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</optgroup>}
-                            </select>
-                            
-                          </div>
-                          <div className="flex-1 flex flex-col min-h-0">
-                            <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">2. Data</label>
-                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
-                              {diasDisponiveis.slice(0, 7).map((data, idx) => (
-                                <button key={idx} onClick={() => setDataEscolhida(data)} className={`px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96]/20 text-[#F8D1BE] border-[#F8D1BE] shadow-lg' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
-                                  <span className="text-[8px] sm:text-[9px] uppercase opacity-70">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
-                                  <span className="text-xs sm:text-sm font-bold">{data.getDate()}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        <div className="w-full sm:w-1/2 flex flex-col min-h-0">
-                          <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">3. Horário</label>
-                          {horariosLivres.length === 0 && dataEscolhida && servicoEscolhido ? (
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 flex items-center justify-center gap-2 h-10"><Ban size={12} className="text-red-400"/><span className="text-[9px] text-red-400">Sem horários livres</span></div>
-                          ) : (
-                            <div className="grid grid-cols-3 sm:grid-cols-2 gap-1.5 mb-2 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                              {horariosLivres.map(hora => (
-                                <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-1.5 rounded-lg transition-all border text-[10px] sm:text-xs h-8 ${horaEscolhida === hora ? 'bg-[#DCAE96]/20 text-[#F8D1BE] font-bold border-[#F8D1BE]' : 'bg-black/30 border-[#DCAE96]/10 text-gray-400 hover:border-[#DCAE96]/40'}`}>
-                                  {hora}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                          
-                          <button onClick={iniciarProcessoAgendamento} disabled={isProcessandoAgendamento || !servicoEscolhido || !dataEscolhida || !horaEscolhida} className="mt-auto w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] py-2 sm:py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-30 text-[10px] sm:text-xs shrink-0 shadow-[0_0_15px_rgba(248,209,190,0.3)]">
-                            {isProcessandoAgendamento ? <Loader2 className="animate-spin" size={14} /> : servicoEscolhido?.taxa_sinal > 0 ? <><QrCode size={14} /> Pagar Sinal (R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')})</> : <><CheckCircle2 size={14} /> Agendar Agora</>}
-                          </button>
+                  {dividaPendente > 0 && (
+                    <div className="bg-red-900/20 border border-red-500/30 p-4 rounded-xl mb-6 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                      <p className="text-red-400 font-bold text-sm flex items-center gap-2 mb-1"><AlertTriangle size={18}/> Débito Pendente de Falta</p>
+                      <p className="text-gray-400 text-xs leading-relaxed">Identificamos um cancelamento tardio/falta na sua última reserva no valor de <strong>R$ {dividaPendente.toFixed(2).replace('.', ',')}</strong>. Como manda nossa política de cancelamento, esse valor foi adicionado ao seu sinal para liberar este novo agendamento.</p>
+                    </div>
+                  )}
+
+                  {pixManualFallback ? (
+                    <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
+                      <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Pague com a Chave PIX</h3>
+                      <p className="text-gray-400 text-xs text-center mb-4">Envie o valor exato abaixo para a chave e clique em confirmar.</p>
+                      <div className="w-full bg-[#180A0D] border border-[#3a2522] p-4 rounded-xl mb-6">
+                        <p className="text-[10px] text-[#C7977D] uppercase tracking-widest font-bold mb-1">Chave ({configuracoes?.tipo_chave_pix || 'PIX'})</p>
+                        <div className="flex gap-2 items-center">
+                          <input type="text" readOnly value={configuracoes?.chave_pix || ''} className="flex-1 bg-transparent border-none text-white text-sm outline-none truncate font-mono" />
+                          <button onClick={() => {navigator.clipboard.writeText(configuracoes?.chave_pix || ''); alert("Chave copiada!");}} className="bg-[#3a2522] text-white p-2 rounded-lg hover:bg-[#DCAE96] hover:text-black transition-colors shrink-0"><Copy size={14}/></button>
                         </div>
                       </div>
-                    )}
+                      <button onClick={() => { processarPagamento(); setStep(5); }} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                        <CheckCircle2 size={18}/> Já realizei o pagamento
+                      </button>
+                    </div>
 
-                    {etapaAgendamento === 2 && (
-                      <div className="w-full flex flex-col items-center justify-center p-4 animate-in zoom-in-95 text-center bg-black/40">
-                        <h3 className="text-[#00B1EA] font-bold mb-2 flex items-center gap-2 text-sm"><QrCode size={16}/> Escaneie para Confirmar a Vaga</h3>
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-3">Sinal exigido de R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')} para {servicoEscolhido.nome}.</p>
-                        <div className="bg-white p-2 rounded-xl mb-3 shadow-[0_0_20px_rgba(0,177,234,0.3)] w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center">
-                          {qrCodeAgendamento ? <img src={`data:image/jpeg;base64,${qrCodeAgendamento}`} className="w-full h-full object-contain" /> : <Loader2 className="animate-spin text-[#00B1EA]" size={24} />}
+                  ) : qrCodePix ? (
+                    <div className="bg-black/50 border border-[#00B1EA]/30 rounded-2xl p-6 flex flex-col items-center justify-center animate-in zoom-in-95">
+                      <h3 className="text-[#00B1EA] font-bold mb-4 flex items-center gap-2"><QrCode size={20}/> Escaneie para Pagar</h3>
+                      <div className="bg-white p-2 rounded-xl mb-4 shadow-[0_0_20px_rgba(0,177,234,0.3)]">
+                        <img src={`data:image/jpeg;base64,${qrCodePix.base64}`} alt="QR Code PIX" className="w-48 h-48" />
+                      </div>
+                      <p className="text-gray-400 text-xs mb-2">Ou use o código Copia e Cola:</p>
+                      <div className="w-full flex gap-2">
+                         <input type="text" readOnly value={qrCodePix.copiaCola} className="w-full bg-[#180A0D] border border-[#3a2522] rounded-lg px-3 py-2 text-[10px] text-gray-500 truncate" />
+                         <button onClick={() => {navigator.clipboard.writeText(qrCodePix.copiaCola); alert("PIX Copiado!");}} className="bg-[#3a2522] text-white px-3 rounded-lg text-xs font-bold hover:bg-[#DCAE96] hover:text-black transition-colors flex items-center gap-1 shrink-0"><Copy size={12}/> Copiar</button>
+                      </div>
+                      <div className="mt-6 flex items-center gap-2 text-emerald-400 text-[10px] font-bold uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
+                         <Loader2 className="animate-spin" size={14} /> Aguardando Pagamento...
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-red-500/10 border border-red-500/20 p-4 rounded-2xl flex items-center justify-between mb-4 shadow-[0_0_15px_rgba(239,68,68,0.1)]">
+                        <div className="flex items-center gap-3">
+                          <AlertCircle className="text-red-400" size={20} />
+                          <div><p className="text-white font-bold text-xs">Vaga reservada temporariamente!</p><p className="text-red-300 text-[10px] mt-0.5">Pague o sinal para confirmar.</p></div>
                         </div>
-                        <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-                           <Loader2 className="animate-spin shrink-0" size={12} /> Aguardando Pagamento...
+                        <div className="text-lg font-mono text-red-400 font-bold bg-[#120308] px-3 py-1 rounded-lg border border-red-500/30">{formatarTempo(tempoRestante)}</div>
+                      </div>
+
+                      <div className="mb-6 bg-black/40 border border-[#DCAE96]/20 p-4 rounded-2xl flex items-start gap-3">
+                        <Info size={16} className="text-[#C7977D] shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-[#E8D3C8] text-xs font-bold mb-1">Política de Cancelamento</p>
+                          <p className="text-gray-400 text-[10px] leading-relaxed">
+                            Ao prosseguir, você concorda que: Cancelamentos com até 48h de antecedência garantem <strong>100% de estorno</strong>. Faltas ou cancelamentos com menos de 24h implicam em retenção do sinal e multa do valor restante na sua próxima reserva.
+                          </p>
                         </div>
                       </div>
-                    )}
 
-                    {etapaAgendamento === 3 && (
-                      <div className="w-full flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 bg-black/40">
-                        <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mb-3 border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                          <CheckCircle2 size={24} className="text-emerald-400" />
-                        </div>
-                        <h2 className="font-serif text-lg sm:text-xl text-white mb-1">Vaga Reservada!</h2>
-                        <p className="text-[10px] sm:text-xs text-gray-400">Você receberá a confirmação no WhatsApp do seu celular.</p>
+                      <div className="mb-6 pb-6 border-b border-[#3a2522] space-y-2">
+                        <div className="flex justify-between text-xs text-gray-400"><span>Valor Total do {servicoEscolhido?.is_pacote ? 'Pacote' : 'Serviço'}</span><span>R$ {servicoEscolhido.preco.toFixed(2).replace('.', ',')}</span></div>
+                        <div className="flex justify-between text-sm text-[#F8D1BE] font-bold"><span>Sinal Exigido ({servicoEscolhido.taxa_sinal}%)</span><span>R$ {calcularSinalBase().toFixed(2).replace('.', ',')}</span></div>
+                        {dividaPendente > 0 && <div className="flex justify-between text-sm text-red-400 font-bold mt-2 pt-2 border-t border-red-500/20"><span>Dívida de Falta Adicionada</span><span>+ R$ {dividaPendente.toFixed(2).replace('.', ',')}</span></div>}
                       </div>
-                    )}
 
+                      <label className="block text-[10px] md:text-xs text-[#E8D3C8] mb-3 font-bold uppercase tracking-wider">Forma de Pagamento</label>
+                      <div className="grid grid-cols-2 gap-3 mb-6">
+                        <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'pix' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
+                          <input type="radio" name="pagamento" value="pix" checked={metodoPagamento === 'pix'} onChange={() => setMetodoPagamento('pix')} className="sr-only" />
+                          <QrCode size={24} className={metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-gray-400'} />
+                          <span className={`font-bold text-sm ${metodoPagamento === 'pix' ? 'text-[#00B1EA]' : 'text-white'}`}>PIX</span>
+                          <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full absolute top-2 right-2 font-bold">Sem taxa</span>
+                        </label>
+                        <label className={`relative border p-4 rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 transition-all ${metodoPagamento === 'cartao' ? 'border-[#00B1EA] bg-[#00B1EA]/10 shadow-[0_0_15px_rgba(0,177,234,0.2)]' : 'glass-card border-[#3a2522]'}`}>
+                          <input type="radio" name="pagamento" value="cartao" checked={metodoPagamento === 'cartao'} onChange={() => setMetodoPagamento('cartao')} className="sr-only" />
+                          <CreditCard size={24} className={metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-gray-400'} />
+                          <span className={`font-bold text-sm ${metodoPagamento === 'cartao' ? 'text-[#00B1EA]' : 'text-white'}`}>Cartão</span>
+                          <span className="text-[9px] bg-red-500/20 text-red-400 px-1.5 py-0.5 rounded absolute top-2 right-2">+5% taxa</span>
+                        </label>
+                      </div>
+
+                      <div className="bg-[#180A0D] p-5 rounded-2xl border border-[#3a2522] flex justify-between items-center mb-6">
+                        <div>
+                          <p className="text-gray-400 text-xs mb-1">Total a pagar agora</p>
+                          <p className="text-2xl font-bold text-white">R$ {valorTotalCobrar.toFixed(2).replace('.', ',')}</p>
+                        </div>
+                        {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularTotalSinalEDivida()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
+                      </div>
+
+                      <button onClick={processarPagamento} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                        {isProcessando ? <Loader2 className="animate-spin" size={20} /> : <><ShieldCheck size={18}/> Pagar Seguramente</>}
+                      </button>
+                    </>
+                  )}
+                  {!pixManualFallback && <p className="text-center text-[10px] text-gray-500 mt-3 flex items-center justify-center gap-1 font-medium"><ShieldCheck size={10}/> Processado pelo Mercado Pago</p>}
+                </div>
+              )}
+              {step === 5 && (
+                <div className="py-8 flex flex-col items-center text-center animate-in zoom-in-95">
+                  <div className="w-16 h-16 bg-emerald-500/20 rounded-full flex items-center justify-center mb-6 border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
+                    <CheckCircle2 size={32} className="text-emerald-400" />
                   </div>
+                  <h2 className="font-serif text-2xl text-white mb-2">Confirmado!</h2>
+                  <p className="text-gray-400 mb-8 text-sm">Te enviamos os detalhes no WhatsApp.</p>
+                  
+                  <div className="bg-[#180A0D] border border-[#3a2522] p-5 rounded-2xl w-full text-left mb-8">
+                    <p className="text-white font-bold mb-3 text-sm">{servicoEscolhido.nome}</p>
+                    
+                    <div className="space-y-1 mb-4">
+                       {sessoesSelecionadas.map((sessao, index) => (
+                         <p key={index} className="text-[#C7977D] text-xs font-medium bg-black/30 p-2 rounded-lg border border-[#DCAE96]/10">Sessão {index + 1}: {new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</p>
+                       ))}
+                    </div>
+
+                    <div className="bg-[#0a0204] p-3 rounded-lg border border-[#3a2522]">
+                      <p className="text-[10px] md:text-xs text-gray-400">Restará pagar <strong className="text-white">R$ {(servicoEscolhido.preco - calcularSinalBase()).toFixed(2).replace('.', ',')}</strong> no momento do atendimento.</p>
+                    </div>
+                  </div>
+
+                  <button onClick={() => {setIsModalOpen(false); setStep(1);}} className="bg-[#DCAE96] text-[#120308] px-8 py-3.5 rounded-full font-bold w-full text-sm shadow-lg hover:scale-105 transition-transform">Concluir</button>
                 </div>
               )}
             </div>
-          </main>
+          </div>
         </div>
       )}
 
       <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 3px; height: 3px; }
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,700;1,400&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0a0204; }
+        .font-serif { font-family: 'Playfair Display', serif; }
+        
+        .ambient-grid { position: fixed; inset: 0; z-index: -1; background-image: linear-gradient(rgba(199, 151, 125, 0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.08) 1px, transparent 1px); background-size: 35px 35px; }
+        .glass-card { background: rgba(18, 3, 8, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+        .neon-border { border: 1px solid rgba(199, 151, 125, 0.5); box-shadow: 0 0 20px rgba(199, 151, 125, 0.1); }
+        .neon-hover:hover { border-color: rgba(220, 174, 150, 0.6); box-shadow: 0 0 25px rgba(220, 174, 150, 0.2); transform: translateY(-3px); }
+        .glow-text { background: linear-gradient(90deg, #F8D1BE, #C7977D); -webkit-background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 0 8px rgba(248, 209, 190, 0.4)); }
+        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(248, 209, 190, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(199, 151, 125, 0.4); border-radius: 10px; }
+        .hide-scroll::-webkit-scrollbar { display: none; }
+        .hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
       `}} />
-    </div>
+    </main>
   );
 }
