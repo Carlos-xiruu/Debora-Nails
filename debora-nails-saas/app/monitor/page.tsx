@@ -447,10 +447,10 @@ export default function MonitorPage() {
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       
-      {/* 🛡️ O RELÓGIO FLUTUANTE QUE RESOLVE O ESPAÇAMENTO */}
-      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 z-50 flex items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-1.5 rounded-full shadow-lg pointer-events-none">
-        <Clock size={12} className="text-[#C7977D]" />
-        <span className="text-white font-medium text-xs sm:text-sm tracking-widest">{horaAtual}</span>
+      {/* 🛡️ O RELÓGIO FLUTUANTE (FIXADO NO TOPO DIREITO ABSOLUTO) */}
+      <div className="absolute top-4 right-4 sm:top-6 sm:right-6 lg:top-8 lg:right-8 z-50 flex items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1 sm:px-4 sm:py-2 rounded-full shadow-lg pointer-events-none">
+        <Clock size={14} className="text-[#C7977D]" />
+        <span className="text-white font-medium text-xs sm:text-base tracking-widest">{horaAtual}</span>
       </div>
 
       <button onClick={ativarTelaCheia} className="absolute top-2 left-2 z-50 p-2 text-[#C7977D] opacity-20 hover:opacity-100 bg-black/40 rounded-full transition-opacity"><Maximize size={16} /></button>
@@ -541,324 +541,340 @@ export default function MonitorPage() {
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
           
           <aside className="w-[30%] min-w-[140px] sm:min-w-[200px] max-w-[260px] bg-[#120308]/90 backdrop-blur-xl border-r border-[#DCAE96]/20 flex flex-col z-20 h-full shrink-0 shadow-2xl">
-            <div className="p-3 sm:p-5 border-b border-[#DCAE96]/10 flex flex-col items-start shrink-0">
-              <img src="/fotonova.jpeg" className="h-8 w-8 sm:h-10 sm:w-10 rounded-full object-cover mb-2 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
-              <p className="text-[8px] sm:text-[9px] text-[#C7977D] uppercase tracking-[0.1em] sm:tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
-              <h2 className="font-serif text-base sm:text-xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
+            <div className="p-4 sm:p-6 border-b border-[#DCAE96]/10 flex flex-col items-start shrink-0">
+              <img src="/fotonova.jpeg" className="h-10 w-10 sm:h-12 sm:w-12 rounded-full object-cover mb-3 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
+              <p className="text-[9px] sm:text-[10px] text-[#C7977D] uppercase tracking-[0.1em] sm:tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
+              <h2 className="font-serif text-lg sm:text-2xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
             </div>
 
-            <nav className="flex-1 p-2 sm:p-3 flex flex-col gap-1 sm:gap-2 overflow-y-auto custom-scrollbar min-h-0">
-              <button onClick={() => setActiveTab('inicio')} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <Sparkles size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Atendimento</span>
+            <nav className="flex-1 p-3 sm:p-4 flex flex-col gap-2 overflow-y-auto custom-scrollbar min-h-0">
+              <button onClick={() => setActiveTab('inicio')} className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl transition-all ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <Sparkles size={18} className="shrink-0" /> <span className="text-xs sm:text-sm">Atendimento</span>
               </button>
-              <button onClick={() => setActiveTab('cardapio')} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <ImageIcon size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Serviços VIP</span>
+              <button onClick={() => setActiveTab('cardapio')} className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl transition-all ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <ImageIcon size={18} className="shrink-0" /> <span className="text-xs sm:text-sm">Serviços VIP</span>
               </button>
-              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-xl transition-all ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <CalendarDays size={16} className="shrink-0" /> <span className="text-xs sm:text-sm">Agendar Retorno</span>
+              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl transition-all ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <CalendarDays size={18} className="shrink-0" /> <span className="text-xs sm:text-sm">Agendar Retorno</span>
               </button>
             </nav>
 
-            <div className="p-2 sm:p-4 border-t border-[#DCAE96]/10 shrink-0">
-              <div className="bg-black/40 p-2 sm:p-3 rounded-lg flex items-center justify-between border border-[#DCAE96]/10">
+            <div className="p-3 sm:p-5 border-t border-[#DCAE96]/10 shrink-0">
+              <div className="bg-black/40 p-3 sm:p-4 rounded-lg flex items-center justify-between border border-[#DCAE96]/10">
                 <div>
-                  <p className="text-[8px] sm:text-[9px] text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
-                  <p className="text-[9px] sm:text-[11px] text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 uppercase tracking-widest mb-1">Wi-Fi Premium</p>
+                  <p className="text-[10px] sm:text-xs text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
+                  <p className="text-[10px] sm:text-xs text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
                 </div>
-                <Wifi className="text-[#C7977D] opacity-80" size={14} />
+                <Wifi className="text-[#C7977D] opacity-80" size={16} />
               </div>
             </div>
           </aside>
 
-          <main className="flex-1 relative z-10 flex flex-col h-[100dvh] overflow-hidden min-h-0 pt-10 sm:pt-14">
+          {/* 🛡️ MAIN CONTAINER - REESTRUTURADO PARA PC/TV */}
+          <main className="flex-1 relative z-10 flex flex-col h-[100dvh] overflow-hidden min-h-0">
 
-            <div className="flex-1 px-4 pb-4 sm:px-6 sm:pb-6 overflow-hidden flex flex-col min-h-0">
-              
-              {abaAtiva === 'inicio' && (
-                <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700 min-h-0">
-                  <div className="mb-2 shrink-0">
-                    <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white mb-0.5 leading-tight drop-shadow-lg">
-                      {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
-                    </h1>
-                    <p className="text-[10px] sm:text-xs text-[#E8D3C8] font-light opacity-80">Relaxe e aproveite o seu momento.</p>
-                  </div>
-
-                  <div className="flex-1 flex flex-col sm:flex-row gap-2 sm:gap-4 w-full min-h-0">
-                    
-                    {/* ESQUERDA: CRONÔMETRO COM UPSELL */}
-                    <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden relative">
-                      <div className="shrink-0 mb-2">
-                        <p className="text-[#C7977D] text-[9px] sm:text-[10px] uppercase tracking-widest font-bold mb-1">Em Andamento</p>
-                        <h2 className="font-serif text-lg sm:text-2xl text-white leading-tight drop-shadow-md line-clamp-2">{sessaoData.servico_nome}</h2>
-                      </div>
-
-                      {/* 🛡️ O NOVO LUGAR DO BANNER DE UPSELL: NO CARD DO CRONÔMETRO */}
-                      {dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
-                        <div className="my-auto mx-2 sm:mx-4 bg-[#120308]/60 border border-[#DCAE96]/30 rounded-xl p-3 flex flex-col items-center justify-center shadow-[0_0_15px_rgba(220,174,150,0.1)]">
-                           <Crown size={16} className="text-[#C7977D] mb-1.5" />
-                           <p className="text-[#F8D1BE] font-bold text-xs sm:text-sm text-center leading-tight mb-1">Sabia que você pode economizar?</p>
-                           <p className="text-gray-400 text-[9px] sm:text-[10px] leading-tight text-center mt-1 mb-3">Transforme esse serviço avulso em um pacote mensal e garanta descontos e vagas fixas.</p>
-                           <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-4 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider w-full hover:scale-105 transition-transform shadow-lg">
-                             Ver Assinaturas VIP
-                           </button>
-                        </div>
-                      )}
-
-                      <div className="bg-black/50 border border-[#DCAE96]/10 rounded-xl p-2 flex flex-col items-center justify-center mt-auto shadow-inner min-h-[60px] shrink-0">
-                        <PlayCircle size={14} className="text-[#F8D1BE] mb-1 animate-pulse" />
-                        <span className="font-mono text-2xl sm:text-3xl text-white tracking-widest font-light drop-shadow-[0_0_10px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
+            <div className="flex-1 p-4 sm:p-6 lg:p-8 overflow-hidden flex flex-col min-h-0 items-center">
+              {/* CAIXA DE CONTENÇÃO - Impede que tudo estique infinitamente numa TV */}
+              <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
+                
+                {abaAtiva === 'inicio' && (
+                  <div className="h-full flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-700 min-h-0 w-full">
+                    <div className="mb-4 sm:mb-6 shrink-0 flex justify-between items-start">
+                      <div>
+                        <h1 className="font-serif text-3xl sm:text-4xl lg:text-5xl text-white mb-1 leading-tight drop-shadow-lg">
+                          {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
+                        </h1>
+                        <p className="text-xs sm:text-sm text-[#E8D3C8] font-light opacity-80">Relaxe e aproveite o seu momento.</p>
                       </div>
                     </div>
 
-                    {/* DIREITA: RESUMO E PIX (LIMPO E FOCADO NO PAGAMENTO) */}
-                    {dadosServicoSessao && (
-                      <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-4 rounded-2xl shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
-                        
-                        <div className="shrink-0">
-                          <div className="flex justify-between items-center mb-1 border-b border-[#DCAE96]/10 pb-1 shrink-0">
-                            <h3 className="font-serif text-sm sm:text-base text-white">Resumo</h3>
-                            {valorRestante <= 0 || statusPagamento === 'pago' ? (
-                               <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-[10px] px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1"><CheckCircle2 size={10}/> Pago</span>
-                            ) : null}
-                          </div>
-                          
-                          <div className="space-y-1 text-[10px] sm:text-xs shrink-0 pt-1">
-                            <div className="flex justify-between text-gray-400">
-                              <span>Total:</span>
-                              <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
+                    {dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
+                      <div className="mb-4 sm:mb-6 bg-gradient-to-r from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-xl p-3 sm:p-4 flex flex-row items-center justify-between shrink-0 shadow-lg">
+                         <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="p-2 sm:p-3 bg-[#DCAE96]/20 rounded-full shrink-0"><Crown size={20} className="text-[#C7977D]" /></div>
+                            <div className="text-left">
+                              <p className="text-[#F8D1BE] font-bold text-xs sm:text-base leading-tight">Sabia que você pode economizar?</p>
+                              <p className="text-gray-400 text-[10px] sm:text-xs leading-tight mt-0.5 hidden sm:block">Transforme este serviço avulso em uma assinatura mensal com vagas fixas e desconto.</p>
                             </div>
-                            {taxaSinal > 0 && (
-                              <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1">
-                                <span>Sinal ({taxaSinal}%):</span>
-                                <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
+                         </div>
+                         <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-4 py-2 sm:px-6 sm:py-2.5 rounded-lg text-[10px] sm:text-xs font-bold uppercase tracking-wider hover:scale-105 transition-transform shadow-md shrink-0">
+                           Ver Assinaturas
+                         </button>
+                      </div>
+                    )}
+
+                    <div className="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-8 w-full min-h-0">
+                      
+                      {/* ESQUERDA: CRONÔMETRO GIGANTE */}
+                      <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-5 sm:p-8 rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
+                        <div className="shrink-0 mb-4">
+                          <p className="text-[#C7977D] text-[10px] sm:text-xs uppercase tracking-widest font-bold mb-2">Em Andamento</p>
+                          <h2 className="font-serif text-2xl sm:text-4xl lg:text-5xl text-white leading-tight drop-shadow-md line-clamp-2">{sessaoData.servico_nome}</h2>
+                        </div>
+
+                        <div className="bg-black/50 border border-[#DCAE96]/10 rounded-2xl p-6 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner shrink-0">
+                          <PlayCircle size={20} className="text-[#F8D1BE] mb-2 sm:mb-4 animate-pulse" />
+                          <span className="font-mono text-5xl sm:text-7xl lg:text-8xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
+                        </div>
+                      </div>
+
+                      {/* DIREITA: RESUMO E PIX */}
+                      {dadosServicoSessao && (
+                        <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-5 sm:p-8 rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
+                          
+                          <div className="shrink-0">
+                            <div className="flex justify-between items-center mb-3 border-b border-[#DCAE96]/10 pb-3 shrink-0">
+                              <h3 className="font-serif text-lg sm:text-2xl text-white">Resumo</h3>
+                              {valorRestante <= 0 || statusPagamento === 'pago' ? (
+                                 <span className="bg-emerald-500/20 text-emerald-400 text-xs sm:text-sm px-2.5 py-1 rounded border border-emerald-500/30 flex items-center gap-1.5"><CheckCircle2 size={14}/> Pago</span>
+                              ) : null}
+                            </div>
+                            
+                            <div className="space-y-2 sm:space-y-3 text-xs sm:text-base shrink-0 pt-2">
+                              <div className="flex justify-between text-gray-400">
+                                <span>Total:</span>
+                                <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
+                              </div>
+                              {taxaSinal > 0 && (
+                                <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-2">
+                                  <span>Sinal ({taxaSinal}%):</span>
+                                  <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
+                                </div>
+                              )}
+                              <div className="flex justify-between text-[#F8D1BE] text-lg sm:text-2xl font-bold pt-2">
+                                <span>Restante:</span>
+                                <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="mt-auto pt-6 shrink-0">
+                            {valorRestante > 0 && statusPagamento === 'pendente' && (
+                              <div className="bg-black/40 border border-[#DCAE96]/20 rounded-2xl p-4 sm:p-5 flex flex-col items-center justify-center gap-2 shadow-inner h-28 sm:h-40 lg:h-48">
+                                {isGerandoPix ? (
+                                  <div className="flex flex-col items-center justify-center w-full">
+                                    <Loader2 className="animate-spin text-[#C7977D] mb-2 sm:mb-3" size={24} />
+                                    <p className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-widest">Gerando PIX...</p>
+                                  </div>
+                                ) : qrCodeImagem ? (
+                                  <div className="flex flex-row items-center gap-4 sm:gap-6 w-full h-full">
+                                    <div className="bg-white p-2 rounded-xl shrink-0 shadow-lg h-20 w-20 sm:h-32 sm:w-32 lg:h-36 lg:w-36 flex items-center justify-center">
+                                      <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
+                                    </div>
+                                    <div className="flex flex-col justify-center min-w-0 flex-1">
+                                      <p className="text-[#E8D3C8] text-sm sm:text-lg lg:text-xl leading-tight mb-1.5 font-bold truncate">Pagar Restante</p>
+                                      <p className="text-emerald-400/70 text-[9px] sm:text-xs uppercase tracking-widest flex items-center gap-1.5">
+                                        <Loader2 className="animate-spin shrink-0" size={12} /> Aguardando Leitura
+                                      </p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                   <p className="text-xs sm:text-sm text-red-400 w-full text-center">Falha de conexão.</p>
+                                )}
                               </div>
                             )}
-                            <div className="flex justify-between text-[#F8D1BE] text-sm sm:text-base font-bold pt-1">
-                              <span>Restante:</span>
-                              <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
-                            </div>
+
+                            {(valorRestante <= 0 || statusPagamento === 'pago') && (
+                              <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-2xl p-4 flex flex-row items-center justify-center gap-3 shadow-inner h-20 sm:h-24">
+                                 <CheckCircle2 className="text-emerald-400 shrink-0" size={28} />
+                                 <div className="flex flex-col text-left">
+                                   <p className="text-emerald-400 text-sm sm:text-lg font-bold leading-tight">Pagamento Confirmado!</p>
+                                   <p className="text-gray-400 text-[10px] sm:text-xs">Aguarde a finalização do atendimento.</p>
+                                 </div>
+                              </div>
+                            )}
                           </div>
                         </div>
-
-                        <div className="mt-auto pt-2 shrink-0">
-                          {valorRestante > 0 && statusPagamento === 'pendente' && (
-                            <div className="bg-black/40 border border-[#DCAE96]/20 rounded-xl p-2 flex flex-col items-center justify-center gap-2 shadow-inner min-h-[4rem] sm:min-h-[5rem]">
-                              {isGerandoPix ? (
-                                <div className="flex flex-col items-center justify-center w-full">
-                                  <Loader2 className="animate-spin text-[#C7977D] mb-1" size={14} />
-                                  <p className="text-[8px] text-gray-400 uppercase tracking-widest">Gerando PIX...</p>
-                                </div>
-                              ) : qrCodeImagem ? (
-                                <div className="flex flex-row items-center gap-4 w-full h-full">
-                                  <div className="bg-white p-1 rounded-lg shrink-0 shadow-lg h-20 w-20 flex items-center justify-center">
-                                    <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
-                                  </div>
-                                  <div className="flex flex-col justify-center min-w-0 flex-1">
-                                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs leading-tight mb-1 font-bold truncate">Pagar Restante</p>
-                                    <p className="text-emerald-400/70 text-[8px] sm:text-[9px] uppercase tracking-widest flex items-center gap-1">
-                                      <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando...
-                                    </p>
-                                  </div>
-                                </div>
-                              ) : (
-                                 <p className="text-[9px] text-red-400 w-full text-center">Falha de conexão.</p>
-                              )}
-                            </div>
-                          )}
-
-                          {(valorRestante <= 0 || statusPagamento === 'pago') && (
-                            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-2 flex flex-row items-center justify-center gap-2 shadow-inner h-12 sm:h-16">
-                               <CheckCircle2 className="text-emerald-400 shrink-0" size={18} />
-                               <div className="flex flex-col text-left">
-                                 <p className="text-emerald-400 text-xs font-bold leading-tight">Confirmado!</p>
-                                 <p className="text-gray-400 text-[8px] sm:text-[9px]">Aguarde finalização.</p>
-                               </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {abaAtiva === 'cardapio' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
-                  <div className="mb-4 shrink-0">
-                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Catálogo Exclusivo</h2>
-                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Inspire-se para a sua próxima visita ou assine um Clube VIP.</p>
-                  </div>
-                  
-                  <div className="overflow-y-auto custom-scrollbar pr-1 flex-1 min-h-0 space-y-6">
+                {abaAtiva === 'cardapio' && (
+                  <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 w-full">
+                    <div className="mb-4 sm:mb-6 shrink-0">
+                      <h2 className="font-serif text-2xl sm:text-4xl text-[#F8D1BE] mb-1.5">Catálogo Exclusivo</h2>
+                      <p className="text-[#E8D3C8] text-xs sm:text-sm opacity-80">Inspire-se para a sua próxima visita ou assine um Clube VIP.</p>
+                    </div>
                     
-                    {/* 🛡️ A NOVA SEÇÃO DE PACOTES NO MONITOR (VISUAL BLACK CARD DE LUXO) */}
-                    {pacotesDb.length > 0 && (
-                      <div>
-                        <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><Crown size={14}/> Assinaturas VIP</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {pacotesDb.map(pacote => {
-                            const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
-                            return (
-                              <div key={pacote.id} className="relative rounded-2xl overflow-hidden group flex flex-col bg-[#180A0D] border border-[#3a2522] hover:border-[#DCAE96]/50 transition-all duration-300 shadow-xl">
-                                {/* Image Header */}
-                                <div className="h-32 relative overflow-hidden bg-black shrink-0">
-                                  {imagem ? (
-                                    <img src={imagem} alt={pacote.nome} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={30} className="text-[#C7977D]" /></div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/40 to-transparent"></div>
-                                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-[#DCAE96]/30 flex items-center gap-1 shadow-lg">
-                                     <Crown size={10} className="text-[#C7977D]"/>
-                                     <span className="text-[8px] text-[#F8D1BE] uppercase font-bold tracking-widest">{pacote.qtd_sessoes} Sessões</span>
+                    <div className="overflow-y-auto custom-scrollbar pr-2 flex-1 min-h-0 space-y-8">
+                      
+                      {pacotesDb.length > 0 && (
+                        <div>
+                          <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><Crown size={16}/> Assinaturas VIP</h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                            {pacotesDb.map(pacote => {
+                              const imagem = pacote.imagens && pacote.imagens.length > 0 ? pacote.imagens[0] : null;
+                              return (
+                                <div key={pacote.id} className="relative rounded-2xl overflow-hidden group flex flex-col bg-[#1A050B] border border-[#3a2522] hover:border-[#DCAE96]/50 transition-all duration-300 shadow-xl">
+                                  <div className="h-32 sm:h-40 relative overflow-hidden bg-black shrink-0">
+                                    {imagem ? (
+                                      <img src={imagem} alt={pacote.nome} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-700" />
+                                    ) : (
+                                      <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={30} className="text-[#C7977D]" /></div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-t from-[#180A0D] via-[#180A0D]/40 to-transparent"></div>
+                                    <div className="absolute top-3 left-3 bg-black/60 backdrop-blur-md px-2 py-1 rounded-md border border-[#DCAE96]/30 flex items-center gap-1.5 shadow-lg">
+                                       <Crown size={12} className="text-[#C7977D]"/>
+                                       <span className="text-[9px] text-[#F8D1BE] uppercase font-bold tracking-widest">{pacote.qtd_sessoes} Sessões</span>
+                                    </div>
                                   </div>
-                                </div>
-                                
-                                {/* Content */}
-                                <div className="p-4 flex flex-col flex-1 relative z-10 -mt-2">
-                                  <h3 className="font-serif text-base text-white leading-tight mb-2 group-hover:text-[#F8D1BE] transition-colors line-clamp-2">{pacote.nome}</h3>
-                                  <div className="flex items-end gap-1 mb-3 border-b border-[#3a2522] pb-3">
-                                    <span className="text-[#C7977D] text-[10px] font-bold mb-0.5">R$</span>
-                                    <span className="text-2xl font-bold text-white tracking-tight">{pacote.preco.toFixed(2).replace('.', ',')}</span>
-                                    <span className="text-gray-500 text-[9px] mb-0.5">/mês</span>
-                                  </div>
-                                  <p className="text-gray-400 text-[9px] italic leading-relaxed mb-4 flex-1 line-clamp-3">{pacote.descricao}</p>
                                   
-                                  <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-2 rounded-lg font-bold text-[10px] uppercase tracking-wider hover:scale-[1.02] transition-transform shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5">
-                                    <Crown size={14} /> Assinar VIP
-                                  </button>
-                                </div>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </div>
-                    )}
-
-                    <div>
-                      <h3 className="text-xs text-[#C7977D] font-bold uppercase tracking-widest mb-3 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-1"><ImageIcon size={14}/> Serviços Avulsos</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {servicosDb.length === 0 ? (
-                          <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
-                        ) : (
-                          servicosDb.map(serv => {
-                            const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
-                            return (
-                              <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
-                                <div className="w-[35%] bg-black relative shrink-0">
-                                  {imagem ? (
-                                    <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
-                                  ) : (
-                                    <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
-                                  )}
-                                  <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
-                                </div>
-                                
-                                <div className="flex-1 p-2 sm:p-3 flex flex-col justify-center min-w-0">
-                                  <h3 className="font-serif text-xs sm:text-sm text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
-                                  <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-1">{serv.descricao || 'Serviço premium.'}</p>
-                                  
-                                  <div className="flex justify-between items-center mt-auto">
-                                    <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                                    <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-2 py-1 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
-                                      Agendar <ChevronRight size={10}/>
+                                  <div className="p-4 sm:p-5 flex flex-col flex-1 relative z-10 -mt-4">
+                                    <h3 className="font-serif text-lg sm:text-xl text-white leading-tight mb-2 group-hover:text-[#F8D1BE] transition-colors line-clamp-2">{pacote.nome}</h3>
+                                    <div className="flex items-end gap-1 mb-4 border-b border-[#3a2522] pb-3">
+                                      <span className="text-[#C7977D] text-xs font-bold mb-0.5">R$</span>
+                                      <span className="text-3xl font-bold text-white tracking-tight">{pacote.preco.toFixed(2).replace('.', ',')}</span>
+                                      <span className="text-gray-500 text-[10px] mb-1">/mês</span>
+                                    </div>
+                                    
+                                    <ul className="space-y-2 mb-5 flex-1 min-h-[60px]">
+                                      <li className="flex items-start gap-1.5 text-xs text-gray-300">
+                                        <CheckCircle2 size={14} className="text-[#C7977D] shrink-0 mt-0.5" />
+                                        <span className="line-clamp-1">Direito a {pacote.qtd_sessoes} horários</span>
+                                      </li>
+                                      <li className="flex items-start gap-1.5 text-xs text-gray-300">
+                                        <CheckCircle2 size={14} className="text-[#C7977D] shrink-0 mt-0.5" />
+                                        <span className="line-clamp-1">Vagas fixas garantidas</span>
+                                      </li>
+                                    </ul>
+                                    
+                                    <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3 rounded-lg font-bold text-[11px] uppercase tracking-wider shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5 mt-auto">
+                                      <Crown size={16} /> Assinar VIP
                                     </button>
                                   </div>
                                 </div>
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
-                    </div>
-
-                  </div>
-                </div>
-              )}
-
-              {abaAtiva === 'agendar' && (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 mt-2 sm:mt-0">
-                  <div className="mb-2 shrink-0">
-                    <h2 className="font-serif text-xl sm:text-2xl text-[#F8D1BE] mb-0.5">Agende seu Retorno</h2>
-                    <p className="text-[#E8D3C8] text-[10px] sm:text-xs opacity-80">Garante sua próxima vaga e pague o sinal agora mesmo.</p>
-                  </div>
-                  
-                  <div className="flex-1 flex bg-[#120308]/60 border border-[#DCAE96]/20 rounded-2xl shadow-xl min-h-0 overflow-hidden">
-                    
-                    {etapaAgendamento === 1 && (
-                      <div className="w-full flex flex-col sm:flex-row p-3 sm:p-4 gap-3 sm:gap-4 overflow-y-auto custom-scrollbar">
-                        <div className="w-full sm:w-1/2 flex flex-col gap-2 sm:gap-3 sm:pr-4 sm:border-r border-[#DCAE96]/10 shrink-0">
-                          <div>
-                            <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">1. Qual o serviço?</label>
-                            
-                            <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 text-[10px] sm:text-xs text-white focus:outline-none focus:border-[#F8D1BE]">
-                              <option value="">Selecione...</option>
-                              {pacotesDb.length > 0 && <optgroup label="👑 Pacotes VIP">{pacotesDb.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.qtd_sessoes}x)</option>)}</optgroup>}
-                              {servicosDb.length > 0 && <optgroup label="💅 Serviços Avulsos">{servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</optgroup>}
-                            </select>
-                            
-                          </div>
-                          <div className="flex-1 flex flex-col min-h-0">
-                            <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">2. Data</label>
-                            <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
-                              {diasDisponiveis.slice(0, 7).map((data, idx) => (
-                                <button key={idx} onClick={() => setDataEscolhida(data)} className={`px-2 py-1.5 sm:px-3 sm:py-2 rounded-lg flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96]/20 text-[#F8D1BE] border-[#F8D1BE] shadow-lg' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
-                                  <span className="text-[8px] sm:text-[9px] uppercase opacity-70">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
-                                  <span className="text-xs sm:text-sm font-bold">{data.getDate()}</span>
-                                </button>
-                              ))}
-                            </div>
+                              )
+                            })}
                           </div>
                         </div>
-                        
-                        <div className="w-full sm:w-1/2 flex flex-col min-h-0">
-                          <label className="block text-[9px] sm:text-[10px] text-[#C7977D] uppercase font-bold tracking-wider mb-1">3. Horário</label>
-                          {horariosLivres.length === 0 && dataEscolhida && servicoEscolhido ? (
-                            <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-2 flex items-center justify-center gap-2 h-10"><Ban size={12} className="text-red-400"/><span className="text-[9px] text-red-400">Sem horários livres</span></div>
+                      )}
+
+                      <div>
+                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={16}/> Serviços Avulsos</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {servicosDb.length === 0 ? (
+                            <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
                           ) : (
-                            <div className="grid grid-cols-3 sm:grid-cols-2 gap-1.5 mb-2 overflow-y-auto custom-scrollbar flex-1 pr-1">
-                              {horariosLivres.map(hora => (
-                                <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-1.5 rounded-lg transition-all border text-[10px] sm:text-xs h-8 ${horaEscolhida === hora ? 'bg-[#DCAE96]/20 text-[#F8D1BE] font-bold border-[#F8D1BE]' : 'bg-black/30 border-[#DCAE96]/10 text-gray-400 hover:border-[#DCAE96]/40'}`}>
-                                  {hora}
-                                </button>
-                              ))}
-                            </div>
+                            servicosDb.map(serv => {
+                              const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
+                              return (
+                                <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
+                                  <div className="w-[35%] bg-black relative shrink-0">
+                                    {imagem ? (
+                                      <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
+                                    ) : (
+                                      <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
+                                    )}
+                                    <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
+                                  </div>
+                                  
+                                  <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                                    <h3 className="font-serif text-sm sm:text-base text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
+                                    <p className="text-gray-400 text-[10px] line-clamp-1 mb-2">{serv.descricao || 'Serviço premium.'}</p>
+                                    
+                                    <div className="flex justify-between items-center mt-auto">
+                                      <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                                      <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-3 py-1.5 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
+                                        Agendar <ChevronRight size={12}/>
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              )
+                            })
                           )}
-                          
-                          <button onClick={iniciarProcessoAgendamento} disabled={isProcessandoAgendamento || !servicoEscolhido || !dataEscolhida || !horaEscolhida} className="mt-auto w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] py-2 sm:py-2.5 rounded-lg font-bold flex items-center justify-center gap-1.5 transition-all disabled:opacity-30 text-[10px] sm:text-xs shrink-0 shadow-[0_0_15px_rgba(248,209,190,0.3)]">
-                            {isProcessandoAgendamento ? <Loader2 className="animate-spin" size={14} /> : servicoEscolhido?.taxa_sinal > 0 ? <><QrCode size={14} /> Pagar Sinal (R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')})</> : <><CheckCircle2 size={14} /> Agendar Agora</>}
-                          </button>
                         </div>
                       </div>
-                    )}
 
-                    {etapaAgendamento === 2 && (
-                      <div className="w-full flex flex-col items-center justify-center p-4 animate-in zoom-in-95 text-center bg-black/40">
-                        <h3 className="text-[#00B1EA] font-bold mb-2 flex items-center gap-2 text-sm"><QrCode size={16}/> Escaneie para Confirmar a Vaga</h3>
-                        <p className="text-[9px] sm:text-[10px] text-gray-400 mb-3">Sinal exigido de R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')} para {servicoEscolhido.nome}.</p>
-                        <div className="bg-white p-2 rounded-xl mb-3 shadow-[0_0_20px_rgba(0,177,234,0.3)] w-28 h-28 sm:w-32 sm:h-32 flex items-center justify-center">
-                          {qrCodeAgendamento ? <img src={`data:image/jpeg;base64,${qrCodeAgendamento}`} className="w-full h-full object-contain" /> : <Loader2 className="animate-spin text-[#00B1EA]" size={24} />}
-                        </div>
-                        <div className="flex items-center gap-2 text-emerald-400 text-[9px] font-bold uppercase tracking-widest bg-emerald-500/10 px-3 py-1.5 rounded-full border border-emerald-500/20">
-                           <Loader2 className="animate-spin shrink-0" size={12} /> Aguardando Pagamento...
-                        </div>
-                      </div>
-                    )}
-
-                    {etapaAgendamento === 3 && (
-                      <div className="w-full flex flex-col items-center justify-center p-6 text-center animate-in zoom-in-95 bg-black/40">
-                        <div className="w-12 h-12 bg-emerald-500/20 rounded-full flex items-center justify-center mb-3 border-2 border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.2)]">
-                          <CheckCircle2 size={24} className="text-emerald-400" />
-                        </div>
-                        <h2 className="font-serif text-lg sm:text-xl text-white mb-1">Vaga Reservada!</h2>
-                        <p className="text-[10px] sm:text-xs text-gray-400">Você receberá a confirmação no WhatsApp do seu celular.</p>
-                      </div>
-                    )}
-
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+
+                {abaAtiva === 'agendar' && (
+                  <div className="animate-in fade-in slide-in-from-right-4 duration-500 h-full flex flex-col min-h-0 w-full">
+                    <div className="mb-4 sm:mb-6 shrink-0">
+                      <h2 className="font-serif text-2xl sm:text-4xl text-[#F8D1BE] mb-1.5">Agende seu Retorno</h2>
+                      <p className="text-[#E8D3C8] text-[10px] sm:text-sm opacity-80">Garante sua próxima vaga e pague o sinal agora mesmo.</p>
+                    </div>
+                    
+                    <div className="flex-1 flex bg-[#120308]/60 border border-[#DCAE96]/20 rounded-[24px] shadow-xl min-h-0 overflow-hidden">
+                      
+                      {etapaAgendamento === 1 && (
+                        <div className="w-full flex flex-col sm:flex-row p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6 overflow-y-auto custom-scrollbar">
+                          <div className="w-full sm:w-1/2 flex flex-col gap-3 sm:gap-4 sm:pr-6 sm:border-r border-[#DCAE96]/10 shrink-0">
+                            <div>
+                              <label className="block text-[10px] sm:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-1.5">1. Qual o serviço?</label>
+                              
+                              <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-xl px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE]">
+                                <option value="">Selecione...</option>
+                                {pacotesDb.length > 0 && <optgroup label="👑 Pacotes VIP">{pacotesDb.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.qtd_sessoes}x)</option>)}</optgroup>}
+                                {servicosDb.length > 0 && <optgroup label="💅 Serviços Avulsos">{servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</optgroup>}
+                              </select>
+                              
+                            </div>
+                            <div className="flex-1 flex flex-col min-h-0">
+                              <label className="block text-[10px] sm:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-1.5">2. Data</label>
+                              <div className="flex gap-2 overflow-x-auto custom-scrollbar pb-2">
+                                {diasDisponiveis.slice(0, 14).map((data, idx) => (
+                                  <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 sm:w-20 py-2 sm:py-3 rounded-xl flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-[#DCAE96]/20 text-[#F8D1BE] border-[#F8D1BE] shadow-lg' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
+                                    <span className="text-[8px] sm:text-[10px] uppercase opacity-70">{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
+                                    <span className="text-sm sm:text-lg font-bold my-0.5">{data.getDate()}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="w-full sm:w-1/2 flex flex-col min-h-0">
+                            <label className="block text-[10px] sm:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-1.5">3. Horário</label>
+                            {horariosLivres.length === 0 && dataEscolhida && servicoEscolhido ? (
+                              <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center justify-center gap-2 h-12"><Ban size={14} className="text-red-400"/><span className="text-[10px] sm:text-xs text-red-400">Sem horários livres</span></div>
+                            ) : (
+                              <div className="grid grid-cols-3 sm:grid-cols-2 gap-2 mb-3 overflow-y-auto custom-scrollbar flex-1 pr-1">
+                                {horariosLivres.map(hora => (
+                                  <button key={hora} onClick={() => setHoraEscolhida(hora)} className={`py-2 rounded-xl transition-all border text-[10px] sm:text-sm h-10 sm:h-12 ${horaEscolhida === hora ? 'bg-[#DCAE96]/20 text-[#F8D1BE] font-bold border-[#F8D1BE]' : 'bg-black/30 border-[#DCAE96]/10 text-gray-400 hover:border-[#DCAE96]/40'}`}>
+                                    {hora}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                            
+                            <button onClick={iniciarProcessoAgendamento} disabled={isProcessandoAgendamento || !servicoEscolhido || !dataEscolhida || !horaEscolhida} className="mt-auto w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] py-3 sm:py-4 rounded-xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 text-[11px] sm:text-sm shrink-0 shadow-[0_0_15px_rgba(248,209,190,0.3)] hover:scale-[1.02]">
+                              {isProcessandoAgendamento ? <Loader2 className="animate-spin" size={16} /> : servicoEscolhido?.taxa_sinal > 0 ? <><QrCode size={16} /> Pagar Sinal (R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')})</> : <><CheckCircle2 size={16} /> Agendar Agora</>}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {etapaAgendamento === 2 && (
+                        <div className="w-full flex flex-col items-center justify-center p-6 animate-in zoom-in-95 text-center bg-black/40">
+                          <h3 className="text-[#00B1EA] font-bold mb-2 flex items-center gap-2 text-base sm:text-lg"><QrCode size={20}/> Escaneie para Confirmar a Vaga</h3>
+                          <p className="text-[10px] sm:text-xs text-gray-400 mb-4">Sinal exigido de R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')} para {servicoEscolhido.nome}.</p>
+                          <div className="bg-white p-3 rounded-2xl mb-4 shadow-[0_0_30px_rgba(0,177,234,0.3)] w-36 h-36 sm:w-48 sm:h-48 flex items-center justify-center">
+                            {qrCodeAgendamento ? <img src={`data:image/jpeg;base64,${qrCodeAgendamento}`} className="w-full h-full object-contain" /> : <Loader2 className="animate-spin text-[#00B1EA]" size={32} />}
+                          </div>
+                          <div className="flex items-center gap-2 text-emerald-400 text-[10px] sm:text-xs font-bold uppercase tracking-widest bg-emerald-500/10 px-4 py-2 rounded-full border border-emerald-500/20">
+                             <Loader2 className="animate-spin shrink-0" size={14} /> Aguardando Pagamento...
+                          </div>
+                        </div>
+                      )}
+
+                      {etapaAgendamento === 3 && (
+                        <div className="w-full flex flex-col items-center justify-center p-8 text-center animate-in zoom-in-95 bg-black/40">
+                          <div className="w-16 h-16 sm:w-20 sm:h-20 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4 border-2 border-emerald-500 shadow-[0_0_30px_rgba(16,185,129,0.2)]">
+                            <CheckCircle2 size={32} className="text-emerald-400 sm:w-10 sm:h-10" />
+                          </div>
+                          <h2 className="font-serif text-2xl sm:text-3xl text-white mb-2">Vaga Reservada!</h2>
+                          <p className="text-xs sm:text-sm text-gray-400">Você receberá a confirmação no WhatsApp do seu celular.</p>
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </main>
         </div>
