@@ -462,7 +462,7 @@ export default function MonitorPage() {
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-col-reverse sm:flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       
-      {/* 🛡️ RELÓGIO FLUTUANTE - Desktop/Tablet */}
+      {/* 🛡️ RELÓGIO FLUTUANTE (Desktop/Tablet) */}
       <div className="hidden sm:flex absolute top-4 right-4 lg:top-8 lg:right-8 z-50 items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
         <Clock size={12} className="text-[#C7977D]" />
         <span className="text-white font-medium text-xs lg:text-base tracking-widest">{horaAtual}</span>
@@ -551,16 +551,15 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* MODO SESSÃO VIP ATIVA */}
+      {/* MODO SESSÃO VIP ATIVA - HYBRID LAYOUT (App + Monitor) */}
       {atendimentoAtivo && sessaoData && (
         <div className="absolute inset-0 z-40 flex flex-col-reverse sm:flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
           
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
           
-          {/* 🛡️ SIDEBAR OTIMIZADA PARA CABER NO GALAXY A10 */}
+          {/* 🛡️ SIDEBAR OTIMIZADA */}
           <aside className="w-full sm:w-[25%] sm:max-w-[220px] lg:max-w-[280px] bg-[#120308]/95 backdrop-blur-xl border-t sm:border-t-0 sm:border-r border-[#DCAE96]/20 flex flex-row sm:flex-col z-50 h-[65px] sm:h-full shrink-0 shadow-2xl">
             
-            {/* O CABEÇALHO COM A LOGO DA MARCA RESTAURADO */}
             <div className="hidden sm:flex p-3 sm:p-4 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
               <div className="flex items-center gap-3">
                  <img src="/fotonova.jpeg" className="h-10 w-10 lg:h-14 lg:w-14 rounded-full object-cover border border-[#C7977D] shadow-lg" alt="Débora Silva" />
@@ -571,13 +570,12 @@ export default function MonitorPage() {
               </div>
             </div>
 
-            {/* Menu de Navegação - Botões mais finos no mobile horizontal */}
             <nav className="flex-1 p-2 sm:p-3 lg:p-6 flex flex-row sm:flex-col justify-around sm:justify-start gap-1 sm:gap-2 lg:gap-3 overflow-y-auto custom-scrollbar min-h-0">
               <button onClick={() => setActiveTab('inicio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
                 <Sparkles size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Atendimento</span>
               </button>
               
-              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL */}
+              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL COM EFEITO NEON */}
               <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'} ${isUpsell && abaAtiva !== 'cardapio' ? 'animate-pulse shadow-[0_0_15px_rgba(220,174,150,0.3)] border border-[#C7977D]/40' : ''}`}>
                 <ImageIcon size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Catálogo VIP</span>
               </button>
@@ -603,10 +601,9 @@ export default function MonitorPage() {
             </div>
           </aside>
 
-          {/* 🛡️ ÁREA PRINCIPAL: BLINDADA CONTRA OVERFLOW */}
+          {/* 🛡️ ÁREA PRINCIPAL: BLINDADA CONTRA OVERFLOW (COMPRESSÃO HÍBRIDA) */}
           <main className="flex-1 relative z-10 flex flex-col h-full overflow-hidden min-h-0">
 
-            {/* HEADER EXCLUSIVO PARA O CELULAR EM PÉ (Se a Débora virar o A10) */}
             <header className="sm:hidden w-full p-2 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
               <div className="flex items-center gap-2">
                 <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D]" alt="Débora" />
@@ -620,7 +617,7 @@ export default function MonitorPage() {
               </div>
             </header>
 
-            {/* 🛡️ O SEGREDO DO "ZERO SCROLL" NO CELULAR DEITADO: overflow-hidden fixo na aba inicio */}
+            {/* AQUI ESTÁ A MÁGICA DO ZERO SCROLL. Aba Início travada! */}
             <div className={`flex-1 p-2 sm:p-3 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
               
               <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
@@ -631,40 +628,41 @@ export default function MonitorPage() {
                     {/* Título de Boas Vindas + Frase Instagramável */}
                     <div className="shrink-0 flex flex-col">
                       <div className="flex justify-between items-start">
-                        <h1 className="font-serif text-2xl sm:text-2xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
+                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
                           {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                         </h1>
-                        {/* Relógio Mobile Escondido */}
                         <div className="sm:hidden flex items-center gap-1 bg-[#120308]/60 border border-[#DCAE96]/20 px-2 py-1 rounded-full">
                           <Clock size={10} className="text-[#C7977D]" />
                           <span className="text-white font-medium text-[9px] tracking-widest">{horaAtual}</span>
                         </div>
                       </div>
-                      <div className="bg-gradient-to-r from-[#DCAE96]/10 to-transparent p-1.5 sm:p-2 rounded-r-lg border-l-2 border-[#DCAE96]">
-                        <p className="text-[9px] sm:text-[10px] lg:text-base text-[#F8D1BE] font-light italic opacity-90 tracking-wide line-clamp-1">
+                      
+                      {/* 🛡️ A FRASE INSTAGRAMÁVEL LUMINOSA */}
+                      <div className="bg-gradient-to-r from-[#DCAE96]/15 to-transparent p-2 sm:p-3 rounded-r-xl border-l-[3px] border-[#DCAE96] mt-1 sm:mt-2 shadow-sm max-w-2xl backdrop-blur-sm">
+                        <p className="text-[11px] sm:text-[13px] lg:text-lg text-[#F8D1BE] font-medium italic opacity-100 tracking-wide drop-shadow-md">
                           "{fraseDoDia}"
                         </p>
                       </div>
                     </div>
 
-                    {/* CARDS PRINCIPAIS: Ultra-Compactos no mobile horizontal */}
+                    {/* CARDS PRINCIPAIS (Flex-row 100% integrados e flexíveis) */}
                     <div className="flex-1 flex flex-row gap-2 sm:gap-3 lg:gap-8 w-full min-h-0 overflow-hidden">
                       
-                      {/* ESQUERDA: CRONÔMETRO (TRAVADO) */}
+                      {/* ESQUERDA: CRONÔMETRO */}
                       <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
                         <div className="shrink-0 mb-1 sm:mb-2 lg:mb-4">
                           <p className="text-[#C7977D] text-[8px] sm:text-[9px] lg:text-sm uppercase tracking-widest font-bold mb-0.5 lg:mb-2">Em Andamento</p>
-                          <h2 className="font-serif text-base sm:text-lg lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 lg:line-clamp-2">{sessaoData.servico_nome}</h2>
+                          <h2 className="font-serif text-lg sm:text-2xl lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 lg:line-clamp-2">{sessaoData.servico_nome}</h2>
                         </div>
 
-                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
+                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl sm:rounded-2xl p-2 sm:p-6 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
                           <PlayCircle size={14} className="text-[#F8D1BE] mb-1 lg:mb-4 animate-pulse hidden sm:block lg:w-6 lg:h-6" />
-                          {/* Tamanho da fonte dinâmico para não cortar no A10 */}
-                          <span className="font-mono text-3xl sm:text-4xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
+                          {/* Tamanho da fonte dinâmico para não cortar */}
+                          <span className="font-mono text-3xl sm:text-5xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
                         </div>
                       </div>
 
-                      {/* DIREITA: RESUMO E PIX (TRAVADO) */}
+                      {/* DIREITA: RESUMO E PIX */}
                       {dadosServicoSessao && (
                         <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                           
@@ -694,7 +692,7 @@ export default function MonitorPage() {
                             </div>
                           </div>
 
-                          {/* ÁREA DO PIX: Compacta e Flexível */}
+                          {/* 🛡️ ÁREA DO PIX: Ocupa o restante do espaço e garante leitura do Nubank! */}
                           <div className="flex-1 mt-1 sm:mt-2 lg:mt-6 flex flex-col min-h-0 justify-end">
                             {valorRestante > 0 && statusPagamento === 'pendente' && (
                               <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-4 flex items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0 overflow-hidden">
@@ -704,14 +702,15 @@ export default function MonitorPage() {
                                     <p className="text-[7px] lg:text-[10px] text-gray-400 uppercase tracking-widest font-bold">Gerando PIX...</p>
                                   </div>
                                 ) : qrCodeImagem ? (
-                                  <div className="flex items-center gap-2 sm:gap-3 lg:gap-5 w-full h-full justify-center px-1">
-                                    <div className="bg-white p-1 lg:p-2 rounded-lg lg:rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.2)] h-[55px] w-[55px] sm:h-[65px] sm:w-[65px] lg:h-36 lg:w-36 flex items-center justify-center">
+                                  <div className="flex items-center gap-3 sm:gap-4 w-full h-full justify-center px-1">
+                                    {/* TAMANHO DO QR CODE GARANTIDO PRA FOCAR NA CÂMERA */}
+                                    <div className="bg-white p-1.5 sm:p-2 rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.3)] h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] lg:h-40 lg:w-40 flex items-center justify-center">
                                       <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="flex flex-col justify-center min-w-0">
-                                      <p className="text-[#E8D3C8] text-[10px] sm:text-xs lg:text-xl leading-tight mb-0.5 lg:mb-1 font-bold truncate">Pagar Restante</p>
-                                      <p className="text-emerald-400/70 text-[7px] sm:text-[8px] lg:text-xs uppercase tracking-widest flex items-center gap-1 font-bold">
-                                        <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando
+                                      <p className="text-[#E8D3C8] text-[11px] sm:text-xs lg:text-xl leading-tight mb-1 font-bold truncate">Pagar Restante</p>
+                                      <p className="text-emerald-400/80 text-[9px] sm:text-[10px] lg:text-sm uppercase tracking-widest flex items-center gap-1 font-bold">
+                                        <Loader2 className="animate-spin shrink-0" size={12} /> Aguardando
                                       </p>
                                     </div>
                                   </div>
@@ -737,7 +736,7 @@ export default function MonitorPage() {
                   </div>
                 )}
 
-                {/* AS OUTRAS ABAS CONTINUAM COM SCROLL NORMAL (overflow-y-auto está no pai) */}
+                {/* ABA INSPIRAÇÕES / IDEIAS */}
                 {abaAtiva === 'ideias' && (
                   <div className="animate-in fade-in duration-500 w-full pb-10">
                     <div className="mb-4 sm:mb-8 shrink-0">
@@ -818,32 +817,32 @@ export default function MonitorPage() {
                       )}
 
                       <div className="mt-8">
-                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={18}/> Serviços Avulsos</h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={16}/> Serviços Avulsos</h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                           {servicosDb.length === 0 ? (
-                            <p className="text-gray-500 text-sm">Nenhum serviço carregado.</p>
+                            <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
                           ) : (
                             servicosDb.map(serv => {
                               const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
                               return (
-                                <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-2xl overflow-hidden shadow-xl h-28 sm:h-36 hover:border-[#DCAE96]/50 transition-colors shrink-0">
+                                <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
                                   <div className="w-[35%] bg-black relative shrink-0">
                                     {imagem ? (
                                       <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
                                     ) : (
-                                      <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={24} className="text-[#C7977D]" /></div>
+                                      <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
                                     )}
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
                                   </div>
                                   
-                                  <div className="flex-1 p-4 flex flex-col justify-center min-w-0">
-                                    <h3 className="font-serif text-base sm:text-lg text-white mb-1 truncate drop-shadow-md">{serv.nome}</h3>
-                                    <p className="text-gray-400 text-[10px] sm:text-xs line-clamp-2 mb-3">{serv.descricao || 'Serviço premium do estúdio.'}</p>
+                                  <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
+                                    <h3 className="font-serif text-sm sm:text-base text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
+                                    <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-2">{serv.descricao || 'Serviço premium do estúdio.'}</p>
                                     
                                     <div className="flex justify-between items-center mt-auto">
-                                      <span className="text-[#F8D1BE] font-bold text-sm sm:text-base">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                                      <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-3 py-1.5 rounded-lg flex items-center gap-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
-                                        Agendar <ChevronRight size={14}/>
+                                      <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                                      <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-2 py-1 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
+                                        Agendar <ChevronRight size={10}/>
                                       </button>
                                     </div>
                                   </div>
