@@ -462,10 +462,10 @@ export default function MonitorPage() {
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-col-reverse sm:flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       
-      {/* RELÓGIO FLUTUANTE EXCLUSIVO PARA DESKTOP/TV */}
-      <div className="hidden sm:flex absolute top-6 right-6 lg:top-8 lg:right-8 z-50 items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-4 py-2 rounded-full shadow-lg pointer-events-none">
-        <Clock size={14} className="text-[#C7977D]" />
-        <span className="text-white font-medium text-sm lg:text-base tracking-widest">{horaAtual}</span>
+      {/* 🛡️ RELÓGIO FLUTUANTE - Desktop/Tablet */}
+      <div className="hidden sm:flex absolute top-4 right-4 lg:top-8 lg:right-8 z-50 items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
+        <Clock size={12} className="text-[#C7977D]" />
+        <span className="text-white font-medium text-xs lg:text-base tracking-widest">{horaAtual}</span>
       </div>
 
       <button onClick={ativarTelaCheia} className="absolute top-2 left-2 z-50 p-2 text-[#C7977D] opacity-20 hover:opacity-100 bg-black/40 rounded-full transition-opacity hidden sm:block"><Maximize size={16} /></button>
@@ -479,7 +479,6 @@ export default function MonitorPage() {
       {/* MODO DESCANSO */}
       {!atendimentoAtivo && (
         <div className="absolute inset-0 z-0 flex flex-col justify-between h-[100dvh] bg-black overflow-hidden pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
-          
           {slides.map((slide, idx) => {
             if (slide.tipo === 'video') {
               return (
@@ -500,7 +499,6 @@ export default function MonitorPage() {
               <div key={idx} className="absolute inset-0 bg-cover bg-center bg-no-repeat transition-opacity duration-[2000ms]" style={{ backgroundImage: `url('${slide.bg}')`, opacity: idx === imagemAtualIndex ? 0.4 : 0, transform: idx === imagemAtualIndex ? 'scale(1.03)' : 'scale(1)', transition: 'opacity 2s ease-in-out, transform 10s ease-out' }} />
             );
           })}
-          
           <div className="absolute inset-0 bg-gradient-to-t from-[#0A0205] via-[#0A0205]/40 to-[#0A0205]/90 z-10 pointer-events-none"></div>
           
           <header className="w-full p-4 md:px-8 flex justify-between items-center z-30 shrink-0">
@@ -511,7 +509,6 @@ export default function MonitorPage() {
                 <span className="text-[#E8D3C8] text-[9px] tracking-[0.2em] uppercase font-bold opacity-80">Studio de Alto Padrão</span>
               </div>
             </div>
-            {/* Relógio Mobile Descanso */}
             <div className="sm:hidden flex items-center gap-1.5 bg-black/40 border border-[#DCAE96]/20 px-3 py-1.5 rounded-full">
               <Clock size={12} className="text-[#C7977D]" />
               <span className="text-white font-medium text-xs tracking-widest">{horaAtual}</span>
@@ -554,65 +551,67 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* MODO SESSÃO VIP ATIVA - HYBRID LAYOUT (App + Monitor) */}
+      {/* MODO SESSÃO VIP ATIVA */}
       {atendimentoAtivo && sessaoData && (
         <div className="absolute inset-0 z-40 flex flex-col-reverse sm:flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
           
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
           
-          {/* 🛡️ BOTTOM NAV (Mobile) / SIDEBAR (Desktop) */}
-          <aside className="w-full sm:w-[30%] sm:max-w-[280px] bg-[#120308]/95 backdrop-blur-xl border-t sm:border-t-0 sm:border-r border-[#DCAE96]/20 flex flex-row sm:flex-col z-50 h-[70px] sm:h-full shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] sm:shadow-2xl">
+          {/* 🛡️ SIDEBAR OTIMIZADA PARA CABER NO GALAXY A10 */}
+          <aside className="w-full sm:w-[25%] sm:max-w-[220px] lg:max-w-[280px] bg-[#120308]/95 backdrop-blur-xl border-t sm:border-t-0 sm:border-r border-[#DCAE96]/20 flex flex-row sm:flex-col z-50 h-[65px] sm:h-full shrink-0 shadow-2xl">
             
-            {/* Escondido no Mobile (Celular em pé), mas visível no tablet/PC ou no celular deitado (sm:flex) */}
-            <div className="hidden sm:flex p-3 sm:p-5 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
-              <img src="/fotonova.jpeg" className="h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14 rounded-full object-cover mb-2 lg:mb-4 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
-              <p className="text-[8px] sm:text-[9px] lg:text-[11px] text-[#C7977D] uppercase tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
-              <h2 className="font-serif text-lg sm:text-xl lg:text-3xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
+            {/* O CABEÇALHO COM A LOGO DA MARCA RESTAURADO */}
+            <div className="hidden sm:flex p-3 sm:p-4 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
+              <div className="flex items-center gap-3">
+                 <img src="/fotonova.jpeg" className="h-10 w-10 lg:h-14 lg:w-14 rounded-full object-cover border border-[#C7977D] shadow-lg" alt="Débora Silva" />
+                 <div className="flex flex-col">
+                   <span className="font-serif text-[#F8D1BE] text-sm lg:text-xl leading-tight drop-shadow-md">Debora Nails</span>
+                   <span className="text-[#E8D3C8] text-[7px] lg:text-[9px] tracking-[0.2em] uppercase font-bold opacity-80">Studio de Alto Padrão</span>
+                 </div>
+              </div>
             </div>
 
-            {/* Menu de Navegação */}
-            <nav className="flex-1 p-2 sm:p-4 lg:p-6 flex flex-row sm:flex-col justify-around sm:justify-start gap-1 sm:gap-3 overflow-y-auto custom-scrollbar min-h-0">
-              <button onClick={() => setActiveTab('inicio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <Sparkles size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Atendimento</span>
+            {/* Menu de Navegação - Botões mais finos no mobile horizontal */}
+            <nav className="flex-1 p-2 sm:p-3 lg:p-6 flex flex-row sm:flex-col justify-around sm:justify-start gap-1 sm:gap-2 lg:gap-3 overflow-y-auto custom-scrollbar min-h-0">
+              <button onClick={() => setActiveTab('inicio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <Sparkles size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Atendimento</span>
               </button>
               
-              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL (Pulsando) */}
-              <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'} ${isUpsell && abaAtiva !== 'cardapio' ? 'animate-pulse shadow-[0_0_15px_rgba(220,174,150,0.3)] border border-[#C7977D]/40' : ''}`}>
-                <ImageIcon size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Catálogo VIP</span>
+              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL */}
+              <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'} ${isUpsell && abaAtiva !== 'cardapio' ? 'animate-pulse shadow-[0_0_15px_rgba(220,174,150,0.3)] border border-[#C7977D]/40' : ''}`}>
+                <ImageIcon size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Catálogo VIP</span>
               </button>
               
-              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <CalendarDays size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Retorno</span>
+              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <CalendarDays size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Retorno</span>
               </button>
 
-              {/* 🛡️ NOVA ABA DE IDEIAS/INSPIRAÇÕES */}
-              <button onClick={() => setActiveTab('ideias')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'ideias' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <Heart size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Ideias</span>
+              <button onClick={() => setActiveTab('ideias')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'ideias' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <Heart size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Ideias</span>
               </button>
             </nav>
 
-            <div className="hidden sm:block p-3 lg:p-6 border-t border-[#DCAE96]/10 shrink-0">
+            <div className="hidden sm:block p-2 lg:p-6 border-t border-[#DCAE96]/10 shrink-0">
               <div className="bg-black/40 p-2 lg:p-4 rounded-xl flex items-center justify-between border border-[#DCAE96]/10">
                 <div>
-                  <p className="text-[8px] lg:text-xs text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
-                  <p className="text-[9px] lg:text-sm text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
-                  <p className="text-[9px] lg:text-sm text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
+                  <p className="text-[7px] lg:text-xs text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
+                  <p className="text-[8px] lg:text-sm text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
+                  <p className="text-[8px] lg:text-sm text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
                 </div>
-                <Wifi className="text-[#C7977D] opacity-80" size={16} />
+                <Wifi className="text-[#C7977D] opacity-80" size={14} />
               </div>
             </div>
           </aside>
 
-          {/* 🛡️ ÁREA DE CONTEÚDO PRINCIPAL */}
+          {/* 🛡️ ÁREA PRINCIPAL: BLINDADA CONTRA OVERFLOW */}
           <main className="flex-1 relative z-10 flex flex-col h-full overflow-hidden min-h-0">
 
-            {/* HEADER EXCLUSIVO MOBILE (Celular em pé) */}
-            <header className="sm:hidden w-full p-3 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
+            {/* HEADER EXCLUSIVO PARA O CELULAR EM PÉ (Se a Débora virar o A10) */}
+            <header className="sm:hidden w-full p-2 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
               <div className="flex items-center gap-2">
-                <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D] shadow-[0_0_10px_rgba(199,151,125,0.3)]" alt="Débora" />
+                <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D]" alt="Débora" />
                 <div className="flex flex-col">
-                  <span className="text-[7px] text-[#C7977D] uppercase font-bold tracking-widest leading-none mb-0.5">Sessão Exclusiva</span>
-                  <span className="font-serif text-sm text-[#F8D1BE] leading-tight">{sessaoData.cliente_nome.split(' ')[0]}</span>
+                  <span className="font-serif text-[#F8D1BE] text-sm leading-tight">Debora Nails</span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 bg-black/50 border border-[#DCAE96]/20 px-2 py-1 rounded-full">
@@ -621,108 +620,113 @@ export default function MonitorPage() {
               </div>
             </header>
 
-            {/* CONTÊINER COM OVERFLOW CONDICIONAL */}
-            <div className={`flex-1 p-3 sm:p-5 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
+            {/* 🛡️ O SEGREDO DO "ZERO SCROLL" NO CELULAR DEITADO: overflow-hidden fixo na aba inicio */}
+            <div className={`flex-1 p-2 sm:p-3 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
               
-              {/* CAIXA DE CONTENÇÃO (MAX-WIDTH) */}
-              <div className="w-full max-w-5xl h-full flex flex-col min-h-0">
+              <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
                 
                 {abaAtiva === 'inicio' && (
-                  <div className="h-full flex flex-col animate-in fade-in duration-700 min-h-0 w-full gap-2 sm:gap-4 lg:gap-6">
+                  <div className="h-full flex flex-col animate-in fade-in duration-700 min-h-0 w-full gap-2 sm:gap-3 lg:gap-6">
                     
                     {/* Título de Boas Vindas + Frase Instagramável */}
-                    <div className="shrink-0 flex flex-col lg:flex-row lg:justify-between lg:items-start gap-2">
-                      <div>
-                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-2">
+                    <div className="shrink-0 flex flex-col">
+                      <div className="flex justify-between items-start">
+                        <h1 className="font-serif text-2xl sm:text-2xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
                           {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                         </h1>
-                        <div className="bg-gradient-to-r from-[#DCAE96]/10 to-transparent p-2 sm:p-3 rounded-r-xl border-l-2 border-[#DCAE96]">
-                          <p className="text-[10px] sm:text-sm lg:text-base text-[#F8D1BE] font-light italic opacity-90 tracking-wide shadow-sm">
-                            "{fraseDoDia}"
-                          </p>
+                        {/* Relógio Mobile Escondido */}
+                        <div className="sm:hidden flex items-center gap-1 bg-[#120308]/60 border border-[#DCAE96]/20 px-2 py-1 rounded-full">
+                          <Clock size={10} className="text-[#C7977D]" />
+                          <span className="text-white font-medium text-[9px] tracking-widest">{horaAtual}</span>
                         </div>
+                      </div>
+                      <div className="bg-gradient-to-r from-[#DCAE96]/10 to-transparent p-1.5 sm:p-2 rounded-r-lg border-l-2 border-[#DCAE96]">
+                        <p className="text-[9px] sm:text-[10px] lg:text-base text-[#F8D1BE] font-light italic opacity-90 tracking-wide line-clamp-1">
+                          "{fraseDoDia}"
+                        </p>
                       </div>
                     </div>
 
-                    {/* CARDS PRINCIPAIS: Lado a Lado (Flex-row) 100% integrados */}
-                    <div className="flex-1 flex flex-row gap-2 sm:gap-4 lg:gap-8 w-full min-h-0 overflow-hidden">
+                    {/* CARDS PRINCIPAIS: Ultra-Compactos no mobile horizontal */}
+                    <div className="flex-1 flex flex-row gap-2 sm:gap-3 lg:gap-8 w-full min-h-0 overflow-hidden">
                       
-                      {/* ESQUERDA: CRONÔMETRO (TRAVADO COM MIN-H-0 PARA NÃO EMPURRAR) */}
-                      <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
-                        <div className="shrink-0 mb-2 sm:mb-4">
-                          <p className="text-[#C7977D] text-[9px] sm:text-xs lg:text-sm uppercase tracking-widest font-bold mb-1">Em Andamento</p>
-                          <h2 className="font-serif text-lg sm:text-2xl lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 sm:line-clamp-2">{sessaoData.servico_nome}</h2>
+                      {/* ESQUERDA: CRONÔMETRO (TRAVADO) */}
+                      <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
+                        <div className="shrink-0 mb-1 sm:mb-2 lg:mb-4">
+                          <p className="text-[#C7977D] text-[8px] sm:text-[9px] lg:text-sm uppercase tracking-widest font-bold mb-0.5 lg:mb-2">Em Andamento</p>
+                          <h2 className="font-serif text-base sm:text-lg lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 lg:line-clamp-2">{sessaoData.servico_nome}</h2>
                         </div>
 
-                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl sm:rounded-2xl p-2 sm:p-6 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
-                          <PlayCircle size={18} className="text-[#F8D1BE] mb-1 sm:mb-4 animate-pulse hidden sm:block" />
-                          <span className="font-mono text-4xl sm:text-5xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
+                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl sm:rounded-2xl p-2 sm:p-3 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
+                          <PlayCircle size={14} className="text-[#F8D1BE] mb-1 lg:mb-4 animate-pulse hidden sm:block lg:w-6 lg:h-6" />
+                          {/* Tamanho da fonte dinâmico para não cortar no A10 */}
+                          <span className="font-mono text-3xl sm:text-4xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
                         </div>
                       </div>
 
-                      {/* DIREITA: RESUMO E PIX (TRAVADO COM MIN-H-0) */}
+                      {/* DIREITA: RESUMO E PIX (TRAVADO) */}
                       {dadosServicoSessao && (
-                        <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
+                        <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                           
                           <div className="shrink-0">
-                            <div className="flex justify-between items-center mb-1 sm:mb-3 border-b border-[#DCAE96]/10 pb-1 sm:pb-3 shrink-0">
-                              <h3 className="font-serif text-sm sm:text-lg lg:text-xl text-white">Resumo Financeiro</h3>
+                            <div className="flex justify-between items-center mb-1 sm:mb-2 lg:mb-3 border-b border-[#DCAE96]/10 pb-1 lg:pb-3 shrink-0">
+                              <h3 className="font-serif text-xs sm:text-sm lg:text-xl text-white">Resumo Financeiro</h3>
                               {valorRestante <= 0 || statusPagamento === 'pago' ? (
-                                 <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-emerald-500/30 flex items-center gap-1 font-bold"><CheckCircle2 size={10} className="sm:w-3 sm:h-3"/> PAGO</span>
+                                 <span className="bg-emerald-500/20 text-emerald-400 text-[8px] lg:text-xs px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 font-bold"><CheckCircle2 size={10}/> PAGO</span>
                               ) : null}
                             </div>
                             
-                            <div className="space-y-1 sm:space-y-2 lg:space-y-3 text-[10px] sm:text-xs lg:text-base shrink-0 pt-1">
+                            <div className="space-y-1 lg:space-y-3 text-[9px] sm:text-[10px] lg:text-base shrink-0 pt-1">
                               <div className="flex justify-between text-gray-400">
-                                <span>Total:</span>
+                                <span>Total do Serviço:</span>
                                 <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
                               </div>
                               {taxaSinal > 0 && (
-                                <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1 sm:pb-2">
-                                  <span>Sinal ({taxaSinal}%):</span>
+                                <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1 lg:pb-2">
+                                  <span>Sinal Pago ({taxaSinal}%):</span>
                                   <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between text-[#F8D1BE] text-sm sm:text-lg lg:text-2xl font-bold pt-1">
+                              <div className="flex justify-between text-[#F8D1BE] text-xs sm:text-sm lg:text-2xl font-bold pt-1">
                                 <span>Restante:</span>
                                 <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* ÁREA DO PIX: Ocupa o restante do espaço natural */}
-                          <div className="flex-1 mt-2 sm:mt-4 lg:mt-6 flex flex-col min-h-0 justify-end">
+                          {/* ÁREA DO PIX: Compacta e Flexível */}
+                          <div className="flex-1 mt-1 sm:mt-2 lg:mt-6 flex flex-col min-h-0 justify-end">
                             {valorRestante > 0 && statusPagamento === 'pendente' && (
-                              <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-2xl p-2 sm:p-4 flex items-center justify-center gap-2 sm:gap-4 shadow-inner min-h-0 overflow-hidden">
+                              <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-4 flex items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0 overflow-hidden">
                                 {isGerandoPix ? (
                                   <div className="flex flex-col items-center justify-center w-full h-full">
-                                    <Loader2 className="animate-spin text-[#C7977D] mb-1 sm:mb-2" size={20} />
-                                    <p className="text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest font-bold">Gerando PIX...</p>
+                                    <Loader2 className="animate-spin text-[#C7977D] mb-1 lg:mb-2" size={16} />
+                                    <p className="text-[7px] lg:text-[10px] text-gray-400 uppercase tracking-widest font-bold">Gerando PIX...</p>
                                   </div>
                                 ) : qrCodeImagem ? (
-                                  <div className="flex items-center gap-3 sm:gap-5 w-full h-full justify-center px-1">
-                                    <div className="bg-white p-1.5 sm:p-2 rounded-lg sm:rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.2)] h-[80px] w-[80px] sm:h-[120px] sm:w-[120px] lg:h-36 lg:w-36 max-h-full aspect-square flex items-center justify-center">
+                                  <div className="flex items-center gap-2 sm:gap-3 lg:gap-5 w-full h-full justify-center px-1">
+                                    <div className="bg-white p-1 lg:p-2 rounded-lg lg:rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.2)] h-[55px] w-[55px] sm:h-[65px] sm:w-[65px] lg:h-36 lg:w-36 flex items-center justify-center">
                                       <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
                                     </div>
                                     <div className="flex flex-col justify-center min-w-0">
-                                      <p className="text-[#E8D3C8] text-xs sm:text-sm lg:text-xl leading-tight mb-0.5 sm:mb-1 font-bold truncate">Pagar Restante</p>
-                                      <p className="text-emerald-400/70 text-[8px] sm:text-[9px] lg:text-xs uppercase tracking-widest flex items-center gap-1 font-bold">
-                                        <Loader2 className="animate-spin shrink-0 sm:w-3 sm:h-3" size={10} /> Aguardando
+                                      <p className="text-[#E8D3C8] text-[10px] sm:text-xs lg:text-xl leading-tight mb-0.5 lg:mb-1 font-bold truncate">Pagar Restante</p>
+                                      <p className="text-emerald-400/70 text-[7px] sm:text-[8px] lg:text-xs uppercase tracking-widest flex items-center gap-1 font-bold">
+                                        <Loader2 className="animate-spin shrink-0" size={10} /> Aguardando
                                       </p>
                                     </div>
                                   </div>
                                 ) : (
-                                   <p className="text-[10px] sm:text-sm text-red-400 w-full text-center">Falha de conexão.</p>
+                                   <p className="text-[8px] lg:text-sm text-red-400 w-full text-center">Falha de conexão.</p>
                                 )}
                               </div>
                             )}
 
                             {(valorRestante <= 0 || statusPagamento === 'pago') && (
-                              <div className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl sm:rounded-2xl p-3 sm:p-5 flex flex-row items-center justify-center gap-2 sm:gap-4 shadow-inner min-h-0">
-                                 <CheckCircle2 className="text-emerald-400 shrink-0 sm:w-8 sm:h-8" size={24} />
+                              <div className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl sm:rounded-2xl p-2 lg:p-5 flex flex-row items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0">
+                                 <CheckCircle2 className="text-emerald-400 shrink-0 lg:w-8 lg:h-8" size={20} />
                                  <div className="flex flex-col text-left">
-                                   <p className="text-emerald-400 text-xs sm:text-lg font-bold leading-tight mb-0.5">Pagamento Confirmado!</p>
-                                   <p className="text-gray-400 text-[8px] sm:text-[10px]">Aguarde a finalização.</p>
+                                   <p className="text-emerald-400 text-[10px] sm:text-xs lg:text-lg font-bold leading-tight mb-0.5">Pagamento Confirmado!</p>
+                                   <p className="text-gray-400 text-[7px] sm:text-[8px] lg:text-[10px]">Aguarde a finalização.</p>
                                  </div>
                               </div>
                             )}
@@ -733,7 +737,7 @@ export default function MonitorPage() {
                   </div>
                 )}
 
-                {/* ABA INSPIRAÇÕES / IDEIAS */}
+                {/* AS OUTRAS ABAS CONTINUAM COM SCROLL NORMAL (overflow-y-auto está no pai) */}
                 {abaAtiva === 'ideias' && (
                   <div className="animate-in fade-in duration-500 w-full pb-10">
                     <div className="mb-4 sm:mb-8 shrink-0">
