@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react';
-import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Package, Crown, Info } from 'lucide-react';
+import { Wifi, Sparkles, Clock, CalendarDays, Image as ImageIcon, CheckCircle2, PlayCircle, Maximize, Loader2, QrCode, Download, ChevronRight, AlertCircle, ShieldCheck, Copy, Ban, Crown, Info, Heart } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import Image from 'next/image';
 
 const DISPONIBILIDADE_PADRAO = {
   0: { ativo: false, abertura: '08:00', fechamento: '12:00' },
@@ -14,17 +15,30 @@ const DISPONIBILIDADE_PADRAO = {
   6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
 };
 
+const FRASES_INSTAGRAMAVEIS = [
+  "Sua única competição é com a mulher maravilhosa que você está se tornando. ✨",
+  "O mundo fica muito mais bonito quando você decide brilhar. 💖",
+  "Unhas feitas, autoestima blindada e pronta para conquistar o mundo. 💅",
+  "Um momento de pausa para quem passa a vida fazendo acontecer. 🥂",
+  "Você é o seu projeto mais importante. Invista em você. 👑",
+  "A verdadeira beleza começa no momento em que você decide ser você mesma. 🌷",
+  "Que a sua semana seja tão impecável quanto as suas unhas. ✨",
+  "O seu brilho é único, não deixe ninguém apagar. 💎"
+];
+
 export default function MonitorPage() {
   const [horaAtual, setHoraAtual] = useState('');
   const [saudacao, setSaudacao] = useState('Olá');
   
-  const [abaAtiva, setActiveTab] = useState<'inicio' | 'cardapio' | 'agendar'>('inicio');
+  const [abaAtiva, setActiveTab] = useState<'inicio' | 'cardapio' | 'agendar' | 'ideias'>('inicio');
   const [atendimentoAtivo, setAtendimentoAtivo] = useState(false);
   
   const [sessaoData, setSessaoData] = useState<any>(null);
   const [dadosServicoSessao, setDadosServicoSessao] = useState<any>(null);
   const [tempoDecorrido, setTempoDecorrido] = useState(0);
   
+  const [fraseDoDia, setFraseDoDia] = useState('');
+
   const [statusPagamento, setStatusPagamento] = useState('pendente');
   const [qrCodeImagem, setQrCodeImagem] = useState<string | null>(null);
   const [qrCodeCopiaCola, setQrCodeCopiaCola] = useState<string | null>(null);
@@ -151,6 +165,7 @@ export default function MonitorPage() {
         setStatusPagamento(sessao.status_pagamento || 'pendente');
         if (sessao.ativo && sessao.servico_nome) {
           carregarDetalhesServico(sessao.servico_nome);
+          setFraseDoDia(FRASES_INSTAGRAMAVEIS[Math.floor(Math.random() * FRASES_INSTAGRAMAVEIS.length)]);
         }
       }
     };
@@ -166,6 +181,7 @@ export default function MonitorPage() {
         
         if (novaSessao.ativo && novaSessao.servico_nome) {
           carregarDetalhesServico(novaSessao.servico_nome);
+          setFraseDoDia(FRASES_INSTAGRAMAVEIS[Math.floor(Math.random() * FRASES_INSTAGRAMAVEIS.length)]);
         } else {
           setActiveTab('inicio');
           setDadosServicoSessao(null);
@@ -262,6 +278,7 @@ export default function MonitorPage() {
   const precoTotal = dadosServicoSessao?.preco || 0;
   const taxaSinal = dadosServicoSessao?.taxa_sinal || 0;
   const valorRestante = precoTotal - (precoTotal * (taxaSinal / 100));
+  const isUpsell = dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0;
 
   useEffect(() => {
     const gerarPixFinal = async () => {
@@ -319,7 +336,6 @@ export default function MonitorPage() {
     }
     return () => clearInterval(intervalo);
   }, [pagamentoMercadoPagoId, statusPagamento, sessaoData, valorRestante]);
-
 
   const iniciarProcessoAgendamento = async () => {
     if (!servicoEscolhido || !dataEscolhida || !horaEscolhida) return;
@@ -446,7 +462,7 @@ export default function MonitorPage() {
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-col-reverse sm:flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       
-      {/* 🛡️ RELÓGIO FLUTUANTE EXCLUSIVO PARA DESKTOP/TV */}
+      {/* RELÓGIO FLUTUANTE EXCLUSIVO PARA DESKTOP/TV */}
       <div className="hidden sm:flex absolute top-6 right-6 lg:top-8 lg:right-8 z-50 items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-4 py-2 rounded-full shadow-lg pointer-events-none">
         <Clock size={14} className="text-[#C7977D]" />
         <span className="text-white font-medium text-sm lg:text-base tracking-widest">{horaAtual}</span>
@@ -547,43 +563,53 @@ export default function MonitorPage() {
           {/* 🛡️ BOTTOM NAV (Mobile) / SIDEBAR (Desktop) */}
           <aside className="w-full sm:w-[30%] sm:max-w-[280px] bg-[#120308]/95 backdrop-blur-xl border-t sm:border-t-0 sm:border-r border-[#DCAE96]/20 flex flex-row sm:flex-col z-50 h-[70px] sm:h-full shrink-0 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] sm:shadow-2xl">
             
-            <div className="hidden sm:flex p-5 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
-              <img src="/fotonova.jpeg" className="h-12 w-12 lg:h-14 lg:w-14 rounded-full object-cover mb-3 lg:mb-4 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
-              <p className="text-[9px] lg:text-[11px] text-[#C7977D] uppercase tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
-              <h2 className="font-serif text-xl lg:text-3xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
+            {/* Escondido no Mobile (Celular em pé), mas visível no tablet/PC ou no celular deitado (sm:flex) */}
+            <div className="hidden sm:flex p-3 sm:p-5 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
+              <img src="/fotonova.jpeg" className="h-10 w-10 sm:h-12 sm:w-12 lg:h-14 lg:w-14 rounded-full object-cover mb-2 lg:mb-4 border border-[#C7977D] shadow-lg" alt="Débora Silva" />
+              <p className="text-[8px] sm:text-[9px] lg:text-[11px] text-[#C7977D] uppercase tracking-[0.15em] mb-0.5 font-bold">Sessão Exclusiva</p>
+              <h2 className="font-serif text-lg sm:text-xl lg:text-3xl text-[#F8D1BE] truncate w-full drop-shadow-md">{sessaoData.cliente_nome.split(' ')[0]}</h2>
             </div>
 
+            {/* Menu de Navegação */}
             <nav className="flex-1 p-2 sm:p-4 lg:p-6 flex flex-row sm:flex-col justify-around sm:justify-start gap-1 sm:gap-3 overflow-y-auto custom-scrollbar min-h-0">
-              <button onClick={() => setActiveTab('inicio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <Sparkles size={18} className="shrink-0" /> <span className="text-[10px] sm:text-sm lg:text-base">Atendimento</span>
+              <button onClick={() => setActiveTab('inicio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'inicio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <Sparkles size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Atendimento</span>
               </button>
-              <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <ImageIcon size={18} className="shrink-0" /> <span className="text-[10px] sm:text-sm lg:text-base">Catálogo VIP</span>
+              
+              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL (Pulsando) */}
+              <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'} ${isUpsell && abaAtiva !== 'cardapio' ? 'animate-pulse shadow-[0_0_15px_rgba(220,174,150,0.3)] border border-[#C7977D]/40' : ''}`}>
+                <ImageIcon size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Catálogo VIP</span>
               </button>
-              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
-                <CalendarDays size={18} className="shrink-0" /> <span className="text-[10px] sm:text-sm lg:text-base">Agendar Retorno</span>
+              
+              <button onClick={() => { setActiveTab('agendar'); setEtapaAgendamento(1); }} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'agendar' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <CalendarDays size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Retorno</span>
+              </button>
+
+              {/* 🛡️ NOVA ABA DE IDEIAS/INSPIRAÇÕES */}
+              <button onClick={() => setActiveTab('ideias')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-3 p-2 sm:p-3 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'ideias' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'}`}>
+                <Heart size={16} className="shrink-0" /> <span className="text-[10px] sm:text-xs lg:text-base">Ideias</span>
               </button>
             </nav>
 
-            <div className="hidden sm:block p-4 lg:p-6 border-t border-[#DCAE96]/10 shrink-0">
-              <div className="bg-black/40 p-3 lg:p-4 rounded-xl flex items-center justify-between border border-[#DCAE96]/10">
+            <div className="hidden sm:block p-3 lg:p-6 border-t border-[#DCAE96]/10 shrink-0">
+              <div className="bg-black/40 p-2 lg:p-4 rounded-xl flex items-center justify-between border border-[#DCAE96]/10">
                 <div>
-                  <p className="text-[9px] lg:text-xs text-gray-500 uppercase tracking-widest mb-1">Wi-Fi Premium</p>
-                  <p className="text-[10px] lg:text-sm text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
-                  <p className="text-[10px] lg:text-sm text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
+                  <p className="text-[8px] lg:text-xs text-gray-500 uppercase tracking-widest mb-0.5">Wi-Fi Premium</p>
+                  <p className="text-[9px] lg:text-sm text-[#F8D1BE]">Rede: <span className="font-bold text-white">Madalenas 5G</span></p>
+                  <p className="text-[9px] lg:text-sm text-[#F8D1BE]">Senha: <span className="font-bold text-white">madalenas2025</span></p>
                 </div>
-                <Wifi className="text-[#C7977D] opacity-80" size={18} />
+                <Wifi className="text-[#C7977D] opacity-80" size={16} />
               </div>
             </div>
           </aside>
 
-          {/* 🛡️ ÁREA DE CONTEÚDO PRINCIPAL - TOTALMENTE RESPONSIVA PARA PC E CELULAR DEITADO */}
+          {/* 🛡️ ÁREA DE CONTEÚDO PRINCIPAL */}
           <main className="flex-1 relative z-10 flex flex-col h-full overflow-hidden min-h-0">
 
-            {/* HEADER EXCLUSIVO MOBILE */}
+            {/* HEADER EXCLUSIVO MOBILE (Celular em pé) */}
             <header className="sm:hidden w-full p-3 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
               <div className="flex items-center gap-2">
-                <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D]" alt="Débora" />
+                <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D] shadow-[0_0_10px_rgba(199,151,125,0.3)]" alt="Débora" />
                 <div className="flex flex-col">
                   <span className="text-[7px] text-[#C7977D] uppercase font-bold tracking-widest leading-none mb-0.5">Sessão Exclusiva</span>
                   <span className="font-serif text-sm text-[#F8D1BE] leading-tight">{sessaoData.cliente_nome.split(' ')[0]}</span>
@@ -595,41 +621,33 @@ export default function MonitorPage() {
               </div>
             </header>
 
-            {/* 🛡️ O SEGREDO DO "ZERO SCROLL" NO CELULAR DEITADO: 
-                overflow-hidden na div principal SOMENTE SE abaAtiva === 'inicio' */}
-            <div className={`flex-1 flex flex-col items-center w-full p-3 sm:p-5 lg:p-8 ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
+            {/* CONTÊINER COM OVERFLOW CONDICIONAL */}
+            <div className={`flex-1 p-3 sm:p-5 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
               
-              <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
+              {/* CAIXA DE CONTENÇÃO (MAX-WIDTH) */}
+              <div className="w-full max-w-5xl h-full flex flex-col min-h-0">
                 
                 {abaAtiva === 'inicio' && (
                   <div className="h-full flex flex-col animate-in fade-in duration-700 min-h-0 w-full gap-2 sm:gap-4 lg:gap-6">
                     
-                    {/* Título de Boas Vindas + Upsell Compacto (Lado a lado no PC/Tablet, ou compacto no mobile) */}
-                    <div className="shrink-0 flex flex-col lg:flex-row lg:justify-between lg:items-center gap-2">
+                    {/* Título de Boas Vindas + Frase Instagramável */}
+                    <div className="shrink-0 flex flex-col lg:flex-row lg:justify-between lg:items-start gap-2">
                       <div>
-                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white leading-tight drop-shadow-lg">
+                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-2">
                           {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                         </h1>
-                      </div>
-
-                      {/* BANNER VIP ULTRA-COMPACTO PARA NÃO ROUBAR ALTURA NO CELULAR DEITADO */}
-                      {dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0 && (
-                        <div className="bg-gradient-to-r from-[#DCAE96]/10 to-transparent border border-[#DCAE96]/30 rounded-lg p-2 sm:p-3 flex items-center justify-between shadow-sm gap-3">
-                           <div className="flex items-center gap-2">
-                              <Crown size={14} className="text-[#C7977D]" />
-                              <p className="text-[#F8D1BE] font-bold text-[10px] sm:text-xs">Sabia que você pode economizar com um pacote?</p>
-                           </div>
-                           <button onClick={() => setActiveTab('cardapio')} className="bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-3 py-1.5 rounded text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:scale-105 transition-transform shrink-0">
-                             Ver
-                           </button>
+                        <div className="bg-gradient-to-r from-[#DCAE96]/10 to-transparent p-2 sm:p-3 rounded-r-xl border-l-2 border-[#DCAE96]">
+                          <p className="text-[10px] sm:text-sm lg:text-base text-[#F8D1BE] font-light italic opacity-90 tracking-wide shadow-sm">
+                            "{fraseDoDia}"
+                          </p>
                         </div>
-                      )}
+                      </div>
                     </div>
 
-                    {/* CARDS PRINCIPAIS: Lado a Lado sempre, ocupando 100% da altura restante sem rolar */}
-                    <div className="flex-1 flex flex-row gap-3 sm:gap-5 lg:gap-8 w-full min-h-0 overflow-hidden">
+                    {/* CARDS PRINCIPAIS: Lado a Lado (Flex-row) 100% integrados */}
+                    <div className="flex-1 flex flex-row gap-2 sm:gap-4 lg:gap-8 w-full min-h-0 overflow-hidden">
                       
-                      {/* ESQUERDA: CRONÔMETRO */}
+                      {/* ESQUERDA: CRONÔMETRO (TRAVADO COM MIN-H-0 PARA NÃO EMPURRAR) */}
                       <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-3 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
                         <div className="shrink-0 mb-2 sm:mb-4">
                           <p className="text-[#C7977D] text-[9px] sm:text-xs lg:text-sm uppercase tracking-widest font-bold mb-1">Em Andamento</p>
@@ -642,13 +660,13 @@ export default function MonitorPage() {
                         </div>
                       </div>
 
-                      {/* DIREITA: RESUMO E PIX */}
+                      {/* DIREITA: RESUMO E PIX (TRAVADO COM MIN-H-0) */}
                       {dadosServicoSessao && (
                         <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-3 sm:p-5 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                           
                           <div className="shrink-0">
                             <div className="flex justify-between items-center mb-1 sm:mb-3 border-b border-[#DCAE96]/10 pb-1 sm:pb-3 shrink-0">
-                              <h3 className="font-serif text-sm sm:text-lg lg:text-xl text-white">Resumo</h3>
+                              <h3 className="font-serif text-sm sm:text-lg lg:text-xl text-white">Resumo Financeiro</h3>
                               {valorRestante <= 0 || statusPagamento === 'pago' ? (
                                  <span className="bg-emerald-500/20 text-emerald-400 text-[9px] sm:text-xs px-2 py-0.5 sm:px-2.5 sm:py-1 rounded border border-emerald-500/30 flex items-center gap-1 font-bold"><CheckCircle2 size={10} className="sm:w-3 sm:h-3"/> PAGO</span>
                               ) : null}
@@ -672,7 +690,8 @@ export default function MonitorPage() {
                             </div>
                           </div>
 
-                          <div className="flex-1 mt-2 sm:mt-4 lg:mt-6 flex flex-col min-h-0">
+                          {/* ÁREA DO PIX: Ocupa o restante do espaço natural */}
+                          <div className="flex-1 mt-2 sm:mt-4 lg:mt-6 flex flex-col min-h-0 justify-end">
                             {valorRestante > 0 && statusPagamento === 'pendente' && (
                               <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-2xl p-2 sm:p-4 flex items-center justify-center gap-2 sm:gap-4 shadow-inner min-h-0 overflow-hidden">
                                 {isGerandoPix ? (
@@ -714,7 +733,27 @@ export default function MonitorPage() {
                   </div>
                 )}
 
-                {/* AS OUTRAS ABAS CONTINUAM COM SCROLL NORMAL (overflow-y-auto está no pai) */}
+                {/* ABA INSPIRAÇÕES / IDEIAS */}
+                {abaAtiva === 'ideias' && (
+                  <div className="animate-in fade-in duration-500 w-full pb-10">
+                    <div className="mb-4 sm:mb-8 shrink-0">
+                      <h2 className="font-serif text-2xl sm:text-4xl text-[#F8D1BE] mb-1.5">Mural de Inspirações</h2>
+                      <p className="text-[#E8D3C8] text-[10px] sm:text-sm opacity-80">Encontre o estilo perfeito para a sua próxima visita. Qual vai ser?</p>
+                    </div>
+                    
+                    <div className="columns-2 sm:columns-3 lg:columns-4 gap-4 space-y-4">
+                      {['/01.jpg', '/vermelha.jpeg', '/02.jpg','/nude-branca.jpeg','/delicada.jpeg','/branca-nude.jpeg','/roxa.jpeg','/nude-dourada.jpeg'].map((img, i) => (
+                        <div key={i} className="relative rounded-2xl overflow-hidden shadow-lg border border-[#DCAE96]/20 group break-inside-avoid">
+                          <Image src={img} alt="Inspiração" width={400} height={500} className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                            <Heart size={24} className="text-[#F8D1BE] drop-shadow-md" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {abaAtiva === 'cardapio' && (
                   <div className="animate-in fade-in duration-500 w-full pb-10">
                     <div className="mb-4 sm:mb-8 shrink-0">
@@ -763,7 +802,7 @@ export default function MonitorPage() {
                                       </li>
                                     </ul>
                                     
-                                    <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3 rounded-lg font-bold text-[11px] uppercase tracking-wider shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5 mt-auto">
+                                    <button onClick={() => abrirWppParaPacote(pacote.nome)} className="w-full bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] py-3 rounded-lg font-bold text-[11px] uppercase tracking-wider shadow-[0_0_15px_rgba(220,174,150,0.3)] flex justify-center items-center gap-1.5 mt-auto hover:scale-[1.02] transition-transform">
                                       <Crown size={16} /> Assinar VIP
                                     </button>
                                   </div>
@@ -775,7 +814,7 @@ export default function MonitorPage() {
                       )}
 
                       <div className="mt-8">
-                        <h3 className="text-sm sm:text-base text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={18}/> Serviços Avulsos</h3>
+                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={18}/> Serviços Avulsos</h3>
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                           {servicosDb.length === 0 ? (
                             <p className="text-gray-500 text-sm">Nenhum serviço carregado.</p>
@@ -810,6 +849,7 @@ export default function MonitorPage() {
                           )}
                         </div>
                       </div>
+
                     </div>
                   </div>
                 )}
@@ -818,7 +858,7 @@ export default function MonitorPage() {
                   <div className="animate-in fade-in duration-500 w-full pb-10">
                     <div className="mb-4 sm:mb-6 shrink-0">
                       <h2 className="font-serif text-2xl sm:text-4xl text-[#F8D1BE] mb-1.5">Agende seu Retorno</h2>
-                      <p className="text-[#E8D3C8] text-xs sm:text-sm opacity-80">Garanta sua próxima vaga com facilidade e segurança.</p>
+                      <p className="text-[#E8D3C8] text-[10px] sm:text-sm opacity-80">Garanta sua próxima vaga com facilidade e segurança.</p>
                     </div>
                     
                     <div className="flex bg-[#120308]/60 border border-[#DCAE96]/20 rounded-[24px] shadow-2xl overflow-hidden">
@@ -827,7 +867,7 @@ export default function MonitorPage() {
                         <div className="w-full flex flex-col sm:flex-row p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6">
                           <div className="w-full sm:w-1/2 flex flex-col gap-4 lg:gap-6 sm:pr-8 sm:border-r border-[#DCAE96]/10 shrink-0">
                             <div>
-                              <label className="block text-xs lg:text-sm text-[#C7977D] uppercase font-bold tracking-wider mb-2">1. Selecione o Serviço</label>
+                              <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-2">1. Selecione o Serviço</label>
                               
                               <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-xl px-3 sm:px-4 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none">
                                 <option value="">Toque para escolher...</option>
@@ -837,7 +877,7 @@ export default function MonitorPage() {
                             </div>
 
                             <div className="flex-1 flex flex-col min-h-0 mt-2">
-                              <label className="block text-xs lg:text-sm text-[#C7977D] uppercase font-bold tracking-wider mb-2">2. Escolha o Dia</label>
+                              <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-2">2. Escolha o Dia</label>
                               <div className="flex gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-3">
                                 {diasDisponiveis.slice(0, 14).map((data, idx) => (
                                   <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 sm:w-20 lg:w-24 py-3 lg:py-4 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-gradient-to-b from-[#DCAE96] to-[#C7977D] text-[#120308] border-transparent shadow-[0_0_15px_rgba(220,174,150,0.4)]' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
@@ -850,7 +890,7 @@ export default function MonitorPage() {
                           </div>
                           
                           <div className="w-full sm:w-1/2 flex flex-col">
-                            <label className="block text-xs lg:text-sm text-[#C7977D] uppercase font-bold tracking-wider mb-2">3. Escolha o Horário</label>
+                            <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-2">3. Escolha o Horário</label>
                             
                             {horariosLivres.length === 0 && dataEscolhida && servicoEscolhido ? (
                               <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-center justify-center gap-3 h-16 mb-4"><Ban size={18} className="text-red-400"/><span className="text-sm text-red-400 font-bold">Sem horários livres</span></div>
