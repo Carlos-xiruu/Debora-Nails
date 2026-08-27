@@ -75,6 +75,7 @@ export default function MonitorPage() {
   const [isProcessandoAgendamento, setIsProcessandoAgendamento] = useState(false);
   const [qrCodeAgendamento, setQrCodeAgendamento] = useState<string | null>(null);
   const [pixIdAgendamento, setPixIdAgendamento] = useState<string | null>(null);
+  const [sessoesSelecionadas, setSessoesSelecionadas] = useState<{data: Date, hora: string}[]>([]);
 
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
@@ -188,6 +189,7 @@ export default function MonitorPage() {
           setDataEscolhida(null);
           setHoraEscolhida('');
           setServicoEscolhido(null);
+          setSessoesSelecionadas([]);
           setEtapaAgendamento(1);
           setQrCodeImagem(null);
           setQrCodeCopiaCola(null);
@@ -246,12 +248,19 @@ export default function MonitorPage() {
         const minInicio = converterParaMinutos(b.inicio); const minFim = converterParaMinutos(b.fim);
         return (minAtual < minFim) && (fimMin > minInicio);
       });
-      if (!conflitoAgendamento && !conflitoBloqueio) slotsLivres.push(converterParaHoraStr(minAtual));
+      
+      const conflitoNoCarrinho = sessoesSelecionadas.some(s => {
+          if(formatarDataLocalStr(new Date(s.data)) !== dataStr) return false;
+          const minCarrinho = converterParaMinutos(s.hora);
+          const fimCarrinho = minCarrinho + duracaoServicoMin;
+          return (minAtual < fimCarrinho) && (fimMin > minCarrinho);
+      });
+
+      if (!conflitoAgendamento && !conflitoBloqueio && !conflitoNoCarrinho) slotsLivres.push(converterParaHoraStr(minAtual));
     }
     setHorariosLivres(slotsLivres);
     setHoraEscolhida('');
-  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos]);
-
+  }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos, sessoesSelecionadas]);
 
   useEffect(() => {
     let cronometro: NodeJS.Timeout;
@@ -337,25 +346,67 @@ export default function MonitorPage() {
     return () => clearInterval(intervalo);
   }, [pagamentoMercadoPagoId, statusPagamento, sessaoData, valorRestante]);
 
+  // 🛡️ FUNÇÕES DE PACOTE (Avançar e Voltar) RESTAURADAS!
+  const avancarData = () => {
+    const novaSessao = { data: dataEscolhida!, hora: horaEscolhida };
+    const numSessoes = servicoEscolhido?.qtd_sessoes || 1;
+
+    if (sessoesSelecionadas.length + 1 < numSessoes) {
+      const proximaDataAlvo = new Date(dataEscolhida!);
+      proximaDataAlvo.setDate(proximaDataAlvo.getDate() + 15);
+      proximaDataAlvo.setHours(0,0,0,0);
+
+      let dataSugerida = null;
+      for (const dia of diasDisponiveis) {
+        if (dia.getTime() >= proximaDataAlvo.getTime()) {
+          dataSugerida = dia;
+          break;
+        }
+      }
+
+      setSessoesSelecionadas([...sessoesSelecionadas, novaSessao]);
+      setDataEscolhida(dataSugerida); 
+      setHoraEscolhida('');
+    }
+  };
+
+  const desfazerUltimaData = () => {
+    const sessoesSalvas = [...sessoesSelecionadas];
+    const ultimaSessao = sessoesSalvas.pop();
+    if (ultimaSessao) {
+      setSessoesSelecionadas(sessoesSalvas);
+      setDataEscolhida(ultimaSessao.data);
+      setHoraEscolhida(ultimaSessao.hora);
+    }
+  };
+
   const iniciarProcessoAgendamento = async () => {
     if (!servicoEscolhido || !dataEscolhida || !horaEscolhida) return;
     setIsProcessandoAgendamento(true);
 
-    const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida));
-    const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
-    const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
-    const fimDate = new Date(inicioDate);
-    fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+    const sessoesFinais = [...sessoesSelecionadas, { data: dataEscolhida!, hora: horaEscolhida }];
 
-    const { data: vagaOcupada } = await supabase.from('agendamentos').select('id')
-      .lt('inicio', fimDate.toISOString()).gt('fim', inicioDate.toISOString());
+    for (const sessao of sessoesFinais) {
+      const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
+      const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
+      const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
+      const fimDate = new Date(inicioDate);
+      fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
 
-    if (vagaOcupada && vagaOcupada.length > 0) {
-      alert("Poxa! 😢 Alguém acabou de reservar esse horário online. Por favor, escolha outro.");
-      setIsProcessandoAgendamento(false);
-      setEtapaAgendamento(1);
-      return; 
+      const { data: vagaOcupada } = await supabase.from('agendamentos').select('id')
+        .lt('inicio', fimDate.toISOString()).gt('fim', inicioDate.toISOString());
+
+      if (vagaOcupada && vagaOcupada.length > 0) {
+        alert(`Poxa! 😢 Alguém acabou de reservar o horário das ${sessao.hora}. Por favor, recomece.`);
+        setIsProcessandoAgendamento(false);
+        setSessoesSelecionadas([]);
+        setDataEscolhida(null);
+        setHoraEscolhida('');
+        return; 
+      }
     }
+
+    setSessoesSelecionadas(sessoesFinais);
 
     const valorSinal = servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100);
 
@@ -373,7 +424,7 @@ export default function MonitorPage() {
         }
       } catch (e) { alert("Erro ao gerar QR Code de reserva."); }
     } else {
-      salvarAgendamentoRetornoBD(inicioDate, fimDate, 0);
+      salvarAgendamentoRetornoBD(sessoesFinais, 0);
     }
     setIsProcessandoAgendamento(false);
   };
@@ -391,30 +442,40 @@ export default function MonitorPage() {
           if (data.status === 'approved') {
             clearInterval(intervaloRetorno);
             setPixIdAgendamento(null);
-            
-            const dataFiltroBase = formatarDataLocalStr(new Date(dataEscolhida!));
-            const inicioDate = new Date(`${dataFiltroBase}T${horaEscolhida}:00-03:00`);
-            const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
-            const fimDate = new Date(inicioDate);
-            fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
             const valorSinal = servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100);
-            
-            salvarAgendamentoRetornoBD(inicioDate, fimDate, valorSinal);
+            salvarAgendamentoRetornoBD(sessoesSelecionadas, valorSinal);
           }
         } catch (e) {}
       }, 5000);
     }
     return () => clearInterval(intervaloRetorno);
-  }, [pixIdAgendamento, etapaAgendamento, servicoEscolhido, dataEscolhida, horaEscolhida]);
+  }, [pixIdAgendamento, etapaAgendamento, servicoEscolhido, sessoesSelecionadas]);
 
-  const salvarAgendamentoRetornoBD = async (inicioDate: Date, fimDate: Date, valorSinal: number) => {
+  const salvarAgendamentoRetornoBD = async (sessoesParaSalvar: any[], valorSinal: number) => {
     const { data: clienteData } = await supabase.from('clientes').select('id, telefone').eq('nome', sessaoData.cliente_nome).limit(1).single();
     
     if (clienteData) {
-      await supabase.from('agendamentos').insert([{
-        cliente_id: clienteData.id, servico_id: servicoEscolhido.id,
-        tipo: 'agendado', inicio: inicioDate.toISOString(), fim: fimDate.toISOString()
-      }]);
+      const grupoPacoteId = servicoEscolhido.is_pacote ? crypto.randomUUID() : null;
+      const agendamentosParaInserir = [];
+
+      for (const sessao of sessoesParaSalvar) {
+        const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
+        const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
+        const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
+        const fimDate = new Date(inicioDate);
+        fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
+
+        agendamentosParaInserir.push({
+          cliente_id: clienteData.id, 
+          servico_id: servicoEscolhido.id,
+          tipo: 'agendado', 
+          inicio: inicioDate.toISOString(), 
+          fim: fimDate.toISOString(),
+          grupo_pacote_id: grupoPacoteId
+        });
+      }
+
+      await supabase.from('agendamentos').insert(agendamentosParaInserir);
 
       if (valorSinal > 0) {
         await supabase.from('transacoes').insert([{
@@ -424,10 +485,14 @@ export default function MonitorPage() {
       }
 
       if (clienteData.telefone) {
-        const dataFormatada = inicioDate.toLocaleDateString('pt-BR');
         const textoBase = configuracoes?.mensagem_confirmacao || "Oii! 💕 Passando para confirmar seu retorno.";
         const sinalTexto = valorSinal > 0 ? '\n✅ *Sinal recebido com sucesso!*' : '';
-        const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n📅 Data: *${dataFormatada}*\n⏰ Horário: *${horaEscolhida}*${sinalTexto}\n\nTe esperamos! ✨`;
+        
+        const datasFormatadasMsg = sessoesParaSalvar.map((s: any, i: number) => {
+           return `🔹 Sessão ${i + 1}: ${new Date(s.data).toLocaleDateString('pt-BR')} às ${s.hora}`;
+        }).join('\n');
+
+        const mensagemCliente = `${textoBase}\n\n*Detalhes do Retorno:*\n👤 Cliente: ${sessaoData.cliente_nome.split(' ')[0]}\n💅 Serviço: *${servicoEscolhido.nome}*\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n${sinalTexto}\n\nTe esperamos! ✨`;
         
         let numeroLimpo = clienteData.telefone.replace(/\D/g, '');
         if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
@@ -444,7 +509,7 @@ export default function MonitorPage() {
     }
     
     setEtapaAgendamento(3); 
-    setTimeout(() => { setActiveTab('inicio'); setEtapaAgendamento(1); }, 5000);
+    setTimeout(() => { setActiveTab('inicio'); setEtapaAgendamento(1); setSessoesSelecionadas([]); }, 5000);
   };
 
   const abrirWppParaPacote = (nomePacote: string) => {
@@ -575,7 +640,6 @@ export default function MonitorPage() {
                 <Sparkles size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Atendimento</span>
               </button>
               
-              {/* 🛡️ UPSELL PASSIVO NA BARRA LATERAL COM EFEITO NEON */}
               <button onClick={() => setActiveTab('cardapio')} className={`flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1 sm:gap-2.5 p-2 sm:p-2.5 lg:p-4 rounded-xl transition-all flex-1 sm:flex-none ${abaAtiva === 'cardapio' ? 'bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#0A0205] font-bold shadow-[0_0_20px_rgba(248,209,190,0.4)]' : 'text-[#E8D3C8] hover:bg-[#DCAE96]/10 hover:text-white'} ${isUpsell && abaAtiva !== 'cardapio' ? 'animate-pulse shadow-[0_0_15px_rgba(220,174,150,0.3)] border border-[#C7977D]/40' : ''}`}>
                 <ImageIcon size={16} className="shrink-0" /> <span className="text-[9px] sm:text-xs lg:text-base">Catálogo VIP</span>
               </button>
@@ -604,6 +668,7 @@ export default function MonitorPage() {
           {/* 🛡️ ÁREA PRINCIPAL: BLINDADA CONTRA OVERFLOW (COMPRESSÃO HÍBRIDA) */}
           <main className="flex-1 relative z-10 flex flex-col h-full overflow-hidden min-h-0">
 
+            {/* HEADER EXCLUSIVO PARA O CELULAR EM PÉ */}
             <header className="sm:hidden w-full p-2 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
               <div className="flex items-center gap-2">
                 <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D]" alt="Débora" />
@@ -617,7 +682,6 @@ export default function MonitorPage() {
               </div>
             </header>
 
-            {/* AQUI ESTÁ A MÁGICA DO ZERO SCROLL. Aba Início travada! */}
             <div className={`flex-1 p-2 sm:p-3 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
               
               <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
@@ -628,53 +692,52 @@ export default function MonitorPage() {
                     {/* Título de Boas Vindas + Frase Instagramável */}
                     <div className="shrink-0 flex flex-col">
                       <div className="flex justify-between items-start">
-                        <h1 className="font-serif text-2xl sm:text-3xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
+                        <h1 className="font-serif text-2xl sm:text-2xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
                           {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                         </h1>
+                        {/* Relógio Mobile Escondido */}
                         <div className="sm:hidden flex items-center gap-1 bg-[#120308]/60 border border-[#DCAE96]/20 px-2 py-1 rounded-full">
                           <Clock size={10} className="text-[#C7977D]" />
                           <span className="text-white font-medium text-[9px] tracking-widest">{horaAtual}</span>
                         </div>
                       </div>
                       
-                      {/* 🛡️ A FRASE INSTAGRAMÁVEL LUMINOSA */}
-                      <div className="bg-gradient-to-r from-[#DCAE96]/15 to-transparent p-2 sm:p-3 rounded-r-xl border-l-[3px] border-[#DCAE96] mt-1 sm:mt-2 shadow-sm max-w-2xl backdrop-blur-sm">
-                        <p className="text-[11px] sm:text-[13px] lg:text-lg text-[#F8D1BE] font-medium italic opacity-100 tracking-wide drop-shadow-md">
+                      <div className="bg-gradient-to-r from-[#DCAE96]/15 to-transparent p-1.5 sm:p-2 rounded-r-xl border-l-[3px] border-[#DCAE96] mt-1 shadow-sm max-w-2xl backdrop-blur-sm">
+                        <p className="text-[11px] sm:text-[11px] lg:text-lg text-[#F8D1BE] font-medium italic opacity-100 tracking-wide drop-shadow-md">
                           "{fraseDoDia}"
                         </p>
                       </div>
                     </div>
 
-                    {/* CARDS PRINCIPAIS (Flex-row 100% integrados e flexíveis) */}
+                    {/* CARDS PRINCIPAIS: Proporção 40/60 no A10 */}
                     <div className="flex-1 flex flex-row gap-2 sm:gap-3 lg:gap-8 w-full min-h-0 overflow-hidden">
                       
-                      {/* ESQUERDA: CRONÔMETRO */}
-                      <div className="flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
-                        <div className="shrink-0 mb-1 sm:mb-2 lg:mb-4">
-                          <p className="text-[#C7977D] text-[8px] sm:text-[9px] lg:text-sm uppercase tracking-widest font-bold mb-0.5 lg:mb-2">Em Andamento</p>
-                          <h2 className="font-serif text-lg sm:text-2xl lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 lg:line-clamp-2">{sessaoData.servico_nome}</h2>
+                      {/* ESQUERDA: CRONÔMETRO (TRAVADO E MENOR NO A10) */}
+                      <div className="w-full sm:w-[40%] lg:flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-2 sm:p-2 lg:p-8 rounded-2xl sm:rounded-2xl lg:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
+                        <div className="shrink-0 mb-1">
+                          <p className="text-[#C7977D] text-[8px] sm:text-[8px] lg:text-sm uppercase tracking-widest font-bold mb-0.5">Em Andamento</p>
+                          <h2 className="font-serif text-lg sm:text-base lg:text-4xl text-white leading-tight drop-shadow-md line-clamp-1 lg:line-clamp-2">{sessaoData.servico_nome}</h2>
                         </div>
 
-                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl sm:rounded-2xl p-2 sm:p-6 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
-                          <PlayCircle size={14} className="text-[#F8D1BE] mb-1 lg:mb-4 animate-pulse hidden sm:block lg:w-6 lg:h-6" />
-                          {/* Tamanho da fonte dinâmico para não cortar */}
-                          <span className="font-mono text-3xl sm:text-5xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
+                        <div className="flex-1 bg-black/50 border border-[#DCAE96]/10 rounded-xl p-2 sm:p-2 lg:p-10 flex flex-col items-center justify-center mt-auto shadow-inner min-h-0 overflow-hidden">
+                          <PlayCircle size={14} className="text-[#F8D1BE] mb-1 lg:mb-4 animate-pulse hidden lg:block lg:w-6 lg:h-6" />
+                          <span className="font-mono text-3xl sm:text-3xl lg:text-7xl text-white tracking-widest font-light drop-shadow-[0_0_20px_rgba(248,209,190,0.5)]">{formatarTempo(tempoDecorrido)}</span>
                         </div>
                       </div>
 
-                      {/* DIREITA: RESUMO E PIX */}
+                      {/* DIREITA: RESUMO E PIX (MAIS ESPAÇO PARA O QR CODE) */}
                       {dadosServicoSessao && (
-                        <div className="flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
+                        <div className="w-full sm:w-[60%] lg:flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-2xl lg:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                           
                           <div className="shrink-0">
-                            <div className="flex justify-between items-center mb-1 sm:mb-2 lg:mb-3 border-b border-[#DCAE96]/10 pb-1 lg:pb-3 shrink-0">
-                              <h3 className="font-serif text-xs sm:text-sm lg:text-xl text-white">Resumo Financeiro</h3>
+                            <div className="flex justify-between items-center mb-1 sm:mb-1.5 lg:mb-3 border-b border-[#DCAE96]/10 pb-1 lg:pb-3 shrink-0">
+                              <h3 className="font-serif text-xs sm:text-xs lg:text-xl text-white">Resumo Financeiro</h3>
                               {valorRestante <= 0 || statusPagamento === 'pago' ? (
                                  <span className="bg-emerald-500/20 text-emerald-400 text-[8px] lg:text-xs px-2 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1 font-bold"><CheckCircle2 size={10}/> PAGO</span>
                               ) : null}
                             </div>
                             
-                            <div className="space-y-1 lg:space-y-3 text-[9px] sm:text-[10px] lg:text-base shrink-0 pt-1">
+                            <div className="space-y-1 lg:space-y-3 text-[9px] sm:text-[9px] lg:text-base shrink-0 pt-1">
                               <div className="flex justify-between text-gray-400">
                                 <span>Total do Serviço:</span>
                                 <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
@@ -685,35 +748,34 @@ export default function MonitorPage() {
                                   <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
                                 </div>
                               )}
-                              <div className="flex justify-between text-[#F8D1BE] text-xs sm:text-sm lg:text-2xl font-bold pt-1">
+                              <div className="flex justify-between text-[#F8D1BE] text-xs sm:text-xs lg:text-2xl font-bold pt-1">
                                 <span>Restante:</span>
                                 <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
                               </div>
                             </div>
                           </div>
 
-                          {/* 🛡️ ÁREA DO PIX: Ocupa o restante do espaço e garante leitura do Nubank! */}
-                          <div className="flex-1 mt-1 sm:mt-2 lg:mt-6 flex flex-col min-h-0 justify-end">
+                          {/* ÁREA DO PIX: Refeita com Padding elegante */}
+                          <div className="flex-1 mt-1 sm:mt-1.5 lg:mt-6 flex flex-col min-h-0 justify-end">
                             {valorRestante > 0 && statusPagamento === 'pendente' && (
-                              <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-2xl p-1.5 sm:p-2 lg:p-4 flex items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0 overflow-hidden">
+                              <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-xl lg:rounded-2xl p-2 sm:p-2 lg:p-6 flex items-center justify-center sm:justify-start gap-3 sm:gap-4 lg:gap-6 shadow-inner min-h-0 overflow-hidden">
                                 {isGerandoPix ? (
                                   <div className="flex flex-col items-center justify-center w-full h-full">
                                     <Loader2 className="animate-spin text-[#C7977D] mb-1 lg:mb-2" size={16} />
                                     <p className="text-[7px] lg:text-[10px] text-gray-400 uppercase tracking-widest font-bold">Gerando PIX...</p>
                                   </div>
                                 ) : qrCodeImagem ? (
-                                  <div className="flex items-center gap-3 sm:gap-4 w-full h-full justify-center px-1">
-                                    {/* TAMANHO DO QR CODE GARANTIDO PRA FOCAR NA CÂMERA */}
-                                    <div className="bg-white p-1.5 sm:p-2 rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.3)] h-[110px] w-[110px] sm:h-[130px] sm:w-[130px] lg:h-40 lg:w-40 flex items-center justify-center">
-                                      <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain" />
+                                  <>
+                                    <div className="bg-white p-2 sm:p-2.5 rounded-xl shrink-0 shadow-[0_0_20px_rgba(220,174,150,0.3)] h-[90px] w-[90px] sm:h-[100px] sm:w-[100px] lg:h-[160px] lg:w-[160px] flex items-center justify-center">
+                                      <img src={`data:image/jpeg;base64,${qrCodeImagem}`} alt="QR Code" className="w-full h-full object-contain rounded-md" />
                                     </div>
                                     <div className="flex flex-col justify-center min-w-0">
-                                      <p className="text-[#E8D3C8] text-[11px] sm:text-xs lg:text-xl leading-tight mb-1 font-bold truncate">Pagar Restante</p>
-                                      <p className="text-emerald-400/80 text-[9px] sm:text-[10px] lg:text-sm uppercase tracking-widest flex items-center gap-1 font-bold">
+                                      <p className="text-[#E8D3C8] text-[11px] sm:text-sm lg:text-xl leading-tight mb-0.5 lg:mb-1 font-bold truncate">Pagar Restante</p>
+                                      <p className="text-emerald-400/80 text-[8px] sm:text-[9px] lg:text-sm uppercase tracking-widest flex items-center gap-1 font-bold">
                                         <Loader2 className="animate-spin shrink-0" size={12} /> Aguardando
                                       </p>
                                     </div>
-                                  </div>
+                                  </>
                                 ) : (
                                    <p className="text-[8px] lg:text-sm text-red-400 w-full text-center">Falha de conexão.</p>
                                 )}
@@ -721,7 +783,7 @@ export default function MonitorPage() {
                             )}
 
                             {(valorRestante <= 0 || statusPagamento === 'pago') && (
-                              <div className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl sm:rounded-2xl p-2 lg:p-5 flex flex-row items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0">
+                              <div className="flex-1 bg-emerald-500/10 border border-emerald-500/30 rounded-xl sm:rounded-xl lg:rounded-2xl p-2 lg:p-5 flex flex-row items-center justify-center gap-2 lg:gap-4 shadow-inner min-h-0">
                                  <CheckCircle2 className="text-emerald-400 shrink-0 lg:w-8 lg:h-8" size={20} />
                                  <div className="flex flex-col text-left">
                                    <p className="text-emerald-400 text-[10px] sm:text-xs lg:text-lg font-bold leading-tight mb-0.5">Pagamento Confirmado!</p>
@@ -817,32 +879,32 @@ export default function MonitorPage() {
                       )}
 
                       <div className="mt-8">
-                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={16}/> Serviços Avulsos</h3>
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                        <h3 className="text-xs sm:text-sm text-[#C7977D] font-bold uppercase tracking-widest mb-4 flex items-center gap-2 border-b border-[#DCAE96]/20 pb-2"><ImageIcon size={18}/> Serviços Avulsos</h3>
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                           {servicosDb.length === 0 ? (
-                            <p className="text-gray-500 text-xs sm:text-sm">Nenhum serviço carregado.</p>
+                            <p className="text-gray-500 text-sm">Nenhum serviço carregado.</p>
                           ) : (
                             servicosDb.map(serv => {
                               const imagem = serv.imagens && serv.imagens.length > 0 ? serv.imagens[0] : null;
                               return (
-                                <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-xl overflow-hidden shadow-lg h-24 sm:h-28 hover:border-[#DCAE96]/50 transition-colors shrink-0">
+                                <div key={serv.id} className="flex bg-[#120308]/80 border border-[#DCAE96]/20 rounded-2xl overflow-hidden shadow-xl h-28 sm:h-36 hover:border-[#DCAE96]/50 transition-colors shrink-0">
                                   <div className="w-[35%] bg-black relative shrink-0">
                                     {imagem ? (
                                       <img src={imagem} alt={serv.nome} className="w-full h-full object-cover opacity-80" />
                                     ) : (
-                                      <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={20} className="text-[#C7977D]" /></div>
+                                      <div className="flex items-center justify-center h-full opacity-20"><Sparkles size={24} className="text-[#C7977D]" /></div>
                                     )}
                                     <div className="absolute inset-0 bg-gradient-to-r from-transparent to-[#120308]/90"></div>
                                   </div>
                                   
-                                  <div className="flex-1 p-3 flex flex-col justify-center min-w-0">
-                                    <h3 className="font-serif text-sm sm:text-base text-white mb-0.5 truncate drop-shadow-md">{serv.nome}</h3>
-                                    <p className="text-gray-400 text-[9px] sm:text-[10px] line-clamp-1 mb-2">{serv.descricao || 'Serviço premium do estúdio.'}</p>
+                                  <div className="flex-1 p-4 flex flex-col justify-center min-w-0">
+                                    <h3 className="font-serif text-base sm:text-lg text-white mb-1 truncate drop-shadow-md">{serv.nome}</h3>
+                                    <p className="text-gray-400 text-[10px] sm:text-xs line-clamp-2 mb-3">{serv.descricao || 'Serviço premium do estúdio.'}</p>
                                     
                                     <div className="flex justify-between items-center mt-auto">
-                                      <span className="text-[#F8D1BE] font-bold text-xs sm:text-sm">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
-                                      <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-2 py-1 rounded flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
-                                        Agendar <ChevronRight size={10}/>
+                                      <span className="text-[#F8D1BE] font-bold text-sm sm:text-base">R$ {serv.preco.toFixed(2).replace('.', ',')}</span>
+                                      <button onClick={() => {setServicoEscolhido(serv); setActiveTab('agendar'); setEtapaAgendamento(1);}} className="bg-[#DCAE96]/10 text-[#C7977D] border border-[#DCAE96]/30 px-3 py-1.5 rounded-lg flex items-center gap-1 text-[10px] sm:text-xs font-bold uppercase tracking-wider hover:bg-[#DCAE96] hover:text-[#120308] transition-colors shrink-0">
+                                        Agendar <ChevronRight size={14}/>
                                       </button>
                                     </div>
                                   </div>
@@ -870,20 +932,47 @@ export default function MonitorPage() {
                         <div className="w-full flex flex-col sm:flex-row p-4 sm:p-6 lg:p-8 gap-4 sm:gap-6">
                           <div className="w-full sm:w-1/2 flex flex-col gap-4 lg:gap-6 sm:pr-8 sm:border-r border-[#DCAE96]/10 shrink-0">
                             <div>
-                              <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-2">1. Selecione o Serviço</label>
+                              <div className="flex justify-between items-center mb-2">
+                                <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider">1. Selecione o Serviço</label>
+                                {servicoEscolhido?.is_pacote && <span className="text-[#C7977D] text-[9px] uppercase font-bold tracking-widest">Sessão {sessoesSelecionadas.length + 1} de {servicoEscolhido.qtd_sessoes}</span>}
+                              </div>
                               
-                              <select value={servicoEscolhido?.id || ''} onChange={(e) => setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value))} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-xl px-3 sm:px-4 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none">
+                              <select value={servicoEscolhido?.id || ''} onChange={(e) => {
+                                setServicoEscolhido([...servicosDb, ...pacotesDb].find(s => s.id === e.target.value));
+                                setSessoesSelecionadas([]);
+                                setDataEscolhida(null);
+                                setHoraEscolhida('');
+                              }} className="w-full bg-black/50 border border-[#DCAE96]/20 rounded-xl px-3 sm:px-4 py-3 text-xs sm:text-sm text-white focus:outline-none focus:border-[#F8D1BE] appearance-none">
                                 <option value="">Toque para escolher...</option>
                                 {pacotesDb.length > 0 && <optgroup label="👑 Assinaturas VIP">{pacotesDb.map(s => <option key={s.id} value={s.id}>{s.nome} ({s.qtd_sessoes}x)</option>)}</optgroup>}
                                 {servicosDb.length > 0 && <optgroup label="💅 Serviços Avulsos">{servicosDb.map(s => <option key={s.id} value={s.id}>{s.nome}</option>)}</optgroup>}
                               </select>
                             </div>
 
+                            {sessoesSelecionadas.length > 0 && (
+                              <div className="bg-black/40 border border-[#DCAE96]/20 p-3 rounded-xl animate-in fade-in">
+                                <p className="text-[9px] text-gray-400 uppercase tracking-widest font-bold mb-2">Sessões escolhidas:</p>
+                                <div className="space-y-2">
+                                  {sessoesSelecionadas.map((sessao, index) => (
+                                    <div key={index} className="flex justify-between items-center text-xs border-b border-white/5 pb-1 last:border-0 last:pb-0">
+                                      <span className="text-[#E8D3C8] flex items-center gap-1.5"><CheckCircle2 size={12} className="text-emerald-400"/> Sessão {index + 1}</span>
+                                      <span className="font-bold text-[#F8D1BE]">{new Date(sessao.data).toLocaleDateString('pt-BR', {day: '2-digit', month: 'short'})} às {sessao.hora}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
                             <div className="flex-1 flex flex-col min-h-0 mt-2">
-                              <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider mb-2">2. Escolha o Dia</label>
+                              <div className="flex justify-between items-end mb-2">
+                                <label className="block text-[10px] lg:text-[11px] text-[#C7977D] uppercase font-bold tracking-wider">2. Escolha o Dia</label>
+                                {sessoesSelecionadas.length > 0 && (
+                                  <button onClick={desfazerUltimaData} className="text-[#C7977D] text-[10px] font-bold hover:text-white transition-colors underline underline-offset-2 mb-1">Desfazer Data</button>
+                                )}
+                              </div>
                               <div className="flex gap-2 sm:gap-3 overflow-x-auto custom-scrollbar pb-3">
                                 {diasDisponiveis.slice(0, 14).map((data, idx) => (
-                                  <button key={idx} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 sm:w-20 lg:w-24 py-3 lg:py-4 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-gradient-to-b from-[#DCAE96] to-[#C7977D] text-[#120308] border-transparent shadow-[0_0_15px_rgba(220,174,150,0.4)]' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
+                                  <button key={idx} id={`dia-${data.getTime()}`} onClick={() => setDataEscolhida(data)} className={`shrink-0 w-16 sm:w-20 lg:w-24 py-3 lg:py-4 rounded-xl sm:rounded-2xl flex flex-col items-center justify-center transition-all border shrink-0 ${dataEscolhida?.getDate() === data.getDate() ? 'bg-gradient-to-b from-[#DCAE96] to-[#C7977D] text-[#120308] border-transparent shadow-[0_0_15px_rgba(220,174,150,0.4)]' : 'bg-black/30 text-gray-400 border-[#DCAE96]/10 hover:border-[#DCAE96]/40'}`}>
                                     <span className={`text-[9px] lg:text-[10px] uppercase font-bold ${dataEscolhida?.getDate() === data.getDate() ? 'opacity-80' : 'opacity-60'}`}>{data.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.','')}</span>
                                     <span className="text-xl sm:text-2xl lg:text-3xl font-serif my-1">{data.getDate()}</span>
                                   </button>
@@ -907,8 +996,15 @@ export default function MonitorPage() {
                               </div>
                             )}
                             
-                            <button onClick={iniciarProcessoAgendamento} disabled={isProcessandoAgendamento || !servicoEscolhido || !dataEscolhida || !horaEscolhida} className="mt-auto w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 sm:py-4 lg:py-5 rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 text-xs sm:text-sm lg:text-base shrink-0 shadow-[0_0_20px_rgba(248,209,190,0.3)] hover:scale-[1.02]">
-                              {isProcessandoAgendamento ? <Loader2 className="animate-spin" size={20} /> : servicoEscolhido?.taxa_sinal > 0 ? <><QrCode size={20} /> Pagar Sinal (R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')})</> : <><CheckCircle2 size={20} /> Confirmar Agendamento</>}
+                            <button 
+                              onClick={(!servicoEscolhido?.is_pacote || sessoesSelecionadas.length + 1 >= (servicoEscolhido?.qtd_sessoes || 1)) ? iniciarProcessoAgendamento : avancarData} 
+                              disabled={isProcessandoAgendamento || !servicoEscolhido || !dataEscolhida || !horaEscolhida} 
+                              className="mt-auto w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] py-3 sm:py-4 lg:py-5 rounded-xl sm:rounded-2xl font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-30 text-xs sm:text-sm lg:text-base shrink-0 shadow-[0_0_20px_rgba(248,209,190,0.3)] hover:scale-[1.02] uppercase tracking-wider"
+                            >
+                              {isProcessandoAgendamento ? <Loader2 className="animate-spin" size={20} /> : 
+                               (servicoEscolhido?.is_pacote && sessoesSelecionadas.length + 1 < servicoEscolhido.qtd_sessoes) ? 'Salvar Data e Escolher a Próxima' :
+                               servicoEscolhido?.taxa_sinal > 0 ? <><QrCode size={20} /> Pagar Sinal (R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')})</> : 
+                               <><CheckCircle2 size={20} /> Confirmar Agendamento</>}
                             </button>
                           </div>
                         </div>
@@ -916,7 +1012,7 @@ export default function MonitorPage() {
 
                       {etapaAgendamento === 2 && (
                         <div className="w-full flex flex-col items-center justify-center p-6 sm:p-8 animate-in zoom-in-95 text-center bg-black/40">
-                          <h3 className="text-[#00B1EA] font-bold mb-2 sm:mb-3 flex items-center gap-2 text-base sm:text-xl lg:text-2xl"><QrCode size={20} className="sm:w-6 sm:h-6"/> Escaneie para Confirmar a Vaga</h3>
+                          <h3 className="text-[#00B1EA] font-bold mb-2 sm:mb-3 flex items-center gap-2 text-base sm:text-xl lg:text-2xl"><QrCode className="sm:w-6 sm:h-6" size={20}/> Escaneie para Confirmar a Vaga</h3>
                           <p className="text-[10px] sm:text-sm text-gray-400 mb-4 sm:mb-6">Sinal exigido de R$ {(servicoEscolhido.preco * (servicoEscolhido.taxa_sinal / 100)).toFixed(2).replace('.', ',')} para {servicoEscolhido.nome}.</p>
                           <div className="bg-white p-3 sm:p-4 rounded-[24px] mb-4 sm:mb-6 shadow-[0_0_40px_rgba(0,177,234,0.3)] w-40 h-40 sm:w-48 sm:h-48 lg:w-64 lg:h-64 flex items-center justify-center">
                             {qrCodeAgendamento ? <img src={`data:image/jpeg;base64,${qrCodeAgendamento}`} className="w-full h-full object-contain" /> : <Loader2 className="animate-spin text-[#00B1EA]" size={32} />}
@@ -932,8 +1028,8 @@ export default function MonitorPage() {
                           <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-emerald-500/20 rounded-full flex items-center justify-center mb-4 sm:mb-6 border-2 border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.2)]">
                             <CheckCircle2 size={32} className="text-emerald-400 sm:w-10 sm:h-10 lg:w-12 lg:h-12" />
                           </div>
-                          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white mb-2 sm:mb-3">Vaga Reservada!</h2>
-                          <p className="text-xs sm:text-sm lg:text-base text-gray-400">Você receberá a confirmação no WhatsApp do seu celular.</p>
+                          <h2 className="font-serif text-2xl sm:text-3xl lg:text-4xl text-white mb-2 sm:mb-3">{servicoEscolhido?.is_pacote ? 'Vagas Reservadas!' : 'Vaga Reservada!'}</h2>
+                          <p className="text-xs sm:text-sm lg:text-base text-gray-400">Você receberá a confirmação no WhatsApp com todas as datas.</p>
                         </div>
                       )}
 
