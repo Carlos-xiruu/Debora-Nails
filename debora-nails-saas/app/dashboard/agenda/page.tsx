@@ -179,7 +179,7 @@ export default function AgendaPage() {
     const horaEscolhida = formData.get('hora') as string;
     const dataEscolhida = formData.get('data') as string;
     const servicoId = formData.get('servico_id') as string;
-    const servicoInfo = servicos.find(s => s.id === servicoId);
+    const servicoInfo = servicos.find(s => String(s.id) === String(servicoId));
     
     const duracaoMins = extrairMinutosDuracao(servicoInfo?.duracao);
     const inicioMins = converterParaMinutos(horaEscolhida);
@@ -248,7 +248,8 @@ export default function AgendaPage() {
       if (erroCliente) { alert(`ERRO: Não foi possível criar cliente. ${erroCliente.message}`); setIsSaving(false); return; }
       cliente_id = novoClienteData.id;
     } else {
-      const clienteEncontrado = clientes.find(c => c.id === cliente_id);
+      // 🛡️ CORREÇÃO CRÍTICA AQUI: O id do formulário é texto, o da tabela pode ser número/uuid. O String() resolve.
+      const clienteEncontrado = clientes.find(c => String(c.id) === String(cliente_id));
       if (clienteEncontrado) {
         clienteNome = clienteEncontrado.nome;
         clienteTelefone = clienteEncontrado.telefone;
@@ -262,32 +263,40 @@ export default function AgendaPage() {
     if (erroAgenda) { 
       alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); 
     } else { 
-      await fetchDados(); 
-      setIsModalOpen(false); 
-      alert("✅ Agendamento forçado/criado com sucesso!"); 
-
+      // 🛡️ O DISPARO DO WHATSAPP DEVE ACONTECER ANTES DO ALERT, PARA NÃO CONGELAR A REDE
+      let whatsappEnviadoStatus = '';
       if (clienteTelefone) {
         try {
           const primeiroNome = clienteNome.split(' ')[0];
           const dataFormatada = dataInicio.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
           
-          const mensagem = `Oii, ${primeiroNome}! Tudo bem? ✨\n\nSeu agendamento de *${servicoInfo?.nome}* foi confirmado para o dia *${dataFormatada}* às *${horaEscolhida}*!\n\nEstamos preparando tudo com muito carinho te esperando no Debora Nails Studio. 💖`;
+          const mensagem = `Oii, ${primeiroNome}! Tudo bem? ✨\n\nSeu agendamento de *${servicoInfo?.nome}* foi confirmado manualmente para o dia *${dataFormatada}* às *${horaEscolhida}*!\n\nTe esperamos no Debora Nails Studio. 💖`;
 
-          // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO (Resolve o Erro de Timeout no Robô)
           let numeroLimpo = clienteTelefone.replace(/\D/g, '');
           if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
             numeroLimpo = '55' + numeroLimpo;
           }
 
-          await fetch('/api/whatsapp', {
+          const response = await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: numeroLimpo, mensagem })
           });
+
+          if (response.ok) {
+            whatsappEnviadoStatus = '\n\n📱 Mensagem de confirmação enviada com sucesso no WhatsApp da cliente!';
+          } else {
+            whatsappEnviadoStatus = '\n\n⚠️ O número da cliente parece inválido no WhatsApp, a mensagem não foi entregue.';
+          }
         } catch (err) {
           console.error("Erro ao enviar mensagem de WhatsApp:", err);
         }
       }
+
+      await fetchDados(); 
+      setIsModalOpen(false); 
+      // 🛡️ O Alert entra no final relatando tudo
+      alert(`✅ Agendamento salvo na agenda!${whatsappEnviadoStatus}`); 
     }
     
     setIsSaving(false);
@@ -350,10 +359,9 @@ export default function AgendaPage() {
     if (error) { 
       alert(`ERRO: ${error.message}`); 
     } else { 
-      await fetchDados(); 
-      alert('Horário remarcado com sucesso!'); 
-
+      let whatsappEnviadoStatus = '';
       const clienteRemarcado = agendamentoEditando.clientes;
+      
       if (clienteRemarcado && clienteRemarcado.telefone) {
         try {
           const primeiroNome = clienteRemarcado.nome.split(' ')[0];
@@ -362,23 +370,28 @@ export default function AgendaPage() {
           
           const mensagem = `Oii, ${primeiroNome}! ✨\n\nPassando para te avisar que seu horário de *${servicoNome}* foi REMARCADO com sucesso para o dia *${dataFormatada}* às *${novaHora}*.\n\nQualquer dúvida, é só nos chamar! 💖`;
 
-          // 🛡️ LIMPEZA E FORMATAÇÃO DO NÚMERO (Resolve o Erro de Timeout no Robô)
           let numeroLimpo = clienteRemarcado.telefone.replace(/\D/g, '');
           if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
             numeroLimpo = '55' + numeroLimpo;
           }
 
-          await fetch('/api/whatsapp', {
+          const response = await fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: numeroLimpo, mensagem })
           });
+
+          if (response.ok) {
+            whatsappEnviadoStatus = '\n\n📱 Mensagem de remarcação enviada no WhatsApp da cliente!';
+          }
         } catch (err) {
           console.error("Erro ao enviar WhatsApp de remarcação:", err);
         }
       }
 
+      await fetchDados(); 
       setAgendamentoEditando(null); 
+      alert(`✅ Horário remarcado com sucesso!${whatsappEnviadoStatus}`); 
     }
     setIsSaving(false);
   };
