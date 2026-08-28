@@ -67,6 +67,7 @@ export default function LandingPage() {
   const [metodoPagamento, setMetodoPagamento] = useState<'pix' | 'cartao'>('pix');
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
+  const [isSalvandoDb, setIsSalvandoDb] = useState(false);
 
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [configuracoes, setConfiguracoes] = useState<any>(null);
@@ -81,7 +82,6 @@ export default function LandingPage() {
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
 
-  // 🛡️ CORREÇÃO 1: BLINDAGEM DE FUSO HORÁRIO
   const converterParaMinutos = (horaStr: string) => {
     if (!horaStr) return 0;
     const [h, m] = horaStr.split(':').map(Number);
@@ -251,8 +251,9 @@ export default function LandingPage() {
     verificarSessaoEIntencao();
   }, [router]);
 
+  // 🛡️ CORREÇÃO 1: BLINDAGEM DO RETORNO DO MERCADO PAGO (Espera salvar antes de dar Sucesso)
   useEffect(() => {
-    setTimeout(() => {
+    const processarRetornoCartao = async () => {
       const params = new URLSearchParams(window.location.search);
       const statusPagamento = params.get('pagamento');
 
@@ -260,6 +261,7 @@ export default function LandingPage() {
         const reservaSalva = localStorage.getItem('reserva_temp_debora');
         if (reservaSalva) {
           try {
+            setIsSalvandoDb(true); // Impede que o usuário clique em botões fantasmas
             const dados = JSON.parse(reservaSalva);
             setServicoEscolhido(dados.servicoEscolhido);
             setSessoesSelecionadas(dados.sessoesSelecionadas);
@@ -267,13 +269,20 @@ export default function LandingPage() {
             setMetodoPagamento(dados.metodoPagamento);
             setDividaPendente(dados.dividaPendente); 
             
-            salvarAgendamentoOficial(dados);
+            // Aguarda a gravação confirmar no Banco de Dados
+            const sucessoDb = await salvarAgendamentoOficial(dados);
             
-            setStep(5);
-            setIsModalOpen(true);
-            localStorage.removeItem('reserva_temp_debora');
+            if (sucessoDb) {
+              setStep(5);
+              setIsModalOpen(true);
+              localStorage.removeItem('reserva_temp_debora');
+            } else {
+              alert("Erro na gravação do banco de dados após o pagamento. Entre em contato com o suporte.");
+            }
+            setIsSalvandoDb(false);
           } catch(e) {
             console.error("Erro ao ler cache do agendamento", e);
+            setIsSalvandoDb(false);
           }
         }
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -281,7 +290,12 @@ export default function LandingPage() {
         alert("O pagamento via cartão foi recusado pelo banco. Tente novamente.");
         window.history.replaceState({}, document.title, window.location.pathname);
       }
-    }, 500); 
+    };
+
+    // Pequeno atraso para a interface hidratar antes do loading
+    setTimeout(() => {
+      processarRetornoCartao();
+    }, 300); 
   }, []);
 
   useEffect(() => {
@@ -298,7 +312,7 @@ export default function LandingPage() {
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (pixId && step === 4 && !pixManualFallback) {
+    if (pixId && step === 4 && !pixManualFallback && !isSalvandoDb) {
       interval = setInterval(async () => {
         try {
           const res = await fetch('/api/checar-pagamento', {
@@ -309,9 +323,15 @@ export default function LandingPage() {
           const data = await res.json();
           if (data.status === 'approved') {
             clearInterval(interval);
+            setIsSalvandoDb(true); // Trava a verificação dupla
             const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
-            await salvarAgendamentoOficial(dados);
-            setStep(5);
+            
+            // Aguarda a gravação no banco
+            const sucessoDb = await salvarAgendamentoOficial(dados);
+            if (sucessoDb) {
+              setStep(5);
+            }
+            setIsSalvandoDb(false);
           }
         } catch (e) {
            console.error("Erro ao checar PIX", e);
@@ -319,7 +339,7 @@ export default function LandingPage() {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente]);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente, isSalvandoDb]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -410,7 +430,6 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
 
-  // 🛡️ CORREÇÃO 2: BLINDAGEM DE PAGAMENTO (Previne Múltiplos Cliques)
   const validarEAvancarPagamento = async () => {
     if (isProcessando) return;
     setIsProcessando(true);
@@ -516,6 +535,7 @@ export default function LandingPage() {
     }
   };
 
+  // 🛡️ CORREÇÃO 2: A FUNÇÃO AGORA RETORNA TRUE OU FALSE PARA INDICAR SUCESSO
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
       let cliente_id;
@@ -531,7 +551,7 @@ export default function LandingPage() {
         cliente_id = clientesEncontrados[0].id;
       } else {
         const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: numeroLimpo, status: 'Novo' }]).select().limit(1);
-        if (errCli) { alert("🚨 Erro ao salvar Cliente."); return; }
+        if (errCli) { alert("🚨 Erro ao salvar Cliente. Tente novamente."); return false; }
         if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
       }
 
@@ -567,7 +587,7 @@ export default function LandingPage() {
         }
 
         const { error: errAgendamento } = await supabase.from('agendamentos').insert(agendamentosParaInserir);
-        if (errAgendamento) { alert("🚨 Erro ao salvar na Agenda."); return; }
+        if (errAgendamento) { alert("🚨 Erro ao gravar reserva no Banco de Dados. A vaga não foi salva."); return false; }
 
         const valorSinalPago = dados.metodoPagamento === 'cartao' 
             ? calcularSinalBase(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinalBase(dados.servicoEscolhido)) 
@@ -580,18 +600,21 @@ export default function LandingPage() {
           }]);
         }
 
+        // 🛡️ CORREÇÃO 3: BLINDAGEM DE FUSO HORÁRIO NO WHATSAPP (A data extrai direto do ISO Local para não ter risco de errar o dia)
         const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
         const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
         const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
 
         const datasFormatadasMsg = dados.sessoesSelecionadas.map((s: any, i: number) => {
-           return `🔹 Sessão ${i + 1}: ${new Date(s.data).toLocaleDateString('pt-BR')} às ${s.hora}`;
+           const [ano, mes, dia] = formatarDataLocalStr(new Date(s.data)).split('-');
+           return `🔹 Sessão ${i + 1}: ${dia}/${mes}/${ano} às ${s.hora}`;
         }).join('\n');
 
         const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
 
         try {
-          await fetch('/api/whatsapp', {
+          // Aqui não precisamos esperar o Fetch terminar para mostrar sucesso para o cliente
+          fetch('/api/whatsapp', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
@@ -599,9 +622,12 @@ export default function LandingPage() {
         } catch (errWhatsApp) {
           console.error('Erro ao chamar API do WhatsApp:', errWhatsApp);
         }
+        
+        return true; // Sucesso absoluto na transação
       }
     } catch (e) {
       console.error("Erro geral na função de salvamento", e);
+      return false;
     }
   };
 
@@ -619,6 +645,13 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-[#0a0204] text-white font-sans selection:bg-[#C7977D] selection:text-[#120308] relative overflow-x-hidden">
       
+      {isSalvandoDb && (
+         <div className="fixed inset-0 z-[9999] bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center">
+            <Loader2 className="animate-spin text-[#DCAE96] mb-4" size={48} />
+            <p className="text-[#F8D1BE] font-bold tracking-widest uppercase text-sm">Salvando sua reserva...</p>
+         </div>
+      )}
+
       <div className="fixed inset-0 pointer-events-none opacity-20" style={{ backgroundImage: 'linear-gradient(rgba(199, 151, 125, 0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(199, 151, 125, 0.15) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
       <div className="fixed top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#DCAE96]/5 rounded-full blur-[150px] pointer-events-none"></div>
 
@@ -789,7 +822,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* 🛡️ CORREÇÃO 3: CARD VIP PROTEGIDO NO MOBILE */}
       {pacotes.length > 0 && (
         <section id="pacotes" className="py-24 px-6 relative z-10 bg-gradient-to-b from-[#0a0204] to-[#120308] border-t border-[#3a2522]">
           <div className="max-w-7xl mx-auto">
@@ -1283,7 +1315,13 @@ export default function LandingPage() {
                           <button onClick={() => {navigator.clipboard.writeText(configuracoes?.chave_pix || ''); alert("Chave copiada!");}} className="bg-[#3a2522] text-white p-2 rounded-lg hover:bg-[#DCAE96] hover:text-black transition-colors shrink-0"><Copy size={14}/></button>
                         </div>
                       </div>
-                      <button onClick={() => { processarPagamento(); setStep(5); }} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                      <button onClick={async () => { 
+                        setIsSalvandoDb(true);
+                        const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
+                        const sucesso = await salvarAgendamentoOficial(dados);
+                        if(sucesso) setStep(5);
+                        setIsSalvandoDb(false);
+                      }} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
                         <CheckCircle2 size={18}/> Já realizei o pagamento
                       </button>
                     </div>

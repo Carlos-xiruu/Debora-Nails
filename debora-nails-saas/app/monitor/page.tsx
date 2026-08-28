@@ -284,9 +284,15 @@ export default function MonitorPage() {
     return () => clearInterval(carrossel);
   }, [atendimentoAtivo, slides.length]);
 
+  // 🛡️ O CÁLCULO DE SINAL CORRIGIDO PARA O MONITOR
   const precoTotal = dadosServicoSessao?.preco || 0;
-  const taxaSinal = dadosServicoSessao?.taxa_sinal || 0;
-  const valorRestante = precoTotal - (precoTotal * (taxaSinal / 100));
+  const taxaSinalPadrao = dadosServicoSessao?.taxa_sinal || 0;
+  const isNadaPago = sessaoData?.status_pagamento === 'pendente_total';
+  
+  const taxaSinalAplicada = isNadaPago ? 0 : taxaSinalPadrao;
+  const valorDescontoSinal = precoTotal * (taxaSinalAplicada / 100);
+  const valorRestante = precoTotal - valorDescontoSinal;
+
   const isUpsell = dadosServicoSessao && !dadosServicoSessao.is_pacote && pacotesDb.length > 0;
 
   useEffect(() => {
@@ -340,13 +346,13 @@ export default function MonitorPage() {
       } catch (err) {}
     };
 
-    if (pagamentoMercadoPagoId && statusPagamento === 'pendente') {
+    // Alterado de === 'pendente' para !== 'pago' para suportar o 'pendente_total'
+    if (pagamentoMercadoPagoId && statusPagamento !== 'pago') {
       intervalo = setInterval(checarPagamento, 5000); 
     }
     return () => clearInterval(intervalo);
   }, [pagamentoMercadoPagoId, statusPagamento, sessaoData, valorRestante]);
 
-  // 🛡️ FUNÇÕES DE PACOTE (Avançar e Voltar) RESTAURADAS!
   const avancarData = () => {
     const novaSessao = { data: dataEscolhida!, hora: horaEscolhida };
     const numSessoes = servicoEscolhido?.qtd_sessoes || 1;
@@ -527,7 +533,6 @@ export default function MonitorPage() {
   return (
     <div className="h-[100dvh] w-full bg-[#0A0205] text-white flex flex-col-reverse sm:flex-row overflow-hidden font-sans select-none relative pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]">
       
-      {/* 🛡️ RELÓGIO FLUTUANTE (Desktop/Tablet) */}
       <div className="hidden sm:flex absolute top-4 right-4 lg:top-8 lg:right-8 z-50 items-center gap-2 bg-[#120308]/60 border border-[#DCAE96]/20 backdrop-blur-md px-3 py-1.5 rounded-full shadow-lg pointer-events-none">
         <Clock size={12} className="text-[#C7977D]" />
         <span className="text-white font-medium text-xs lg:text-base tracking-widest">{horaAtual}</span>
@@ -616,13 +621,12 @@ export default function MonitorPage() {
         </div>
       )}
 
-      {/* MODO SESSÃO VIP ATIVA - HYBRID LAYOUT (App + Monitor) */}
+      {/* MODO SESSÃO VIP ATIVA */}
       {atendimentoAtivo && sessaoData && (
         <div className="absolute inset-0 z-40 flex flex-col-reverse sm:flex-row bg-[#0A0205] animate-in slide-in-from-bottom-8 duration-700 h-[100dvh] pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] overflow-hidden">
           
           <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-[#DCAE96]/10 rounded-full blur-[120px] animate-pulse pointer-events-none" style={{ animationDuration: '6s' }}></div>
           
-          {/* 🛡️ SIDEBAR OTIMIZADA */}
           <aside className="w-full sm:w-[25%] sm:max-w-[220px] lg:max-w-[280px] bg-[#120308]/95 backdrop-blur-xl border-t sm:border-t-0 sm:border-r border-[#DCAE96]/20 flex flex-row sm:flex-col z-50 h-[65px] sm:h-full shrink-0 shadow-2xl">
             
             <div className="hidden sm:flex p-3 sm:p-4 lg:p-8 border-b border-[#DCAE96]/10 flex-col items-start shrink-0">
@@ -665,10 +669,8 @@ export default function MonitorPage() {
             </div>
           </aside>
 
-          {/* 🛡️ ÁREA PRINCIPAL: BLINDADA CONTRA OVERFLOW (COMPRESSÃO HÍBRIDA) */}
           <main className="flex-1 relative z-10 flex flex-col h-full overflow-hidden min-h-0">
 
-            {/* HEADER EXCLUSIVO PARA O CELULAR EM PÉ */}
             <header className="sm:hidden w-full p-2 bg-[#120308]/90 backdrop-blur-md border-b border-[#DCAE96]/20 flex justify-between items-center shrink-0 z-40 shadow-lg">
               <div className="flex items-center gap-2">
                 <img src="/fotonova.jpeg" className="h-8 w-8 rounded-full border border-[#C7977D]" alt="Débora" />
@@ -682,37 +684,33 @@ export default function MonitorPage() {
               </div>
             </header>
 
-            <div className={`flex-1 p-2 sm:p-3 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
+            <div className={`flex-1 p-2 sm:p-2 lg:p-8 flex flex-col items-center w-full ${abaAtiva === 'inicio' ? 'overflow-hidden' : 'overflow-y-auto custom-scrollbar'}`}>
               
               <div className="w-full max-w-6xl h-full flex flex-col min-h-0">
                 
                 {abaAtiva === 'inicio' && (
-                  <div className="h-full flex flex-col animate-in fade-in duration-700 min-h-0 w-full gap-2 sm:gap-3 lg:gap-6">
+                  <div className="h-full flex flex-col animate-in fade-in duration-700 min-h-0 w-full gap-2 sm:gap-2 lg:gap-6">
                     
-                    {/* Título de Boas Vindas + Frase Instagramável */}
                     <div className="shrink-0 flex flex-col">
                       <div className="flex justify-between items-start">
-                        <h1 className="font-serif text-2xl sm:text-2xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-2">
+                        <h1 className="font-serif text-2xl sm:text-2xl lg:text-5xl text-white leading-tight drop-shadow-lg mb-1 sm:mb-1">
                           {saudacao}, <span className="text-[#F8D1BE]">{sessaoData.cliente_nome.split(' ')[0]}!</span> ✨
                         </h1>
-                        {/* Relógio Mobile Escondido */}
                         <div className="sm:hidden flex items-center gap-1 bg-[#120308]/60 border border-[#DCAE96]/20 px-2 py-1 rounded-full">
                           <Clock size={10} className="text-[#C7977D]" />
                           <span className="text-white font-medium text-[9px] tracking-widest">{horaAtual}</span>
                         </div>
                       </div>
                       
-                      <div className="bg-gradient-to-r from-[#DCAE96]/15 to-transparent p-1.5 sm:p-2 rounded-r-xl border-l-[3px] border-[#DCAE96] mt-1 shadow-sm max-w-2xl backdrop-blur-sm">
+                      <div className="bg-gradient-to-r from-[#DCAE96]/15 to-transparent p-1.5 sm:p-1.5 lg:p-3 rounded-r-xl border-l-[3px] border-[#DCAE96] mt-1 shadow-sm max-w-2xl backdrop-blur-sm">
                         <p className="text-[11px] sm:text-[11px] lg:text-lg text-[#F8D1BE] font-medium italic opacity-100 tracking-wide drop-shadow-md">
                           "{fraseDoDia}"
                         </p>
                       </div>
                     </div>
 
-                    {/* CARDS PRINCIPAIS: Proporção 40/60 no A10 */}
                     <div className="flex-1 flex flex-row gap-2 sm:gap-3 lg:gap-8 w-full min-h-0 overflow-hidden">
                       
-                      {/* ESQUERDA: CRONÔMETRO (TRAVADO E MENOR NO A10) */}
                       <div className="w-full sm:w-[40%] lg:flex-1 bg-gradient-to-br from-[#1A050B] to-[#0A0205] border border-[#DCAE96]/20 p-2 sm:p-2 lg:p-8 rounded-2xl sm:rounded-2xl lg:rounded-[24px] shadow-xl flex flex-col justify-between min-h-0 overflow-hidden relative">
                         <div className="shrink-0 mb-1">
                           <p className="text-[#C7977D] text-[8px] sm:text-[8px] lg:text-sm uppercase tracking-widest font-bold mb-0.5">Em Andamento</p>
@@ -725,7 +723,6 @@ export default function MonitorPage() {
                         </div>
                       </div>
 
-                      {/* DIREITA: RESUMO E PIX (MAIS ESPAÇO PARA O QR CODE) */}
                       {dadosServicoSessao && (
                         <div className="w-full sm:w-[60%] lg:flex-1 bg-[#120308]/80 border border-[#DCAE96]/20 p-2 sm:p-3 lg:p-8 rounded-2xl sm:rounded-2xl lg:rounded-[24px] shadow-xl flex flex-col min-h-0 overflow-hidden justify-between">
                           
@@ -742,12 +739,20 @@ export default function MonitorPage() {
                                 <span>Total do Serviço:</span>
                                 <span>R$ {precoTotal.toFixed(2).replace('.', ',')}</span>
                               </div>
-                              {taxaSinal > 0 && (
+                              
+                              {/* 🛡️ EXIBIÇÃO INTELIGENTE DO SINAL PAGO OU NADA PAGO */}
+                              {taxaSinalAplicada > 0 ? (
                                 <div className="flex justify-between text-emerald-400/80 border-b border-white/5 pb-1 lg:pb-2">
-                                  <span>Sinal Pago ({taxaSinal}%):</span>
-                                  <span>- R$ {(precoTotal * (taxaSinal / 100)).toFixed(2).replace('.', ',')}</span>
+                                  <span>Sinal Pago ({taxaSinalAplicada}%):</span>
+                                  <span>- R$ {valorDescontoSinal.toFixed(2).replace('.', ',')}</span>
+                                </div>
+                              ) : (
+                                <div className="flex justify-between text-orange-400/80 border-b border-white/5 pb-1 lg:pb-2">
+                                  <span>Sinal Recebido:</span>
+                                  <span>R$ 0,00</span>
                                 </div>
                               )}
+
                               <div className="flex justify-between text-[#F8D1BE] text-xs sm:text-xs lg:text-2xl font-bold pt-1">
                                 <span>Restante:</span>
                                 <span>R$ {Math.max(0, valorRestante).toFixed(2).replace('.', ',')}</span>
@@ -755,9 +760,9 @@ export default function MonitorPage() {
                             </div>
                           </div>
 
-                          {/* ÁREA DO PIX: Refeita com Padding elegante */}
                           <div className="flex-1 mt-1 sm:mt-1.5 lg:mt-6 flex flex-col min-h-0 justify-end">
-                            {valorRestante > 0 && statusPagamento === 'pendente' && (
+                            {/* 🛡️ RENDERIZA O PIX SE TIVER VALOR RESTANTE */}
+                            {valorRestante > 0 && statusPagamento !== 'pago' && (
                               <div className="flex-1 bg-black/40 border border-[#DCAE96]/20 rounded-xl sm:rounded-xl lg:rounded-2xl p-2 sm:p-2 lg:p-6 flex items-center justify-center sm:justify-start gap-3 sm:gap-4 lg:gap-6 shadow-inner min-h-0 overflow-hidden">
                                 {isGerandoPix ? (
                                   <div className="flex flex-col items-center justify-center w-full h-full">
@@ -798,7 +803,6 @@ export default function MonitorPage() {
                   </div>
                 )}
 
-                {/* ABA INSPIRAÇÕES / IDEIAS */}
                 {abaAtiva === 'ideias' && (
                   <div className="animate-in fade-in duration-500 w-full pb-10">
                     <div className="mb-4 sm:mb-8 shrink-0">

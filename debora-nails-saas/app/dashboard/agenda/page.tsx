@@ -248,7 +248,6 @@ export default function AgendaPage() {
       if (erroCliente) { alert(`ERRO: Não foi possível criar cliente. ${erroCliente.message}`); setIsSaving(false); return; }
       cliente_id = novoClienteData.id;
     } else {
-      // 🛡️ CORREÇÃO CRÍTICA AQUI: O id do formulário é texto, o da tabela pode ser número/uuid. O String() resolve.
       const clienteEncontrado = clientes.find(c => String(c.id) === String(cliente_id));
       if (clienteEncontrado) {
         clienteNome = clienteEncontrado.nome;
@@ -263,7 +262,6 @@ export default function AgendaPage() {
     if (erroAgenda) { 
       alert(`ERRO: Falha ao agendar. ${erroAgenda.message}`); 
     } else { 
-      // 🛡️ O DISPARO DO WHATSAPP DEVE ACONTECER ANTES DO ALERT, PARA NÃO CONGELAR A REDE
       let whatsappEnviadoStatus = '';
       if (clienteTelefone) {
         try {
@@ -295,7 +293,6 @@ export default function AgendaPage() {
 
       await fetchDados(); 
       setIsModalOpen(false); 
-      // 🛡️ O Alert entra no final relatando tudo
       alert(`✅ Agendamento salvo na agenda!${whatsappEnviadoStatus}`); 
     }
     
@@ -744,9 +741,11 @@ export default function AgendaPage() {
                   <input type="date" name="data" defaultValue={dataFiltro} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
                   <input type="time" name="hora" defaultValue={horaModal} required className="bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
                 </div>
+                {/* 🛡️ A OPÇÃO 'NADA PAGO' INSERIDA AQUI */}
                 <select name="status_pagamento" className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:border-[#F8D1BE] outline-none">
-                  <option value="pendente">Pendente (Cobrar no final)</option>
-                  <option value="pago">Já foi Pago (Adiantado)</option>
+                  <option value="pendente_total">Nada Pago (Cobrar 100% no final)</option>
+                  <option value="pendente">Sinal Pago (Cobrar apenas o restante)</option>
+                  <option value="pago">Já foi Pago (100% Adiantado)</option>
                 </select>
               </div>
               <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
@@ -796,9 +795,14 @@ export default function AgendaPage() {
                   <span className="text-xs text-gray-400">Novo Horário</span>
                   <input type="time" name="hora" defaultValue={new Date(agendamentoEditando.inicio).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})} required className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white color-scheme-dark focus:border-[#F8D1BE] outline-none"/>
                 </label>
+                {/* 🛡️ A OPÇÃO 'NADA PAGO' INSERIDA AQUI */}
                 <label className="block">
                   <span className="text-xs text-gray-400">Status do Pagamento</span>
-                  <select name="status_pagamento" defaultValue={agendamentoEditando.status_pagamento || 'pendente'} className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:border-[#F8D1BE] outline-none"><option value="pendente">Pendente</option><option value="pago">Pago</option></select>
+                  <select name="status_pagamento" defaultValue={agendamentoEditando.status_pagamento || 'pendente_total'} className="mt-1 w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-white focus:border-[#F8D1BE] outline-none">
+                    <option value="pendente_total">Nada Pago (Cobrar 100% no final)</option>
+                    <option value="pendente">Sinal Pago (Cobrar restante)</option>
+                    <option value="pago">100% Pago</option>
+                  </select>
                 </label>
               </div>
               <div className="px-6 py-4 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
