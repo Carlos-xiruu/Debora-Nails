@@ -1,11 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image'; 
-import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, MapPin, ChevronDown, Award, Heart, Coffee, Wifi, Wind, CarFront, LogOut, Crown, User, Copy, Ban, Info, ChevronLeft, ChevronRight, AlertTriangle, Package, Check } from 'lucide-react';
+import { CalendarDays, Sparkles, Clock, ArrowRight, CheckCircle2, ShieldCheck, Loader2, X, CreditCard, QrCode, AlertCircle, Award, LogOut, Crown, User, Copy, Ban, Info, AlertTriangle, Check } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import Link from 'next/link';
+
+// 🛡️ Ferramentas Isoladas
+import { converterParaMinutos, converterParaHoraStr, extrairMinutosDuracao, formatarDataLocalStr } from './utils/helpers';
+
+// 🛡️ Componentes Isolados
+import Sobre from './components/Sobre';
+import Portfolio from './components/Portfolio';
+import Espaco from './components/Espaco';
+import FAQ from './components/FAQ';
 
 const DISPONIBILIDADE_PADRAO = {
   0: { ativo: false, abertura: '08:00', fechamento: '12:00' },
@@ -15,30 +24,6 @@ const DISPONIBILIDADE_PADRAO = {
   4: { ativo: true, abertura: '10:00', fechamento: '20:00' },
   5: { ativo: true, abertura: '08:00', fechamento: '18:00' },
   6: { ativo: true, abertura: '08:00', fechamento: '13:00' }
-};
-
-const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisSrc: string }) => {
-  const [posicao, setPosicao] = useState(50);
-
-  return (
-    <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden group border border-[#DCAE96]/20 select-none shadow-xl">
-      <Image src={antesSrc} alt="Antes" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
-      <div className="absolute inset-0 z-10 pointer-events-none" style={{ clipPath: `polygon(0 0, ${posicao}% 0, ${posicao}% 100%, 0 100%)` }}>
-        <Image src={depoisSrc} alt="Depois" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover pointer-events-none" />
-      </div>
-      <div className="absolute top-0 bottom-0 z-20 w-[2px] bg-white cursor-ew-resize flex items-center justify-center shadow-[0_0_15px_rgba(0,0,0,0.8)] pointer-events-none" style={{ left: `calc(${posicao}% - 1px)` }}>
-        <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg border border-gray-200">
-          <div className="flex gap-0.5">
-            <ChevronLeft size={14} className="text-[#C7977D]" />
-            <ChevronRight size={14} className="text-[#C7977D]" />
-          </div>
-        </div>
-      </div>
-      <input type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))} className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize" />
-      <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
-      <div className="absolute top-4 right-4 z-20 bg-[#DCAE96]/80 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
-    </div>
-  );
 };
 
 export default function LandingPage() {
@@ -68,48 +53,17 @@ export default function LandingPage() {
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
   const [isSalvandoDb, setIsSalvandoDb] = useState(false);
+  const [idsReservados, setIdsReservados] = useState<number[]>([]); // 🚨 IDs dos cadeados da nossa vaga!
 
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [configuracoes, setConfiguracoes] = useState<any>(null);
-  const [diasDisponiveis, setDiasDisponiveis] = useState<Date[]>([]);
-  const [horariosLivres, setHorariosLivres] = useState<string[]>([]);
 
   const [qrCodePix, setQrCodePix] = useState<{base64: string, copiaCola: string} | null>(null);
   const [pixId, setPixId] = useState<string | null>(null);
   const [pixManualFallback, setPixManualFallback] = useState(false);
 
-  const [faqAberto, setFaqAberto] = useState<number | null>(null);
   const [showWaBubble, setShowWaBubble] = useState(false);
   const [bubbleFechado, setBubbleFechado] = useState(false);
-
-  const converterParaMinutos = (horaStr: string) => {
-    if (!horaStr) return 0;
-    const [h, m] = horaStr.split(':').map(Number);
-    return h * 60 + m;
-  };
-
-  const converterParaHoraStr = (minutos: number) => {
-    const h = Math.floor(minutos / 60).toString().padStart(2, '0');
-    const m = (minutos % 60).toString().padStart(2, '0');
-    return `${h}:${m}`;
-  };
-
-  const extrairMinutosDuracao = (duracaoStr: string) => {
-    if (!duracaoStr) return 60;
-    let total = 0;
-    const str = duracaoStr.toLowerCase().trim();
-    const horasMatch = str.match(/(\d+)\s*h/);
-    if (horasMatch) total += parseInt(horasMatch[1]) * 60;
-    const minMatch = str.match(/(\d+)\s*m/);
-    if (minMatch) total += parseInt(minMatch[1]);
-    return total > 0 ? total : 60;
-  };
-
-  const formatarDataLocalStr = (d: Date) => {
-    const tzOffset = d.getTimezoneOffset() * 60000; 
-    const localISOTime = new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
-    return localISOTime;
-  };
 
   useEffect(() => {
     const fetchDadosGerais = async () => {
@@ -131,7 +85,18 @@ export default function LandingPage() {
       }
 
       const hojeStr = formatarDataLocalStr(new Date());
-      const { data: agends } = await supabase.from('agendamentos').select('inicio, fim').gte('inicio', `${hojeStr}T00:00:00-03:00`).neq('tipo', 'cancelado');
+      const limiteFuturo = new Date();
+      limiteFuturo.setDate(limiteFuturo.getDate() + 45); 
+      const limiteFuturoStr = formatarDataLocalStr(limiteFuturo);
+
+      // 🚨 Puxamos o created_at para a inteligência dos 10 minutos
+      const { data: agends } = await supabase
+        .from('agendamentos')
+        .select('id, inicio, fim, tipo, created_at')
+        .gte('inicio', `${hojeStr}T00:00:00-03:00`)
+        .lte('inicio', `${limiteFuturoStr}T23:59:59-03:00`)
+        .neq('tipo', 'cancelado');
+        
       if (agends) setAgendamentos(agends);
     };
 
@@ -140,8 +105,8 @@ export default function LandingPage() {
     return () => clearTimeout(waTimer);
   }, []);
 
-  useEffect(() => {
-    if (!configuracoes) return;
+  const diasDisponiveis = useMemo(() => {
+    if (!configuracoes) return [];
     const dias = [];
     let d = new Date();
     d.setHours(0,0,0,0);
@@ -156,19 +121,18 @@ export default function LandingPage() {
       }
       d.setDate(d.getDate() + 1);
     }
-    setDiasDisponiveis(dias);
+    return dias;
   }, [configuracoes]);
 
-  useEffect(() => {
-    if (!dataEscolhida || !servicoEscolhido || !configuracoes) return;
+  // 🛡️ OTIMIZAÇÃO: A MÁGICA DOS 10 MINUTOS
+  const horariosLivres = useMemo(() => {
+    if (!dataEscolhida || !servicoEscolhido || !configuracoes) return [];
 
     const dataStr = formatarDataLocalStr(dataEscolhida);
     const diaDaSemana = dataEscolhida.getDay();
     const regraDoDia = configuracoes.disponibilidade[diaDaSemana];
 
-    if (!regraDoDia || !regraDoDia.ativo) {
-      setHorariosLivres([]); return;
-    }
+    if (!regraDoDia || !regraDoDia.ativo) return [];
 
     const aberturaMin = converterParaMinutos(regraDoDia.abertura);
     const fechamentoMin = converterParaMinutos(regraDoDia.fechamento);
@@ -188,6 +152,12 @@ export default function LandingPage() {
       const fimMin = minAtual + duracaoServicoMin;
 
       const conflitoAgendamento = agendsDoDia.some(a => {
+        // Se a vaga for pendente de pagamento, só oculta se foi clicada há menos de 10 min.
+        if (a.tipo === 'pendente_pagamento') {
+          const idadeEmMinutos = (new Date().getTime() - new Date(a.created_at).getTime()) / 60000;
+          if (idadeEmMinutos > 10) return false; // Vaga expirada volta a aparecer!
+        }
+        
         const dInicio = new Date(a.inicio); const dFim = new Date(a.fim);
         const minInicio = dInicio.getHours() * 60 + dInicio.getMinutes(); const minFim = dFim.getHours() * 60 + dFim.getMinutes();
         return (minAtual < minFim) && (fimMin > minInicio);
@@ -212,9 +182,12 @@ export default function LandingPage() {
       }
     }
 
-    setHorariosLivres(slotsLivres);
-    setHoraEscolhida('');
+    return slotsLivres;
   }, [dataEscolhida, servicoEscolhido, configuracoes, agendamentos, sessoesSelecionadas]);
+
+  useEffect(() => {
+    setHoraEscolhida('');
+  }, [dataEscolhida, servicoEscolhido, sessoesSelecionadas]);
 
   useEffect(() => {
     const verificarSessaoEIntencao = async () => {
@@ -251,7 +224,6 @@ export default function LandingPage() {
     verificarSessaoEIntencao();
   }, [router]);
 
-  // 🛡️ CORREÇÃO 1: BLINDAGEM DO RETORNO DO MERCADO PAGO (Espera salvar antes de dar Sucesso)
   useEffect(() => {
     const processarRetornoCartao = async () => {
       const params = new URLSearchParams(window.location.search);
@@ -261,24 +233,22 @@ export default function LandingPage() {
         const reservaSalva = localStorage.getItem('reserva_temp_debora');
         if (reservaSalva) {
           try {
-            setIsSalvandoDb(true); // Impede que o usuário clique em botões fantasmas
+            setIsSalvandoDb(true); 
             const dados = JSON.parse(reservaSalva);
             setServicoEscolhido(dados.servicoEscolhido);
             setSessoesSelecionadas(dados.sessoesSelecionadas);
             setClienteDados(dados.clienteDados);
             setMetodoPagamento(dados.metodoPagamento);
             setDividaPendente(dados.dividaPendente); 
+            setIdsReservados(dados.idsReservados);
             
-            // Aguarda a gravação confirmar no Banco de Dados
             const sucessoDb = await salvarAgendamentoOficial(dados);
             
             if (sucessoDb) {
               setStep(5);
               setIsModalOpen(true);
               localStorage.removeItem('reserva_temp_debora');
-            } else {
-              alert("Erro na gravação do banco de dados após o pagamento. Entre em contato com o suporte.");
-            }
+            } 
             setIsSalvandoDb(false);
           } catch(e) {
             console.error("Erro ao ler cache do agendamento", e);
@@ -292,17 +262,24 @@ export default function LandingPage() {
       }
     };
 
-    // Pequeno atraso para a interface hidratar antes do loading
     setTimeout(() => {
       processarRetornoCartao();
     }, 300); 
   }, []);
+
+  // O cancelamento automático se o tempo acabar!
+  const cancelarVagaExpirada = async () => {
+    if (idsReservados.length > 0) {
+      await supabase.from('agendamentos').update({ tipo: 'cancelado' }).in('id', idsReservados);
+    }
+  };
 
   useEffect(() => {
     let timer: NodeJS.Timeout;
     if (step === 4 && tempoRestante > 0) {
       timer = setInterval(() => setTempoRestante(prev => prev - 1), 1000);
     } else if (step === 4 && tempoRestante === 0) {
+      cancelarVagaExpirada(); // Libera a vaga
       alert("O tempo limite para pagamento expirou. A vaga foi liberada para outras clientes.");
       setIsModalOpen(false);
       setStep(1);
@@ -323,10 +300,9 @@ export default function LandingPage() {
           const data = await res.json();
           if (data.status === 'approved') {
             clearInterval(interval);
-            setIsSalvandoDb(true); // Trava a verificação dupla
-            const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
+            setIsSalvandoDb(true); 
+            const dados = { idsReservados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
             
-            // Aguarda a gravação no banco
             const sucessoDb = await salvarAgendamentoOficial(dados);
             if (sucessoDb) {
               setStep(5);
@@ -339,7 +315,7 @@ export default function LandingPage() {
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente, isSalvandoDb]);
+  }, [pixId, step, pixManualFallback, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente, isSalvandoDb, idsReservados]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -362,11 +338,18 @@ export default function LandingPage() {
       setQrCodePix(null);
       setPixId(null);
       setPixManualFallback(false);
+      setIdsReservados([]);
     } else {
       localStorage.setItem('intencao_agendamento', servico ? JSON.stringify(servico) : 'geral');
       setServicoDetalhe(null);
       setIsAuthModalOpen(true); 
     }
+  };
+
+  const fecharModalECancelar = () => {
+    if (step === 4) cancelarVagaExpirada(); // Libera se ela fechar no X
+    setIsModalOpen(false);
+    setSessoesSelecionadas([]);
   };
 
   const continuarComoConvidada = () => {
@@ -430,6 +413,7 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
 
+  // 🚨 AQUI O CADEADO É COLOCADO NA VAGA!
   const validarEAvancarPagamento = async () => {
     if (isProcessando) return;
     setIsProcessando(true);
@@ -438,68 +422,57 @@ export default function LandingPage() {
     try {
       let numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
       if (numeroLimpo.length >= 10) {
-        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-           numeroLimpo = '55' + numeroLimpo;
-        }
+        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) numeroLimpo = '55' + numeroLimpo;
         const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', numeroLimpo).limit(1).single();
-        if (cli && cli.divida_pendente > 0) {
-          dividaAtual = cli.divida_pendente;
-        }
+        if (cli && cli.divida_pendente > 0) dividaAtual = cli.divida_pendente;
       }
       
       setDividaPendente(dividaAtual);
+
+      const sessoesMapeadas = sessoesSelecionadas.map((s: any) => ({
+        ...s, dataFiltroBase: formatarDataLocalStr(new Date(s.data))
+      }));
+      const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
+
+      // Bate na API para pedir o Bloqueio da Vaga!
+      const resBloqueio = await fetch('/api/bloquear-vaga', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clienteDados, servicoEscolhido, sessoesSelecionadas: sessoesMapeadas, duracaoMins })
+      });
+
+      if (resBloqueio.status === 409) {
+        alert("Poxa! 😢 Alguém acabou de pegar essa vaga na sua frente. Por favor, reinicie o agendamento escolhendo outro horário.");
+        setIsProcessando(false); setIsModalOpen(false); setStep(1); return; 
+      }
+
+      if (!resBloqueio.ok) {
+        alert("Erro de conexão ao reservar a vaga temporariamente.");
+        setIsProcessando(false); return;
+      }
+
+      const dataBloqueio = await resBloqueio.json();
+      const idsAprovados = dataBloqueio.idsReservados;
+      setIdsReservados(idsAprovados); // Guardou no bolso!
       
       if (calcularSinalBase() > 0 || dividaAtual > 0) {
         setStep(4);
-        setIsProcessando(false);
+        processarPagamentoLocal(idsAprovados); 
       } else {
-        processarPagamento(); 
+        // Se for de graça (sem sinal e sem dívida), já finaliza o cofre na hora
+        await salvarAgendamentoOficial({ idsReservados: idsAprovados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente });
+        setStep(5);
+        setIsProcessando(false);
       }
     } catch (e) {
       setIsProcessando(false);
     }
   };
 
-  const processarPagamento = async () => {
-    setIsProcessando(true);
-    
-    for (const sessao of sessoesSelecionadas) {
-      const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
-      const hojeStrBase = formatarDataLocalStr(new Date());
-      
-      if (dataFiltroBase === hojeStrBase) {
-         const agora = new Date();
-         const minAtual = agora.getHours() * 60 + agora.getMinutes();
-         const inicioMins = converterParaMinutos(sessao.hora);
-         if (inicioMins < minAtual) {
-           alert(`🚨 O horário ${sessao.hora} acabou de passar! Volte e escolha um novo horário.`);
-           setIsProcessando(false); setIsModalOpen(false); setStep(1); return;
-         }
-      }
-
-      const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
-      const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
-      const fimDate = new Date(inicioDate);
-      fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
-
-      const { data: vagaOcupada } = await supabase
-        .from('agendamentos')
-        .select('id')
-        .neq('tipo', 'cancelado')
-        .lt('inicio', fimDate.toISOString())
-        .gt('fim', inicioDate.toISOString());
-
-      if (vagaOcupada && vagaOcupada.length > 0) {
-        alert("Poxa! 😢 Alguém acabou de reservar uma de suas datas escolhidas. Por favor, reinicie o agendamento.");
-        setIsProcessando(false); setIsModalOpen(false); setStep(1); return; 
-      }
-    }
-    
+  const processarPagamentoLocal = async (idsAprovados: number[]) => {
     if (metodoPagamento === 'pix') {
       try {
         const res = await fetch('/api/pagamento-monitor', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ valor: valorTotalCobrar, descricao: `Sinal - ${servicoEscolhido.nome}` })
         });
         const data = await res.json();
@@ -509,21 +482,20 @@ export default function LandingPage() {
           setPixId(data.id);
         } else {
           if (configuracoes?.chave_pix) setPixManualFallback(true);
-          else alert("Ocorreu um erro ao gerar a chave PIX. Tente novamente.");
+          else alert("Ocorreu um erro ao gerar a chave PIX.");
         }
       } catch (e) {
         if (configuracoes?.chave_pix) setPixManualFallback(true);
-        else alert("Ocorreu um erro ao processar. Tente novamente.");
+        else alert("Ocorreu um erro ao processar.");
       } finally {
         setIsProcessando(false);
       }
 
     } else {
-      localStorage.setItem('reserva_temp_debora', JSON.stringify({ clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ idsReservados: idsAprovados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
       try {
         const resposta = await fetch('/api/pagamento', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalCobrar, clienteNome: clienteDados.nome })
         });
         const data = await resposta.json();
@@ -535,96 +507,47 @@ export default function LandingPage() {
     }
   };
 
-  // 🛡️ CORREÇÃO 2: A FUNÇÃO AGORA RETORNA TRUE OU FALSE PARA INDICAR SUCESSO
   const salvarAgendamentoOficial = async (dados: any) => {
     try {
-      let cliente_id;
-      
-      let numeroLimpo = dados.clienteDados.telefone.replace(/\D/g, '');
-      if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-         numeroLimpo = '55' + numeroLimpo;
-      }
-      
-      const { data: clientesEncontrados } = await supabase.from('clientes').select('id').eq('telefone', numeroLimpo).limit(1);
-      
-      if (clientesEncontrados && clientesEncontrados.length > 0) {
-        cliente_id = clientesEncontrados[0].id;
-      } else {
-        const { data: novoCliente, error: errCli } = await supabase.from('clientes').insert([{ nome: dados.clienteDados.nome, telefone: numeroLimpo, status: 'Novo' }]).select().limit(1);
-        if (errCli) { alert("🚨 Erro ao salvar Cliente. Tente novamente."); return false; }
-        if (novoCliente && novoCliente.length > 0) cliente_id = novoCliente[0].id;
-      }
-
-      if (cliente_id) {
-        if (dados.dividaPendente > 0) {
-          await supabase.from('clientes').update({ divida_pendente: 0 }).eq('id', cliente_id);
-          await supabase.from('transacoes').insert([{
-            descricao: `Pagamento Dívida (Falta Anterior) - ${dados.clienteDados.nome}`, 
-            tipo: 'entrada', valor: dados.dividaPendente, categoria: 'Outros', data_pagamento: new Date().toISOString()
-          }]);
-        }
-
-        const grupoPacoteId = dados.servicoEscolhido.is_pacote ? crypto.randomUUID() : null;
-        const agendamentosParaInserir = [];
-
-        for (const sessao of dados.sessoesSelecionadas) {
-          const dataFiltroBase = formatarDataLocalStr(new Date(sessao.data));
-          const inicioDate = new Date(`${dataFiltroBase}T${sessao.hora}:00-03:00`);
-          const duracaoMins = extrairMinutosDuracao(dados.servicoEscolhido.duracao);
-          const fimDate = new Date(inicioDate);
-          fimDate.setMinutes(fimDate.getMinutes() + duracaoMins);
-
-          agendamentosParaInserir.push({
-            cliente_id: cliente_id, 
-            servico_id: dados.servicoEscolhido.id, 
-            tipo: 'agendado', 
-            inicio: inicioDate.toISOString(), 
-            fim: fimDate.toISOString(), 
-            observacoes: dados.clienteDados.observacoes, 
-            prefere_silencio: dados.clienteDados.prefere_silencio,
-            grupo_pacote_id: grupoPacoteId
-          });
-        }
-
-        const { error: errAgendamento } = await supabase.from('agendamentos').insert(agendamentosParaInserir);
-        if (errAgendamento) { alert("🚨 Erro ao gravar reserva no Banco de Dados. A vaga não foi salva."); return false; }
-
-        const valorSinalPago = dados.metodoPagamento === 'cartao' 
+      const valorSinalPago = dados.metodoPagamento === 'cartao' 
             ? calcularSinalBase(dados.servicoEscolhido) + calcularTaxaCartao(calcularSinalBase(dados.servicoEscolhido)) 
             : calcularSinalBase(dados.servicoEscolhido);
 
-        if (valorSinalPago > 0) {
-          await supabase.from('transacoes').insert([{
-            descricao: `Sinal (LP via ${dados.metodoPagamento.toUpperCase()}): ${dados.clienteDados.nome}`, 
-            tipo: 'entrada', valor: valorSinalPago, categoria: 'Sinal', data_pagamento: new Date().toISOString()
-          }]);
-        }
+      const payload = {
+        ...dados,
+        valorSinalPago,
+      };
 
-        // 🛡️ CORREÇÃO 3: BLINDAGEM DE FUSO HORÁRIO NO WHATSAPP (A data extrai direto do ISO Local para não ter risco de errar o dia)
-        const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
-        const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
-        const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
+      const response = await fetch('/api/finalizar-reserva', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
+      });
 
-        const datasFormatadasMsg = dados.sessoesSelecionadas.map((s: any, i: number) => {
-           const [ano, mes, dia] = formatarDataLocalStr(new Date(s.data)).split('-');
-           return `🔹 Sessão ${i + 1}: ${dia}/${mes}/${ano} às ${s.hora}`;
-        }).join('\n');
-
-        const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
-
-        try {
-          // Aqui não precisamos esperar o Fetch terminar para mostrar sucesso para o cliente
-          fetch('/api/whatsapp', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
-          });
-        } catch (errWhatsApp) {
-          console.error('Erro ao chamar API do WhatsApp:', errWhatsApp);
-        }
-        
-        return true; // Sucesso absoluto na transação
+      if (!response.ok) {
+        alert("🚨 Erro ao efetivar a reserva. Chame a gente no WhatsApp.");
+        return false;
       }
+
+      const { numeroLimpo } = await response.json();
+
+      const textoBase = configuracoes?.mensagem_confirmacao || "Olá, cliente. Tudo bem?\nSeu agendamento no Debora Nails Studio está confirmado.";
+      const textoSilencio = dados.clienteDados.prefere_silencio ? "\n🤫 *Aviso:* A cliente optou pela Terapia Silenciosa." : "";
+      const textoObs = dados.clienteDados.observacoes ? `\n📝 *Obs:* ${dados.clienteDados.observacoes}` : "";
+
+      const datasFormatadasMsg = dados.sessoesSelecionadas.map((s: any, i: number) => {
+         const [ano, mes, dia] = formatarDataLocalStr(new Date(s.data)).split('-');
+         return `🔹 Sessão ${i + 1}: ${dia}/${mes}/${ano} às ${s.hora}`;
+      }).join('\n');
+
+      const mensagemCliente = `${textoBase}\n\n*Detalhes da Reserva:*\nCliente: ${dados.clienteDados.nome}\nServiço: ${dados.servicoEscolhido.nome}\n\n*Datas Agendadas:*\n${datasFormatadasMsg}\n\n*Política de Cancelamento:*\nLembre-se que em caso de cancelamento com menos de 24h ou falta, o valor restante do serviço será cobrado como multa na próxima reserva.${textoSilencio}${textoObs}\n\nNosso endereço é Rua Fritz Hasse, 38 - Centro, Jaraguá do Sul.\nAguardamos você.`;
+
+      try {
+        fetch('/api/whatsapp', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ telefone: numeroLimpo, mensagem: mensagemCliente })
+        });
+      } catch (errWhatsApp) {}
+      
+      return true; 
     } catch (e) {
       console.error("Erro geral na função de salvamento", e);
       return false;
@@ -752,27 +675,7 @@ export default function LandingPage() {
         </div>
       </header>
 
-      <section id="sobre" className="py-20 px-6 relative z-10">
-        <div className="max-w-5xl mx-auto glass-card rounded-3xl p-6 md:p-12 border border-[#3a2522] flex flex-col md:flex-row items-center gap-10 shadow-2xl">
-          <div className="w-full md:w-1/3 relative group">
-            <div className="w-full aspect-square md:aspect-[4/5] relative rounded-2xl overflow-hidden border border-[#DCAE96]/20 z-10">
-               <Image src="/fotonova.jpeg" alt="Debora Silva" fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover" />
-            </div>
-            <div className="absolute -bottom-5 -right-5 bg-[#0a0204] border border-[#C7977D]/40 text-[#F8D1BE] p-4 rounded-xl shadow-2xl z-20 flex flex-col items-center">
-              <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
-              <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
-            </div>
-          </div>
-          <div className="w-full md:w-2/3">
-            <span className="text-[#C7977D] text-xs font-bold uppercase tracking-widest flex items-center gap-2 mb-2"><Heart size={14}/> A Especialista</span>
-            <h2 className="font-serif text-4xl text-white mb-5">Muito prazer, sou a <span className="italic text-[#DCAE96]">Debora.</span></h2>
-            <div className="space-y-4 text-gray-300 text-base leading-relaxed font-light">
-              <p>Por trás de cada detalhe, existe uma mulher que ama transformar beleza em autoestima.</p>
-              <p>Há mais de 6 anos venho aperfeiçoando minhas técnicas, aprendendo, evoluindo e construindo um trabalho que carrega muito de quem eu sou: <strong>dedicação, delicadeza, perfeccionismo e amor pelo que faço</strong>.<br/>Para mim, cada cliente é única, e cada atendimento é uma oportunidade de fazer você se olhar no espelho e pensar: “uau, era exatamente isso que eu queria.” Mais do que unhas, eu entrego cuidado, confiança e uma experiência feita para você. </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <Sobre />
 
       <section id="servicos" className="py-24 pl-6 md:pl-0 max-w-7xl mx-auto relative z-10">
         <div className="text-left md:text-center mb-12 md:px-6">
@@ -916,131 +819,9 @@ export default function LandingPage() {
         </section>
       )}
 
-      <section id="portfolio" className="py-20 px-6 bg-[#050102] border-y border-[#3a2522] relative z-10">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <span className="glow-text text-sm font-bold uppercase tracking-widest">Galeria de Arte</span>
-            <h2 className="font-serif text-4xl md:text-5xl text-white mt-2 mb-4">Transformações Reais</h2>
-          </div>
-
-          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4">Nails Design</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 mb-16">
-            {['/01.jpg', '/vermelha.jpeg', '/02.jpg','/nude-branca.jpeg','/delicada.jpeg','/branca-nude.jpeg','/roxa.jpeg','/nude-dourada.jpeg'].map((img, i) => (
-              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-[4/5] border border-[#DCAE96]/20 group cursor-pointer relative">
-                <Image src={img} alt="Trabalho Debora Nails" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
-              </article>
-            ))}
-          </div>
-
-          <h3 className="text-2xl font-serif text-[#F8D1BE] mb-6 border-l-4 border-[#C7977D] pl-4 mt-20">Maquiagem Profissional</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 mb-16">
-            {['/make01.jpeg','/make-loira.jpeg','/make-rabico.jpeg', '/make02.jpeg', '/make-batomv.jpeg' , '/make03.jpeg','/make-menina.jpg' , '/make04.jpeg'].map((img, i) => (
-              <article key={i} className="glass-card neon-hover rounded-2xl overflow-hidden aspect-square border border-[#DCAE96]/20 group cursor-pointer relative">
-                <Image src={img} alt="Maquiagem Profissional" fill sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw" className="object-cover transition-transform duration-700 group-hover:scale-110" />
-              </article>
-            ))}
-          </div>
-
-          <div className="pt-16 border-t border-[#3a2522]">
-            <div className="text-center mb-10">
-              <span className="glow-text text-sm font-bold uppercase tracking-widest">O Poder da Maquiagem</span>
-              <h3 className="font-serif text-3xl md:text-4xl text-white mt-2">Antes & Depois</h3>
-              <p className="text-gray-400 text-sm mt-3 font-light">Arraste a linha para ver a transformação completa.</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <AntesEDepoisSlider antesSrc="/make-antes1.jpeg" depoisSrc="/make-depois1.jpeg" />
-              <AntesEDepoisSlider antesSrc="/make-antes2.jpeg" depoisSrc="/make-depois2.jpeg" />
-            </div>
-          </div>
-          
-        </div>
-      </section>
-
-      <section id="espaco" className="py-24 px-6 relative z-10">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
-            <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
-            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group relative">
-               <Image src="/cadeiras.png" alt="Interior do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
-            </div>
-            <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
-               <video autoPlay loop muted playsInline className="w-full h-full object-cover">
-                  <source src="/espaco.mp4" type="video/mp4" />
-               </video>
-            </div>
-            <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group relative">
-               <Image src="/mesa.png" alt="Detalhe do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
-            </div>
-          </div>
-
-          <div className="order-1 lg:order-2 text-center lg:text-left">
-            <span className="glow-text text-xs md:text-sm font-bold uppercase tracking-widest mb-2 block">Onde a Mágica Acontece</span>
-            <h2 className="font-serif text-4xl md:text-5xl text-white mb-6">Seu momento de <span className="text-[#F8D1BE] italic">paz e luxo.</span></h2>
-            <p className="text-gray-400 text-sm md:text-lg mb-10 leading-relaxed font-light px-4 lg:px-0">
-              Muito mais do que fazer as unhas, oferecemos uma experiência de relaxamento completa. 
-              Nosso ateliê foi projetado para ser o seu refúgio da rotina corrida, com atendimento pontual e exclusivo.
-            </p>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-10 px-4 lg:px-0 text-left">
-              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
-                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Coffee className="text-[#C7977D]" size={18}/></div>
-                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Menu de Bebidas</span>
-              </div>
-              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
-                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Wifi className="text-[#C7977D]" size={18}/></div>
-                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Wi-Fi Exclusivo</span>
-              </div>
-              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
-                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><CarFront className="text-[#C7977D]" size={18}/></div>
-                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Estacionamento</span>
-              </div>
-              <div className="flex items-center gap-3 bg-[#120308] p-3 rounded-xl border border-[#3a2522]">
-                <div className="w-10 h-10 rounded-full bg-[#0a0204] flex items-center justify-center shrink-0"><Wind className="text-[#C7977D]" size={18}/></div>
-                <span className="text-[#E8D3C8] font-medium text-xs md:text-sm">Climatização</span>
-              </div>
-            </div>
-
-            <div className="glass-card p-5 md:p-6 rounded-[24px] border border-[#DCAE96]/20 shadow-xl mx-4 lg:mx-0 text-left">
-              <h3 className="text-white font-bold mb-2 flex items-center gap-2 text-sm md:text-base"><MapPin className="text-[#C7977D]" size={18}/> Madalena Ateliê de Beleza</h3>
-              <p className="text-gray-400 text-xs md:text-sm mb-4">Rua Fritz Hasse, 38 - Centro<br/>Jaraguá do Sul - SC, 89251-180</p>
-              <div className="h-40 md:h-48 rounded-xl overflow-hidden border border-[#DCAE96]/10">
-                 <iframe 
-                  src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3570.9757661162407!2d-49.07930872662806!3d-26.4887251245534!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x94de953cae7f01db%3A0x3b361fd6e7bd4a66!2sMadalena%20Ateli%C3%AA%20de%20Beleza!5e0!3m2!1spt-BR!2sbr!4v1785889183146!5m2!1spt-BR!2sbr" 
-                  width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"
-                  className="filter invert-[.9] hue-rotate-180 opacity-80"
-                ></iframe>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="py-20 px-6 max-w-3xl mx-auto relative z-10 border-t border-[#3a2522]">
-        <div className="text-center mb-10">
-          <span className="glow-text text-sm font-bold uppercase tracking-widest">FAQ</span>
-          <h2 className="font-serif text-3xl md:text-4xl text-white mt-2">Dúvidas Frequentes</h2>
-        </div>
-        <div className="space-y-4">
-          {[
-            { q: "Quanto tempo demora a aplicação da fibra?", a: "O procedimento leva em média de 2h a 2h30. Esse tempo é necessário para a preparação minuciosa e o acabamento impecável." },
-            { q: "Quanto tempo demora o Banho de gel e Esmaltação?", a: "A esmaltação leva de 1h a 1h30. O banho de gel em média de 1h30 a 2h15, dependendo da necessidade da unha natural." },
-            { q: "Quais os tipos de alongamento?", a: "Trabalhamos com técnica em molde F1 e Fibra de Vidro." },
-            { q: "Quanto tempo dura a esmaltação em gel?", a: "De 15 a 20 dias, dependendo do cuidado prestado. Para o Banho de gel, de 21 a 25 dias." },
-            { q: "Quais as formas de pagamento aceitas?", a: "Aceitamos pagamentos via PIX, cartão de crédito, débito e dinheiro." },
-          ].map((faq, index) => (
-            <article key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
-              <button onClick={() => setFaqAberto(faqAberto === index ? null : index)} className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors">
-                {faq.q}
-                <ChevronDown className={`transition-transform duration-300 shrink-0 ml-4 ${faqAberto === index ? 'rotate-180 text-[#C7977D]' : 'text-gray-500'}`} />
-              </button>
-              <div className={`px-4 md:px-6 overflow-hidden transition-all duration-300 ${faqAberto === index ? 'max-h-40 pb-4 md:pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
-                <p className="text-gray-400 text-sm md:text-base leading-relaxed font-light">{faq.a}</p>
-              </div>
-            </article>
-          ))}
-        </div>
-      </section>
+      <Portfolio />
+      <Espaco />
+      <FAQ />
 
       <section className="py-24 px-6 relative z-10 border-t border-[#3a2522] bg-[#0a0204]">
         <div className="max-w-4xl mx-auto text-center">
@@ -1095,7 +876,6 @@ export default function LandingPage() {
         </div>
       )}
 
-      {/* 🛡️ MODAL DE DETALHES (Agora com Persuasão VIP para Pacotes) */}
       {servicoDetalhe && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 backdrop-blur-md px-4 py-6">
           <div className="bg-[#120308] border border-[#3a2522] rounded-[32px] w-full max-w-sm overflow-hidden shadow-[0_0_50px_rgba(199,151,125,0.2)] flex flex-col animate-in zoom-in-95 max-h-full">
@@ -1119,7 +899,6 @@ export default function LandingPage() {
               
               <p className="text-gray-400 text-sm mb-6 leading-relaxed font-light">{servicoDetalhe.descricao}</p>
 
-              {/* 🛡️ CARTA DE VENDAS DENTRO DO MODAL PARA PACOTES */}
               {servicoDetalhe.is_pacote && (
                 <div className="bg-gradient-to-br from-[#2D0A12] to-[#180A0D] border border-[#DCAE96]/30 p-5 rounded-2xl mb-6 shadow-inner">
                   <h4 className="text-[#F8D1BE] font-serif text-lg mb-3 flex items-center gap-2"><Award size={18} className="text-[#C7977D]"/> Por que assinar o Clube VIP?</h4>
@@ -1162,7 +941,7 @@ export default function LandingPage() {
                 {step < 5 && <div className="bg-[#DCAE96] text-[#120308] w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs">{step}</div>}
                 <h2 className="text-sm md:text-base font-serif text-white">{step === 1 ? 'Escolha o Serviço' : step === 2 ? 'Data e Hora' : step === 3 ? 'Seus Dados' : step === 4 ? 'Pagamento Seguro' : 'Pronto!'}</h2>
               </div>
-              {step < 5 && <button onClick={() => { setIsModalOpen(false); setSessoesSelecionadas([]); }} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
+              {step < 5 && <button onClick={fecharModalECancelar} className="text-gray-500 hover:text-white bg-[#180A0D] p-1.5 rounded-full"><X size={16} /></button>}
             </div>
 
             <div className="p-6 overflow-y-auto custom-scrollbar flex-1 bg-[#120308]">
@@ -1317,7 +1096,7 @@ export default function LandingPage() {
                       </div>
                       <button onClick={async () => { 
                         setIsSalvandoDb(true);
-                        const dados = { clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
+                        const dados = { idsReservados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente };
                         const sucesso = await salvarAgendamentoOficial(dados);
                         if(sucesso) setStep(5);
                         setIsSalvandoDb(false);
@@ -1391,7 +1170,7 @@ export default function LandingPage() {
                         {metodoPagamento === 'cartao' && <div className="text-right"><p className="text-[10px] text-red-400 font-medium">R$ {calcularTaxaCartao(calcularTotalSinalEDivida()).toFixed(2).replace('.', ',')} de taxa inclusa</p></div>}
                       </div>
 
-                      <button onClick={processarPagamento} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
+                      <button onClick={() => processarPagamentoLocal(idsReservados)} disabled={isProcessando} className="w-full bg-[#00B1EA] text-white py-4 rounded-full font-bold flex justify-center items-center gap-2 hover:bg-[#0098C7] transition-all text-sm shadow-[0_0_20px_rgba(0,177,234,0.4)]">
                         {isProcessando ? <Loader2 className="animate-spin" size={20} /> : <><ShieldCheck size={18}/> Pagar Seguramente</>}
                       </button>
                     </>

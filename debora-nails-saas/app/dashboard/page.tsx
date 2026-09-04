@@ -193,7 +193,7 @@ export default function DashboardPage() {
   return (
     <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="mb-8">
-        <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><LayoutDashboard className="text-[#C7977D]" size={28} /> {saudacao}, Débora!</h1>
+        <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><LayoutDashboard className="text-[#C7977D]" size={28} /> {saudacao}, Debora!</h1>
         <p className="text-[#E8D3C8]">Aqui está a sua fila de produção para hoje.</p>
       </div>
 
