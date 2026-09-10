@@ -270,9 +270,11 @@ export default function AgendaPage() {
           
           const mensagem = `Oii, ${primeiroNome}! Tudo bem? ✨\n\nSeu agendamento de *${servicoInfo?.nome}* foi confirmado manualmente para o dia *${dataFormatada}* às *${horaEscolhida}*!\n\nTe esperamos no Debora Nails Studio. 💖`;
 
-          let numeroLimpo = clienteTelefone.replace(/\D/g, '');
-          if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-            numeroLimpo = '55' + numeroLimpo;
+          // 🛡️ CORREÇÃO DEFINITIVA DO WHATSAPP (Agendamento Novo)
+          let numeroLimpo = clienteTelefone.replace(/\D/g, ''); // Tira tudo que não é número
+          if (numeroLimpo.startsWith('0')) numeroLimpo = numeroLimpo.substring(1); // Tira o zero do início se tiver (ex: 047)
+          if (numeroLimpo.length >= 10 && !numeroLimpo.startsWith('55')) {
+            numeroLimpo = '55' + numeroLimpo; // Adiciona o 55 se estiver faltando
           }
 
           const response = await fetch('/api/whatsapp', {
@@ -367,9 +369,11 @@ export default function AgendaPage() {
           
           const mensagem = `Oii, ${primeiroNome}! ✨\n\nPassando para te avisar que seu horário de *${servicoNome}* foi REMARCADO com sucesso para o dia *${dataFormatada}* às *${novaHora}*.\n\nQualquer dúvida, é só nos chamar! 💖`;
 
-          let numeroLimpo = clienteRemarcado.telefone.replace(/\D/g, '');
-          if (numeroLimpo.length === 10 || numeroLimpo.length === 11) {
-            numeroLimpo = '55' + numeroLimpo;
+          // 🛡️ CORREÇÃO DEFINITIVA DO WHATSAPP (Remarcação)
+          let numeroLimpo = clienteRemarcado.telefone.replace(/\D/g, ''); 
+          if (numeroLimpo.startsWith('0')) numeroLimpo = numeroLimpo.substring(1); 
+          if (numeroLimpo.length >= 10 && !numeroLimpo.startsWith('55')) {
+            numeroLimpo = '55' + numeroLimpo; 
           }
 
           const response = await fetch('/api/whatsapp', {

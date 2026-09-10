@@ -53,7 +53,7 @@ export default function LandingPage() {
   const [tempoRestante, setTempoRestante] = useState(300);
   const [isProcessando, setIsProcessando] = useState(false);
   const [isSalvandoDb, setIsSalvandoDb] = useState(false);
-  const [idsReservados, setIdsReservados] = useState<number[]>([]); // 🚨 IDs dos cadeados da nossa vaga!
+  const [idsReservados, setIdsReservados] = useState<number[]>([]); 
 
   const [agendamentos, setAgendamentos] = useState<any[]>([]);
   const [configuracoes, setConfiguracoes] = useState<any>(null);
@@ -89,7 +89,6 @@ export default function LandingPage() {
       limiteFuturo.setDate(limiteFuturo.getDate() + 45); 
       const limiteFuturoStr = formatarDataLocalStr(limiteFuturo);
 
-      // 🚨 Puxamos o created_at para a inteligência dos 10 minutos
       const { data: agends } = await supabase
         .from('agendamentos')
         .select('id, inicio, fim, tipo, created_at')
@@ -124,7 +123,6 @@ export default function LandingPage() {
     return dias;
   }, [configuracoes]);
 
-  // 🛡️ OTIMIZAÇÃO: A MÁGICA DOS 10 MINUTOS
   const horariosLivres = useMemo(() => {
     if (!dataEscolhida || !servicoEscolhido || !configuracoes) return [];
 
@@ -152,10 +150,9 @@ export default function LandingPage() {
       const fimMin = minAtual + duracaoServicoMin;
 
       const conflitoAgendamento = agendsDoDia.some(a => {
-        // Se a vaga for pendente de pagamento, só oculta se foi clicada há menos de 10 min.
         if (a.tipo === 'pendente_pagamento') {
           const idadeEmMinutos = (new Date().getTime() - new Date(a.created_at).getTime()) / 60000;
-          if (idadeEmMinutos > 10) return false; // Vaga expirada volta a aparecer!
+          if (idadeEmMinutos > 10) return false; 
         }
         
         const dInicio = new Date(a.inicio); const dFim = new Date(a.fim);
@@ -267,7 +264,6 @@ export default function LandingPage() {
     }, 300); 
   }, []);
 
-  // O cancelamento automático se o tempo acabar!
   const cancelarVagaExpirada = async () => {
     if (idsReservados.length > 0) {
       await supabase.from('agendamentos').update({ tipo: 'cancelado' }).in('id', idsReservados);
@@ -279,7 +275,7 @@ export default function LandingPage() {
     if (step === 4 && tempoRestante > 0) {
       timer = setInterval(() => setTempoRestante(prev => prev - 1), 1000);
     } else if (step === 4 && tempoRestante === 0) {
-      cancelarVagaExpirada(); // Libera a vaga
+      cancelarVagaExpirada(); 
       alert("O tempo limite para pagamento expirou. A vaga foi liberada para outras clientes.");
       setIsModalOpen(false);
       setStep(1);
@@ -347,7 +343,7 @@ export default function LandingPage() {
   };
 
   const fecharModalECancelar = () => {
-    if (step === 4) cancelarVagaExpirada(); // Libera se ela fechar no X
+    if (step === 4) cancelarVagaExpirada(); 
     setIsModalOpen(false);
     setSessoesSelecionadas([]);
   };
@@ -413,16 +409,31 @@ export default function LandingPage() {
   const calcularTaxaCartao = (valorBase: number) => valorBase * 0.05;
   const valorTotalCobrar = metodoPagamento === 'cartao' ? calcularTotalSinalEDivida() + calcularTaxaCartao(calcularTotalSinalEDivida()) : calcularTotalSinalEDivida();
 
-  // 🚨 AQUI O CADEADO É COLOCADO NA VAGA!
+  // 🛡️ MÁGICA DA SANITIZAÇÃO DIRETO NA ORIGEM
   const validarEAvancarPagamento = async () => {
     if (isProcessando) return;
     setIsProcessando(true);
     let dividaAtual = 0;
 
     try {
+      // 1. Limpeza profunda do número da cliente (Impede números bugados ou duplicados)
       let numeroLimpo = clienteDados.telefone.replace(/\D/g, '');
-      if (numeroLimpo.length >= 10) {
-        if (numeroLimpo.length === 10 || numeroLimpo.length === 11) numeroLimpo = '55' + numeroLimpo;
+      
+      if (numeroLimpo.startsWith('550')) {
+          numeroLimpo = '55' + numeroLimpo.substring(3); // Se botou DDI mas incluiu zero do DDD
+      }
+      if (numeroLimpo.startsWith('0')) {
+          numeroLimpo = numeroLimpo.substring(1); // Arranca 0 do DDD
+      }
+      if (numeroLimpo.length >= 10 && !numeroLimpo.startsWith('55')) {
+          numeroLimpo = '55' + numeroLimpo; // Adiciona 55 se faltar
+      }
+      
+      // 2. Salva o número perfeito no estado pra o sistema inteiro já ler correto
+      const clienteSanitizado = { ...clienteDados, telefone: numeroLimpo };
+      setClienteDados(clienteSanitizado);
+
+      if (numeroLimpo.length >= 12) {
         const { data: cli } = await supabase.from('clientes').select('divida_pendente').eq('telefone', numeroLimpo).limit(1).single();
         if (cli && cli.divida_pendente > 0) dividaAtual = cli.divida_pendente;
       }
@@ -434,10 +445,10 @@ export default function LandingPage() {
       }));
       const duracaoMins = extrairMinutosDuracao(servicoEscolhido.duracao);
 
-      // Bate na API para pedir o Bloqueio da Vaga!
+      // Bate na API já com o 'clienteSanitizado'
       const resBloqueio = await fetch('/api/bloquear-vaga', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clienteDados, servicoEscolhido, sessoesSelecionadas: sessoesMapeadas, duracaoMins })
+        body: JSON.stringify({ clienteDados: clienteSanitizado, servicoEscolhido, sessoesSelecionadas: sessoesMapeadas, duracaoMins })
       });
 
       if (resBloqueio.status === 409) {
@@ -452,14 +463,13 @@ export default function LandingPage() {
 
       const dataBloqueio = await resBloqueio.json();
       const idsAprovados = dataBloqueio.idsReservados;
-      setIdsReservados(idsAprovados); // Guardou no bolso!
+      setIdsReservados(idsAprovados); 
       
       if (calcularSinalBase() > 0 || dividaAtual > 0) {
         setStep(4);
-        processarPagamentoLocal(idsAprovados); 
+        processarPagamentoLocal(idsAprovados, clienteSanitizado); 
       } else {
-        // Se for de graça (sem sinal e sem dívida), já finaliza o cofre na hora
-        await salvarAgendamentoOficial({ idsReservados: idsAprovados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente });
+        await salvarAgendamentoOficial({ idsReservados: idsAprovados, clienteDados: clienteSanitizado, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente });
         setStep(5);
         setIsProcessando(false);
       }
@@ -468,7 +478,7 @@ export default function LandingPage() {
     }
   };
 
-  const processarPagamentoLocal = async (idsAprovados: number[]) => {
+  const processarPagamentoLocal = async (idsAprovados: number[], dadosCliente: any = clienteDados) => {
     if (metodoPagamento === 'pix') {
       try {
         const res = await fetch('/api/pagamento-monitor', {
@@ -492,11 +502,11 @@ export default function LandingPage() {
       }
 
     } else {
-      localStorage.setItem('reserva_temp_debora', JSON.stringify({ idsReservados: idsAprovados, clienteDados, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
+      localStorage.setItem('reserva_temp_debora', JSON.stringify({ idsReservados: idsAprovados, clienteDados: dadosCliente, servicoEscolhido, sessoesSelecionadas, metodoPagamento, dividaPendente }));
       try {
         const resposta = await fetch('/api/pagamento', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalCobrar, clienteNome: clienteDados.nome })
+          body: JSON.stringify({ titulo: servicoEscolhido.nome, preco: valorTotalCobrar, clienteNome: dadosCliente.nome })
         });
         const data = await resposta.json();
         if (data.init_point) window.location.href = data.init_point;
