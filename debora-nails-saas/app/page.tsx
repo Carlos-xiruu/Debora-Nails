@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { ArrowRight, MapPin, MessageCircle } from 'lucide-react';
 import Espaco from './components/Espaco';
+import ExperienceTimeline from './components/ExperienceTimeline';
 import FAQ from './components/FAQ';
 import Portfolio from './components/Portfolio';
 import SiteHeader from './components/SiteHeader';
@@ -36,8 +37,12 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="hero-media">
+        <div className="hero-media has-glow">
           <div className="hero-float-wrapper">
+            <div className="hero-portrait">
+              <Image src="/debora.jpg" alt="Débora Silva, nail designer" fill priority sizes="(max-width: 1023px) 100vw, 42vw" className="object-cover object-[50%_25%]" />
+              <div className="hero-portrait-caption"><span>Debora Nails</span><strong>Beauty Studio</strong></div>
+            </div>
             <div className="glass-card profile-card">
               <div className="profile-photo-wrap"><Image src="/fotonova.jpeg" alt="Débora Silva" width={64} height={64} /></div>
               <div className="profile-details"><strong>Débora Silva</strong><span>Nail designer & maquiadora</span></div>
@@ -57,6 +62,7 @@ export default function Home() {
 
       <Sobre />
       <ServicesShowcase />
+      <ExperienceTimeline />
       <Portfolio />
       <Espaco />
       <FAQ />

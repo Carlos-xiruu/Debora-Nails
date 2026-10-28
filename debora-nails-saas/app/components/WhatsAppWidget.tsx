@@ -24,6 +24,7 @@ export default function WhatsAppWidget() {
             <strong>Oii! 👋🏼</strong>
           </div>
           <p>Ficou com alguma dúvida ou não encontrou o horário ideal? Fale comigo no WhatsApp e eu vou te ajudar.</p>
+          <a href={whatsappUrl} target="_blank" rel="noreferrer">Conversar agora</a>
         </aside>
       )}
       <a href={whatsappUrl} target="_blank" rel="noreferrer" className="whatsapp-launcher" aria-label="Conversar com a Débora pelo WhatsApp">
