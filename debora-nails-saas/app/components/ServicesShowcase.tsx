@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Clock3, ImageOff, MessageCircle, Sparkles } from 'lucide-react';
 import { servicesStorageBucket, supabase, supabaseUrl } from '../lib/supabase';
 
@@ -78,42 +78,56 @@ const getServiceImage = (service: Service) => {
 
 export default function ServicesShowcase() {
   const [services, setServices] = useState<Service[]>([]);
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!supabase) {
-      setStatus('error');
-      return;
-    }
-    const client = supabase;
+    const section = sectionRef.current;
+    if (!section) return;
+
     let isMounted = true;
+    const observer = new IntersectionObserver(([entry]) => {
+      if (!entry.isIntersecting) return;
+      observer.disconnect();
 
-    const loadServices = async () => {
-      const { data, error } = await client
-        .from('servicos')
-        .select('*')
-        .eq('ativo', true)
-        .order('preco', { ascending: true });
-
-      if (!isMounted) return;
-      if (error) {
+      if (!supabase) {
         setStatus('error');
         return;
       }
 
-      setServices((data ?? []) as Service[]);
-      setStatus('ready');
-    };
+      const client = supabase;
+      setStatus('loading');
+      const loadServices = async () => {
+        const { data, error } = await client
+          .from('servicos')
+          .select('id,nome,descricao,duracao,preco,imagens,is_pacote')
+          .eq('ativo', true)
+          .order('preco', { ascending: true });
 
-    void loadServices();
-    return () => { isMounted = false; };
+        if (!isMounted) return;
+        if (error) {
+          setStatus('error');
+          return;
+        }
+
+        setServices((data ?? []) as Service[]);
+        setStatus('ready');
+      };
+      void loadServices();
+    }, { rootMargin: '320px 0px' });
+
+    observer.observe(section);
+    return () => {
+      isMounted = false;
+      observer.disconnect();
+    };
   }, []);
 
   const individualServices = services.filter((service) => !service.is_pacote);
   const packages = services.filter((service) => service.is_pacote);
 
   return (
-    <section id="servicos" className="services-section">
+    <section id="servicos" className="services-section" ref={sectionRef}>
       <div className="services-container">
         <div className="services-heading">
           <span className="services-eyebrow"><Sparkles size={14} /> Especialidades</span>
@@ -159,7 +173,7 @@ function ServiceCard({ service, isPackage = false }: { service: Service; isPacka
     <article className={`premium-service-card${isPackage ? ' premium-service-card-package' : ''}`}>
       <div className="service-media">
         {image && !imageFailed ? (
-          <img src={image} alt={service.nome} className="service-image" loading="lazy" onError={() => setImageFailed(true)} />
+          <img src={image} alt={service.nome} className="service-image" loading="lazy" decoding="async" fetchPriority="low" onError={() => setImageFailed(true)} />
         ) : (
           <div className="service-image-fallback" role="img" aria-label={`Imagem indisponível para ${service.nome}`}>
             <ImageOff size={25} strokeWidth={1.4} />

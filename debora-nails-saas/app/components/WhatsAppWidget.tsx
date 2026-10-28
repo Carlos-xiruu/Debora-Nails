@@ -21,7 +21,7 @@ export default function WhatsAppWidget() {
           <button className="whatsapp-greeting-close" type="button" onClick={() => setIsGreetingVisible(false)} aria-label="Fechar mensagem de boas-vindas"><X size={14} /></button>
           <div className="whatsapp-greeting-heading">
             <Image src="/debora.card.PNG" width={46} height={46} alt="Débora" />
-            <strong>Oii! 👋🏼</strong>
+            <strong>Oi, posso ajudar?</strong>
           </div>
           <p>Ficou com alguma dúvida ou não encontrou o horário ideal? Fale comigo no WhatsApp e eu vou te ajudar.</p>
           <a href={whatsappUrl} target="_blank" rel="noreferrer">Conversar agora</a>

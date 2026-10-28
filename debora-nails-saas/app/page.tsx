@@ -21,41 +21,25 @@ export default function Home() {
 
       <section id="inicio" className="hero-section">
         <div className="hero-content">
-          <span className="hero-tag glow-text">Jaraguá do Sul, SC</span>
-          <h1>Beleza refinada,<br /><em>detalhes inesquecíveis.</em></h1>
-          <p className="hero-description">Unhas e maquiagem para mulheres que enxergam o autocuidado como uma experiência de luxo, leveza e autenticidade.</p>
+          <span className="hero-tag glow-text">Beauty studio · Jaraguá do Sul</span>
+          <h1>O luxo está<br /><em>nos detalhes.</em></h1>
+          <p className="hero-description">Uma experiência de beleza criada para você, com técnica, presença e um cuidado que respeita o seu tempo.</p>
           <div className="hero-actions">
             <a className="social-button main-action-button" href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer">
-              Agendar pelo WhatsApp <ArrowRight size={18} />
+              Reservar meu horário <ArrowRight size={18} />
             </a>
             <a className="social-button secondary-action-button" href="#servicos">Conhecer serviços</a>
           </div>
-          <div className="hero-stats" aria-label="Diferenciais do studio">
-            <span><strong>6+ anos</strong>de experiência</span>
-            <span><strong>Atendimento</strong>individualizado</span>
-            <span><strong>Detalhes</strong>pensados para você</span>
-          </div>
+          <a className="hero-scroll-cue" href="#sobre"><span aria-hidden="true" />Conheça a experiência</a>
         </div>
 
         <div className="hero-media has-glow">
           <div className="hero-float-wrapper">
-            <div className="hero-portrait">
+            <div className="hero-portrait hero-portrait-frame">
               <Image src="/debora.jpg" alt="Débora Silva, nail designer" fill priority sizes="(max-width: 1023px) 100vw, 42vw" className="object-cover object-[50%_25%]" />
               <div className="hero-portrait-caption"><span>Debora Nails</span><strong>Beauty Studio</strong></div>
             </div>
-            <div className="glass-card profile-card">
-              <div className="profile-photo-wrap"><Image src="/fotonova.jpeg" alt="Débora Silva" width={64} height={64} /></div>
-              <div className="profile-details"><strong>Débora Silva</strong><span>Nail designer & maquiadora</span></div>
-              <span className="status-tag"><i className="dot" /> Atendimento exclusivo</span>
-            </div>
-            <div className="glass-card concept-window">
-              <div className="concept-topbar"><span /><span /><span /><strong>DEBORA NAILS</strong></div>
-              <div className="concept-body">
-                <p className="concept-badge">Sua pausa de beleza</p>
-                <h3>Um atendimento pensado para você.</h3>
-                <p>Escolha seu serviço e converse diretamente comigo para encontrar o melhor horário.</p>
-              </div>
-            </div>
+            <div className="hero-note"><span>Atendimento</span><strong>exclusivo e personalizado</strong></div>
           </div>
         </div>
       </section>
