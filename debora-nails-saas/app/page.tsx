@@ -22,11 +22,11 @@ export default function Home() {
       <section id="inicio" className="hero-section">
         <div className="hero-content">
           <span className="hero-tag glow-text">Beauty studio · Jaraguá do Sul</span>
-          <h1>O luxo está<br /><em>nos detalhes.</em></h1>
-          <p className="hero-description">Uma experiência de beleza criada para você, com técnica, presença e um cuidado que respeita o seu tempo.</p>
+          <h1>Seu momento de<br /><em>se sentir bem.</em></h1>
+          <p className="hero-description">Unhas, maquiagem e aquele cuidado especial que faz toda a diferença no seu dia.</p>
           <div className="hero-actions">
             <a className="social-button main-action-button" href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer">
-              Reservar meu horário <ArrowRight size={18} />
+              Agendar meu horário <ArrowRight size={18} />
             </a>
             <a className="social-button secondary-action-button" href="#servicos">Conhecer serviços</a>
           </div>
@@ -39,7 +39,7 @@ export default function Home() {
               <Image src="/debora.jpg" alt="Débora Silva, nail designer" fill priority sizes="(max-width: 1023px) 100vw, 42vw" className="object-cover object-[50%_25%]" />
               <div className="hero-portrait-caption"><span>Debora Nails</span><strong>Beauty Studio</strong></div>
             </div>
-            <div className="hero-note"><span>Atendimento</span><strong>exclusivo e personalizado</strong></div>
+            <div className="hero-note"><span>Atendimento</span><strong>com cuidado em cada detalhe</strong></div>
           </div>
         </div>
       </section>

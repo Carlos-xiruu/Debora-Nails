@@ -57,14 +57,30 @@ function PortfolioRail({ title, images, aspect, onSelect }: { title: string; ima
 
 export default function Portfolio() {
   const [selectedImage, setSelectedImage] = useState<{ src: string; alt: string } | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => {
+    if (!selectedImage) return;
+
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const previousOverflow = document.body.style.overflow;
+    const manageDialogKeys = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setSelectedImage(null);
+      if (event.key === 'Tab') {
+        event.preventDefault();
+        closeButtonRef.current?.focus();
+      }
     };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, []);
+    window.addEventListener('keydown', manageDialogKeys);
+    document.body.style.overflow = 'hidden';
+    closeButtonRef.current?.focus();
+
+    return () => {
+      window.removeEventListener('keydown', manageDialogKeys);
+      document.body.style.overflow = previousOverflow;
+      previousFocus?.focus();
+    };
+  }, [selectedImage]);
 
   return (
     <section id="portfolio" className="portfolio-section">
@@ -93,7 +109,7 @@ export default function Portfolio() {
 
       {selectedImage && (
         <div className="portfolio-lightbox" role="dialog" aria-modal="true" aria-label={selectedImage.alt} onClick={() => setSelectedImage(null)}>
-          <button className="portfolio-lightbox-close" type="button" aria-label="Fechar imagem ampliada" onClick={() => setSelectedImage(null)}><X size={22} /></button>
+          <button ref={closeButtonRef} className="portfolio-lightbox-close" type="button" aria-label="Fechar imagem ampliada" onClick={() => setSelectedImage(null)}><X size={22} /></button>
           <div className="portfolio-lightbox-image" onClick={(event) => event.stopPropagation()}>
             <Image src={selectedImage.src} alt={selectedImage.alt} fill sizes="100vw" className="object-contain" priority />
           </div>

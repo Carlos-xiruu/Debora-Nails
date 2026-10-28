@@ -23,12 +23,12 @@ export default function Espaco() {
           <h2>Seu momento de<br /><em>paz e beleza.</em></h2>
           <p>
             Muito mais do que fazer as unhas, oferecemos uma experiência de relaxamento completa. 
-            Nosso ateliê foi projetado para ser o seu refúgio da rotina corrida, com atendimento pontual e exclusivo.
+            Nosso ateliê foi pensado para ser uma pausa gostosa na rotina, com atendimento cuidadoso e feito com atenção.
           </p>
           
           <div className="space-amenities">
             <div><i><Coffee size={18}/></i><span>Menu de bebidas</span></div>
-            <div><i><Wifi size={18}/></i><span>Wi-Fi exclusivo</span></div>
+            <div><i><Wifi size={18}/></i><span>Wi-Fi disponível</span></div>
             <div><i><CarFront size={18}/></i><span>Estacionamento</span></div>
             <div><i><Wind size={18}/></i><span>Climatização</span></div>
           </div>
@@ -42,7 +42,8 @@ export default function Espaco() {
                   width="100%" height="100%" style={{ border: 0 }} allowFullScreen loading="lazy" referrerPolicy="no-referrer-when-downgrade"
                 ></iframe>
              </div>
-            </div>
+             <a className="space-directions" href="https://www.google.com/maps/dir/?api=1&destination=Rua+Fritz+Hasse,+38,+Jaragu%C3%A1+do+Sul,+SC,+89251-180" target="_blank" rel="noreferrer">Como chegar</a>
+             </div>
         </div>
       </div>
     </section>

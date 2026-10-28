@@ -22,8 +22,8 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: 'Debora Nails | Alongamentos de Alto Padrão & Maquiagem',
-  description: 'Design, durabilidade e sofisticação para as suas unhas e produções exclusivas em Jaraguá do Sul.',
+  title: 'Debora Nails | Unhas e Maquiagem em Jaraguá do Sul',
+  description: 'Unhas, maquiagem e cuidado em cada detalhe para você se sentir bem em Jaraguá do Sul.',
   manifest: '/manifest-landing.json',
   alternates: { canonical: 'https://deboranails.com.br' },
   robots: { index: true, follow: true },
@@ -39,8 +39,8 @@ export const metadata: Metadata = {
     icon: '/favicon.ico',
   },
   openGraph: {
-    title: 'Debora Nails | Studio de Alto Padrão',
-    description: 'Design, durabilidade e sofisticação. Agende sua experiência exclusiva.',
+    title: 'Debora Nails | Unhas e Maquiagem',
+    description: 'Unhas, maquiagem e cuidado em cada detalhe. Agende seu horário.',
     url: 'https://deboranails.com.br',
     images: [
       {
@@ -55,8 +55,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Debora Nails | Studio de Alto Padrão',
-    description: 'Design, durabilidade e sofisticação para suas unhas e produções exclusivas.',
+    title: 'Debora Nails | Unhas e Maquiagem',
+    description: 'Unhas, maquiagem e cuidado em cada detalhe.',
     images: ['/metadados.png'],
   },
 };

@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function SpaceVideo() {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [showControls, setShowControls] = useState(false);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -14,10 +15,9 @@ export default function SpaceVideo() {
     const syncPlayback = (isVisible: boolean) => {
       if (reducedMotion.matches || !isVisible) {
         video.pause();
+        if (reducedMotion.matches) setShowControls(true);
       } else {
-        void video.play().catch(() => {
-          // Browsers that block autoplay keep the first frame visible.
-        });
+        void video.play().then(() => setShowControls(false)).catch(() => setShowControls(true));
       }
     };
 
@@ -40,8 +40,9 @@ export default function SpaceVideo() {
   }, []);
 
   return (
-    <video ref={videoRef} loop muted playsInline preload="none" poster="/capa.PNG" aria-label="Vídeo do ambiente do ateliê" className="w-full h-full object-cover">
+    <video ref={videoRef} autoPlay loop muted playsInline preload="metadata" poster="/capa.PNG" controls={showControls} onError={() => setShowControls(true)} aria-label="Vídeo do ambiente do ateliê" className="w-full h-full object-cover">
       <source src="/espaco.mp4" type="video/mp4" />
+      Seu navegador não suporta a reprodução deste vídeo.
     </video>
   );
 }
