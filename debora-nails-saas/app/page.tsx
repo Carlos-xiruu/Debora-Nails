@@ -3,6 +3,7 @@ import { ArrowRight, MapPin, MessageCircle } from 'lucide-react';
 import Espaco from './components/Espaco';
 import FAQ from './components/FAQ';
 import Portfolio from './components/Portfolio';
+import SiteHeader from './components/SiteHeader';
 import Sobre from './components/Sobre';
 import ServicesShowcase from './components/ServicesShowcase';
 
@@ -14,20 +15,7 @@ export default function Home() {
     <main className="site-shell">
       <div className="ambient-grid" aria-hidden="true" />
 
-      <header className="site-header">
-        <div className="header-inner">
-          <a className="brand" href="#inicio" aria-label="Debora Nails, início">
-            <Image src="/logo.PNG" alt="Debora Nails" width={46} height={46} priority />
-            <span><strong>Debora Nails</strong><small>Beauty Studio</small></span>
-          </a>
-          <nav className="nav-links" aria-label="Navegação principal">
-            <a href="#servicos">Serviços</a>
-            <a href="#portfolio">Portfólio</a>
-            <a href="#espaco">O espaço</a>
-            <a href="#sobre">Sobre</a>
-          </nav>
-        </div>
-      </header>
+      <SiteHeader />
 
       <section id="inicio" className="hero-section">
         <div className="hero-content">
@@ -43,7 +31,7 @@ export default function Home() {
           <div className="hero-stats" aria-label="Diferenciais do studio">
             <span><strong>6+ anos</strong>de experiência</span>
             <span><strong>Atendimento</strong>individualizado</span>
-            <span><strong>Premium</strong>em cada detalhe</span>
+            <span><strong>Detalhes</strong>pensados para você</span>
           </div>
         </div>
 
@@ -52,7 +40,7 @@ export default function Home() {
             <div className="glass-card profile-card">
               <div className="profile-photo-wrap"><Image src="/fotonova.jpeg" alt="Débora Silva" width={64} height={64} /></div>
               <div className="profile-details"><strong>Débora Silva</strong><span>Nail designer & maquiadora</span></div>
-              <span className="status-tag"><i className="dot" /> Agenda aberta</span>
+              <span className="status-tag"><i className="dot" /> Atendimento exclusivo</span>
             </div>
             <div className="glass-card concept-window">
               <div className="concept-topbar"><span /><span /><span /><strong>DEBORA NAILS</strong></div>

@@ -23,11 +23,18 @@ export default function FAQ() {
       <div className="space-y-4">
         {faqs.map((faq, index) => (
           <article key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
-            <button onClick={() => setFaqAberto(faqAberto === index ? null : index)} className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors">
+            <button
+              type="button"
+              id={`faq-question-${index}`}
+              aria-expanded={faqAberto === index}
+              aria-controls={`faq-answer-${index}`}
+              onClick={() => setFaqAberto(faqAberto === index ? null : index)}
+              className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors"
+            >
               {faq.q}
               <ChevronDown className={`transition-transform duration-300 shrink-0 ml-4 ${faqAberto === index ? 'rotate-180 text-[#C7977D]' : 'text-gray-500'}`} />
             </button>
-            <div className={`px-4 md:px-6 overflow-hidden transition-all duration-300 ${faqAberto === index ? 'max-h-40 pb-4 md:pb-6 opacity-100' : 'max-h-0 opacity-0'}`}>
+            <div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} hidden={faqAberto !== index} className="px-4 md:px-6 pb-4 md:pb-6">
               <p className="text-gray-400 text-sm md:text-base leading-relaxed font-light">{faq.a}</p>
             </div>
           </article>

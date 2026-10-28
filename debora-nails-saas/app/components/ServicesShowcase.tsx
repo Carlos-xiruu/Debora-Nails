@@ -31,6 +31,12 @@ const formatPrice = (price: Service['preco']) => {
     : null;
 };
 
+const displayDescription = (description: Service['descricao'], price: string | null) => {
+  if (!description || !price) return description;
+  const cleanDescription = description.replaceAll(price, '').replace(/\s{2,}/g, ' ').replace(/\s+([,.!])/g, '$1').trim();
+  return cleanDescription || undefined;
+};
+
 const absoluteUrl = (value: string) => {
   try {
     const url = new URL(value);
@@ -140,6 +146,7 @@ export default function ServicesShowcase() {
 
 function ServiceCard({ service, isPackage = false }: { service: Service; isPackage?: boolean }) {
   const price = formatPrice(service.preco);
+  const description = displayDescription(service.descricao, price);
   const image = getServiceImage(service);
   const [imageFailed, setImageFailed] = useState(false);
   const action = isPackage
@@ -165,7 +172,7 @@ function ServiceCard({ service, isPackage = false }: { service: Service; isPacka
           <h3>{service.nome}</h3>
           {service.duracao && <span className="service-time"><Clock3 size={15} /> {service.duracao}</span>}
         </div>
-        {service.descricao && <p>{service.descricao}</p>}
+        {description && <p>{description}</p>}
         <a className="service-whatsapp-button" href={whatsappUrl(action)} target="_blank" rel="noreferrer">
           <MessageCircle size={18} /> {isPackage ? 'Tenho interesse' : 'Agendar pelo WhatsApp'} <ArrowRight size={17} />
         </a>
