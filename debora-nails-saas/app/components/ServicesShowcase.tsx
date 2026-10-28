@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowRight, Check, Clock3, Crown, Sparkles } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { ArrowRight, Clock3, ImageOff, MessageCircle, Sparkles } from 'lucide-react';
+import { servicesStorageBucket, supabase, supabaseUrl } from '../lib/supabase';
 
 type Service = {
   id: string | number;
@@ -10,14 +10,19 @@ type Service = {
   descricao?: string | null;
   duracao?: string | null;
   preco?: number | string | null;
-  imagem_url?: string | null;
-  foto_url?: string | null;
-  imagem?: string | null;
   is_pacote?: boolean | null;
+  [key: string]: unknown;
 };
+
+type ImageReference = { bucket?: string; path: string };
+
+const imageFields = ['imagem_url', 'foto_url', 'imagem', 'image_url', 'image', 'imagem_path', 'foto_path', 'image_path'];
+const bucketFields = ['imagem_bucket', 'foto_bucket', 'image_bucket', 'bucket'];
 
 const whatsappUrl = (message: string) =>
   `https://wa.me/5547996987519?text=${encodeURIComponent(message)}`;
+
+const readText = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
 
 const formatPrice = (price: Service['preco']) => {
   const value = typeof price === 'string' ? Number(price.replace(',', '.')) : price;
@@ -26,18 +31,54 @@ const formatPrice = (price: Service['preco']) => {
     : null;
 };
 
-const serviceImage = (service: Service) => service.imagem_url || service.foto_url || service.imagem;
+const absoluteUrl = (value: string) => {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const storageReference = (value: string): ImageReference | undefined => {
+  if (!value.startsWith('storage://')) return undefined;
+  const [bucket, ...path] = value.slice('storage://'.length).split('/');
+  return bucket && path.length ? { bucket, path: path.join('/') } : undefined;
+};
+
+const getServiceImage = (service: Service) => {
+  const value = imageFields.map((field) => readText(service[field])).find(Boolean);
+  if (!value) return undefined;
+
+  const url = absoluteUrl(value);
+  if (url) return url;
+
+  if (/^\/?storage\/v1\/object\/(?:public|sign)\//.test(value) && supabaseUrl) {
+    return new URL(value.startsWith('/') ? value : `/${value}`, supabaseUrl).toString();
+  }
+
+  const reference = storageReference(value);
+  const bucket = reference?.bucket ?? bucketFields.map((field) => readText(service[field])).find(Boolean) ?? servicesStorageBucket;
+  if (!bucket || !supabase) return undefined;
+
+  let path = reference?.path ?? value.replace(/^\/+/, '');
+  if (path.startsWith(`${bucket}/`)) path = path.slice(bucket.length + 1);
+  if (!path) return undefined;
+
+  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+};
 
 export default function ServicesShowcase() {
   const [services, setServices] = useState<Service[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   useEffect(() => {
     if (!supabase) {
-      setIsLoading(false);
+      setStatus('error');
       return;
     }
     const client = supabase;
+    let isMounted = true;
 
     const loadServices = async () => {
       const { data, error } = await client
@@ -46,92 +87,104 @@ export default function ServicesShowcase() {
         .eq('ativo', true)
         .order('preco', { ascending: true });
 
-      if (!error) setServices((data ?? []) as Service[]);
-      setIsLoading(false);
+      if (!isMounted) return;
+      if (error) {
+        setStatus('error');
+        return;
+      }
+
+      setServices((data ?? []) as Service[]);
+      setStatus('ready');
     };
 
     void loadServices();
+    return () => { isMounted = false; };
   }, []);
 
   const individualServices = services.filter((service) => !service.is_pacote);
   const packages = services.filter((service) => service.is_pacote);
 
   return (
-    <>
-      <section id="servicos" className="content-section">
-        <div className="section-heading">
-          <span className="section-subtitle glow-text">Especialidades</span>
-          <h2>Seu ritual de beleza começa aqui.</h2>
+    <section id="servicos" className="services-section">
+      <div className="services-container">
+        <div className="services-heading">
+          <span className="services-eyebrow"><Sparkles size={14} /> Especialidades</span>
+          <h2>Seu ritual de beleza,<br /><em>do seu jeito.</em></h2>
+          <p>Escolha o cuidado que combina com você e fale diretamente com a Débora para encontrar seu horário.</p>
         </div>
-        {isLoading ? (
-          <div className="service-skeletons" aria-label="Carregando serviços">
-            {[1, 2, 3].map((item) => <div className="service-skeleton" key={item} />)}
-          </div>
-        ) : individualServices.length > 0 ? (
-          <div className="service-showcase-grid">
+
+        {status === 'loading' && <LoadingCards />}
+        {status === 'error' && <ServicesMessage title="Não foi possível carregar os serviços agora." description="Fale diretamente com a Débora pelo WhatsApp para conhecer as opções disponíveis." />}
+        {status === 'ready' && individualServices.length === 0 && <ServicesMessage title="Novos cuidados estão sendo preparados." description="Fale com a Débora para conhecer os serviços disponíveis." />}
+        {status === 'ready' && individualServices.length > 0 && (
+          <div className="services-grid">
             {individualServices.map((service) => <ServiceCard key={service.id} service={service} />)}
           </div>
-        ) : (
-          <p className="service-empty">Em breve, novos serviços estarão disponíveis.</p>
         )}
-      </section>
 
-      {packages.length > 0 && (
-        <section className="package-section muted-section">
-          <div className="content-section">
-            <div className="section-heading">
-              <span className="section-subtitle glow-text">Cuidado contínuo</span>
-              <h2>Pacotes criados para a sua rotina.</h2>
+        {status === 'ready' && packages.length > 0 && (
+          <div className="packages-showcase">
+            <div className="packages-heading">
+              <span>Planos de cuidado</span>
+              <h3>Constância para suas unhas estarem sempre impecáveis.</h3>
             </div>
-            <div className="package-grid">
-              {packages.map((service) => <PackageCard key={service.id} service={service} />)}
+            <div className="packages-grid">
+              {packages.map((service) => <ServiceCard key={service.id} service={service} isPackage />)}
             </div>
           </div>
-        </section>
-      )}
-    </>
+        )}
+      </div>
+    </section>
   );
 }
 
-function ServiceCard({ service }: { service: Service }) {
+function ServiceCard({ service, isPackage = false }: { service: Service; isPackage?: boolean }) {
   const price = formatPrice(service.preco);
-  const image = serviceImage(service);
+  const image = getServiceImage(service);
+  const [imageFailed, setImageFailed] = useState(false);
+  const action = isPackage
+    ? `Olá, Débora! Tenho interesse no pacote: ${service.nome}`
+    : `Olá, Débora! Gostaria de agendar um horário para o serviço: ${service.nome}`;
 
   return (
-    <article className="service-showcase-card glass-card neon-hover">
-      {image && <img src={image} alt={service.nome} className="service-showcase-image" loading="lazy" />}
-      <div className="service-showcase-body">
-        <div className="service-showcase-meta">
-          <span><Sparkles size={14} /> Atendimento exclusivo</span>
-          {price && <strong>{price}</strong>}
+    <article className={`premium-service-card${isPackage ? ' premium-service-card-package' : ''}`}>
+      <div className="service-media">
+        {image && !imageFailed ? (
+          <img src={image} alt={service.nome} className="service-image" loading="lazy" onError={() => setImageFailed(true)} />
+        ) : (
+          <div className="service-image-fallback" role="img" aria-label={`Imagem indisponível para ${service.nome}`}>
+            <ImageOff size={25} strokeWidth={1.4} />
+            <span>Debora Nails</span>
+          </div>
+        )}
+        {price && <span className="service-price">{price}</span>}
+        {isPackage && <span className="service-package-label">Pacote</span>}
+      </div>
+      <div className="service-content">
+        <div className="service-title-row">
+          <h3>{service.nome}</h3>
+          {service.duracao && <span className="service-time"><Clock3 size={15} /> {service.duracao}</span>}
         </div>
-        <h3>{service.nome}</h3>
         {service.descricao && <p>{service.descricao}</p>}
-        {service.duracao && <span className="service-duration"><Clock3 size={15} /> {service.duracao}</span>}
-        <a className="service-book-button" href={whatsappUrl(`Olá, Débora! Gostaria de agendar um horário para o serviço: ${service.nome}`)} target="_blank" rel="noreferrer">
-          Agendar pelo WhatsApp <ArrowRight size={17} />
+        <a className="service-whatsapp-button" href={whatsappUrl(action)} target="_blank" rel="noreferrer">
+          <MessageCircle size={18} /> {isPackage ? 'Tenho interesse' : 'Agendar pelo WhatsApp'} <ArrowRight size={17} />
         </a>
       </div>
     </article>
   );
 }
 
-function PackageCard({ service }: { service: Service }) {
-  const price = formatPrice(service.preco);
-  const image = serviceImage(service);
+function LoadingCards() {
+  return <div className="services-grid" aria-label="Carregando serviços">{[1, 2, 3].map((item) => <div className="service-loading-card" key={item} />)}</div>;
+}
 
+function ServicesMessage({ title, description }: { title: string; description: string }) {
   return (
-    <article className="package-card glass-card">
-      {image && <img src={image} alt={service.nome} className="package-image" loading="lazy" />}
-      <div className="package-card-body">
-        <Crown size={20} className="text-[#DCAE96]" />
-        {price && <strong className="package-price">{price}</strong>}
-        <h3>{service.nome}</h3>
-        {service.descricao && <p>{service.descricao}</p>}
-        {service.duracao && <span><Clock3 size={15} /> {service.duracao}</span>}
-        <span><Check size={15} /> Atendimento personalizado</span>
-        <a className="package-link" href={whatsappUrl(`Olá, Débora! Tenho interesse em assinar o pacote: ${service.nome}`)} target="_blank" rel="noreferrer">Tenho interesse <ArrowRight size={16} /></a>
-      </div>
-    </article>
+    <div className="services-message">
+      <Sparkles size={22} />
+      <h3>{title}</h3>
+      <p>{description}</p>
+      <a href={whatsappUrl('Olá, Débora! Gostaria de conhecer os serviços disponíveis.')} target="_blank" rel="noreferrer">Falar no WhatsApp <ArrowRight size={16} /></a>
+    </div>
   );
 }
