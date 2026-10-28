@@ -10,6 +10,7 @@ type Service = {
   descricao?: string | null;
   duracao?: string | null;
   preco?: number | string | null;
+  imagens?: string[] | null;
   is_pacote?: boolean | null;
   [key: string]: unknown;
 };
@@ -17,7 +18,6 @@ type Service = {
 type ImageReference = { bucket?: string; path: string };
 
 const imageFields = ['imagem_url', 'foto_url', 'imagem', 'image_url', 'image', 'imagem_path', 'foto_path', 'image_path'];
-const bucketFields = ['imagem_bucket', 'foto_bucket', 'image_bucket', 'bucket'];
 
 const whatsappUrl = (message: string) =>
   `https://wa.me/5547996987519?text=${encodeURIComponent(message)}`;
@@ -53,7 +53,7 @@ const storageReference = (value: string): ImageReference | undefined => {
 };
 
 const getServiceImage = (service: Service) => {
-  const value = imageFields.map((field) => readText(service[field])).find(Boolean);
+  const value = service.imagens?.map(readText).find(Boolean) ?? imageFields.map((field) => readText(service[field])).find(Boolean);
   if (!value) return undefined;
 
   const url = absoluteUrl(value);
@@ -63,9 +63,11 @@ const getServiceImage = (service: Service) => {
     return new URL(value.startsWith('/') ? value : `/${value}`, supabaseUrl).toString();
   }
 
+  // The original dashboard also permits bundled fallback images such as /01.jpg.
+  if (value.startsWith('/')) return value;
+
   const reference = storageReference(value);
-  const bucket = reference?.bucket ?? bucketFields.map((field) => readText(service[field])).find(Boolean) ?? servicesStorageBucket;
-  if (!bucket || !supabase) return undefined;
+  const bucket = reference?.bucket ?? servicesStorageBucket;
 
   let path = reference?.path ?? value.replace(/^\/+/, '');
   if (path.startsWith(`${bucket}/`)) path = path.slice(bucket.length + 1);
