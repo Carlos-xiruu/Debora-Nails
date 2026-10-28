@@ -6,6 +6,7 @@ import Portfolio from './components/Portfolio';
 import SiteHeader from './components/SiteHeader';
 import Sobre from './components/Sobre';
 import ServicesShowcase from './components/ServicesShowcase';
+import WhatsAppWidget from './components/WhatsAppWidget';
 
 const whatsappUrl = (message: string) =>
   `https://wa.me/5547996987519?text=${encodeURIComponent(message)}`;
@@ -54,11 +55,10 @@ export default function Home() {
         </div>
       </section>
 
+      <Sobre />
       <ServicesShowcase />
-
       <Portfolio />
       <Espaco />
-      <Sobre />
       <FAQ />
 
       <section className="content-section pt-0">
@@ -70,7 +70,7 @@ export default function Home() {
         </div>
       </section>
 
-      <a className="floating-whatsapp" href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer" aria-label="Conversar no WhatsApp"><MessageCircle size={26} /></a>
+      <WhatsAppWidget />
       <footer className="site-footer">
         <p>© {new Date().getFullYear()} Debora Nails. Todos os direitos reservados.</p>
       </footer>

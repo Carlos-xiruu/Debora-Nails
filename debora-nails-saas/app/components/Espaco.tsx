@@ -1,22 +1,20 @@
 import Image from 'next/image';
 import { Coffee, Wifi, Wind, CarFront, MapPin } from 'lucide-react';
+import SpaceVideo from './SpaceVideo';
 
 export default function Espaco() {
   return (
-    <section id="espaco" className="py-24 px-6 relative z-10">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-        <div className="order-2 lg:order-1 grid grid-cols-2 gap-4 relative">
-          <div className="absolute inset-0 bg-gradient-to-tr from-[#120308] to-transparent z-10 pointer-events-none rounded-3xl"></div>
-          <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border border-[#DCAE96]/20 mt-8 shadow-xl group relative">
-             <Image src="/cadeiras.png" alt="Interior do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+    <section id="espaco" className="py-20 px-4 sm:px-6 lg:py-28 lg:px-8 relative z-10">
+      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+        <div className="space-gallery order-2 lg:order-1">
+          <div className="space-gallery-chair group relative">
+             <Image src="/cadeiras.png" alt="Poltronas do interior do ateliê" fill sizes="(max-width: 1023px) 100vw, 40vw" className="object-cover group-hover:scale-[1.03] transition-transform duration-500" />
           </div>
-          <div className="rounded-3xl w-full h-[300px] md:h-64 overflow-hidden border-2 border-[#C7977D] shadow-[0_0_30px_rgba(199,151,125,0.3)]">
-              <video muted playsInline preload="metadata" poster="/cadeiras.png" aria-hidden="true" className="w-full h-full object-cover">
-                <source src="/espaco.mp4" type="video/mp4" />
-             </video>
+          <div className="space-gallery-video">
+              <SpaceVideo />
           </div>
-          <div className="col-span-2 rounded-3xl w-full h-[200px] md:h-48 overflow-hidden border border-[#DCAE96]/20 shadow-xl group relative">
-             <Image src="/mesa.png" alt="Detalhe do Ateliê" fill sizes="(max-width: 768px) 100vw, 50vw" className="object-cover group-hover:scale-105 transition-transform duration-700" />
+          <div className="space-gallery-table group relative">
+             <Image src="/mesa.png" alt="Mesa de atendimento do ateliê" fill sizes="(max-width: 1023px) 100vw, 50vw" className="object-cover group-hover:scale-[1.03] transition-transform duration-500" />
           </div>
         </div>
 

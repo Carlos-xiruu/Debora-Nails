@@ -5,10 +5,10 @@ import { Menu, MessageCircle, X } from 'lucide-react';
 import { useState } from 'react';
 
 const links = [
+  { href: '#sobre', label: 'Sobre' },
   { href: '#servicos', label: 'Serviços' },
   { href: '#portfolio', label: 'Portfólio' },
   { href: '#espaco', label: 'O espaço' },
-  { href: '#sobre', label: 'Sobre' },
 ];
 
 const whatsappUrl = 'https://wa.me/5547996987519?text=Ol%C3%A1%2C%20D%C3%A9bora!%20Gostaria%20de%20agendar%20um%20hor%C3%A1rio.';
