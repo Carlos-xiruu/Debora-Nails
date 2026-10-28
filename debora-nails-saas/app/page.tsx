@@ -1,40 +1,13 @@
 import Image from 'next/image';
-import { ArrowRight, Check, Crown, MapPin, MessageCircle, Sparkles } from 'lucide-react';
+import { ArrowRight, MapPin, MessageCircle } from 'lucide-react';
 import Espaco from './components/Espaco';
 import FAQ from './components/FAQ';
 import Portfolio from './components/Portfolio';
 import Sobre from './components/Sobre';
+import ServicesShowcase from './components/ServicesShowcase';
 
 const whatsappUrl = (message: string) =>
   `https://wa.me/5547996987519?text=${encodeURIComponent(message)}`;
-
-const services = [
-  {
-    name: 'Alongamento em Fibra',
-    description: 'Estrutura leve, resistente e personalizada para unhas elegantes todos os dias.',
-    detail: 'Fibra de vidro',
-  },
-  {
-    name: 'Molde F1',
-    description: 'Alongamento com acabamento preciso, formato sob medida e aparência natural.',
-    detail: 'Técnica F1',
-  },
-  {
-    name: 'Banho de Gel',
-    description: 'Proteção e brilho para valorizar o crescimento das suas unhas naturais.',
-    detail: 'Unhas naturais',
-  },
-  {
-    name: 'Maquiagem Profissional',
-    description: 'Beleza que respeita sua identidade para eventos, celebrações e momentos especiais.',
-    detail: 'Produção exclusiva',
-  },
-];
-
-const packages = [
-  { name: 'Essencial', description: 'Cuidado recorrente para manter suas unhas sempre impecáveis.' },
-  { name: 'Signature', description: 'Uma experiência completa para quem valoriza cada detalhe.' },
-];
 
 export default function Home() {
   return (
@@ -93,46 +66,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section id="servicos" className="content-section">
-        <div className="section-heading">
-          <span className="section-subtitle glow-text">Especialidades</span>
-          <h2>Seu ritual de beleza começa aqui.</h2>
-        </div>
-        <div className="tech-practice-grid">
-          {services.map((service) => (
-            <article className="glass-card service-card neon-hover" key={service.name}>
-              <div className="service-icon"><Sparkles size={21} /></div>
-              <div className="tech-chip-list"><span>{service.detail}</span></div>
-              <h3>{service.name}</h3>
-              <p>{service.description}</p>
-              <a className="service-link" href={whatsappUrl(`Olá, Débora! Gostaria de agendar um horário para o serviço ${service.name}.`)} target="_blank" rel="noreferrer">
-                Agendar serviço <ArrowRight size={16} />
-              </a>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="package-section muted-section">
-        <div className="content-section package-content">
-          <div>
-            <span className="section-subtitle glow-text">Cuidado contínuo</span>
-            <h2>Pacotes criados para a sua rotina.</h2>
-            <p>Garanta constância no seu autocuidado com um plano alinhado às suas necessidades.</p>
-          </div>
-          <div className="package-grid">
-            {packages.map((item) => (
-              <article className="glass-card package-card" key={item.name}>
-                <Crown size={20} className="text-[#DCAE96]" />
-                <h3>{item.name}</h3>
-                <p>{item.description}</p>
-                <span><Check size={15} /> Atendimento personalizado</span>
-                <a className="package-link" href={whatsappUrl(`Olá, Débora! Tenho interesse em assinar o pacote ${item.name}.`)} target="_blank" rel="noreferrer">Tenho interesse <ArrowRight size={16} /></a>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
+      <ServicesShowcase />
 
       <Portfolio />
       <Espaco />
