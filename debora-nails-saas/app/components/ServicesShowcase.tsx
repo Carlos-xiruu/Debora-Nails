@@ -37,9 +37,10 @@ export default function ServicesShowcase() {
       setIsLoading(false);
       return;
     }
+    const client = supabase;
 
     const loadServices = async () => {
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from('servicos')
         .select('*')
         .eq('ativo', true)
