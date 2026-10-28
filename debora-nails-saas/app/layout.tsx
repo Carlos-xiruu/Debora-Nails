@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { Plus_Jakarta_Sans, Playfair_Display } from 'next/font/google';
 import './globals.css';
-import { icons } from 'lucide-react';
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ['latin'],

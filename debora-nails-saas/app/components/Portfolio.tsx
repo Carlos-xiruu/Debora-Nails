@@ -22,8 +22,8 @@ const AntesEDepoisSlider = ({ antesSrc, depoisSrc }: { antesSrc: string, depoisS
         </div>
       </div>
       <input type="range" min="0" max="100" value={posicao} onChange={(e) => setPosicao(Number(e.target.value))} className="absolute inset-0 z-30 w-full h-full opacity-0 cursor-ew-resize" />
-      <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
-      <div className="absolute top-4 right-4 z-20 bg-[#DCAE96]/80 backdrop-blur-md px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
+      <div className="absolute top-4 left-4 z-20 bg-black/80 px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/10 text-white pointer-events-none transition-opacity duration-300" style={{ opacity: posicao > 20 ? 1 : 0 }}>Depois</div>
+      <div className="absolute top-4 right-4 z-20 bg-[#DCAE96] px-2 py-1 rounded text-[9px] uppercase font-bold tracking-widest border border-white/20 text-[#120308] pointer-events-none transition-opacity duration-300" style={{ opacity: posicao < 80 ? 1 : 0 }}>Antes</div>
     </div>
   );
 };
