@@ -1,0 +1,37 @@
+
+name: Supabase Keep Alive
+
+on:
+  schedule:
+    # Executa 3 vezes ao dia (UTC)
+    - cron: "17 2,10,18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+
+    steps:
+      - name: Consultar Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          test -n "$SUPABASE_URL"
+          test -n "$SUPABASE_KEY"
+
+          curl --fail --silent --show-error \
+            --retry 2 \
+            --max-time 20 \
+            --get "${SUPABASE_URL%/}/rest/v1/servicos" \
+            --data-urlencode "select=id" \
+            --data-urlencode "limit=1" \
+            --header "apikey: ${SUPABASE_KEY}" \
+            --header "Accept: application/json" \
+            --output /dev/null
+
+          echo "Consulta Supabase concluída."
