@@ -5,12 +5,16 @@
     "shadcn": {
       "type": "local",
       "command": [
+        "C:\\Windows\\System32\\cmd.exe",
+        "/d",
+        "/c",
         "C:\\nodejs\\npx.cmd",
         "-y",
         "shadcn@latest",
         "mcp"
       ],
-      "enabled": false
+      "enabled": true,
+      "timeout": 60000
     },
     "inspo": {
       "type": "remote",

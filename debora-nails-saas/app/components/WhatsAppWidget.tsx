@@ -8,20 +8,29 @@ const whatsappUrl = 'https://wa.me/5547996987519';
 
 export default function WhatsAppWidget() {
   const [isGreetingVisible, setIsGreetingVisible] = useState(false);
+  const [isGreetingClosing, setIsGreetingClosing] = useState(false);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => setIsGreetingVisible(true), 20_000);
+    const timer = window.setTimeout(() => {
+      setIsGreetingClosing(false);
+      setIsGreetingVisible(true);
+    }, 12_000);
     return () => window.clearTimeout(timer);
   }, []);
+
+  const closeGreeting = () => {
+    setIsGreetingClosing(true);
+    window.setTimeout(() => setIsGreetingVisible(false), 220);
+  };
 
   return (
     <div className="whatsapp-widget">
       {isGreetingVisible && (
-        <aside className="whatsapp-greeting" aria-label="Mensagem de boas-vindas">
-          <button className="whatsapp-greeting-close" type="button" onClick={() => setIsGreetingVisible(false)} aria-label="Fechar mensagem de boas-vindas"><X size={14} /></button>
+        <aside className={`whatsapp-greeting${isGreetingClosing ? ' is-closing' : ''}`} aria-label="Mensagem de boas-vindas" aria-live="polite">
+          <button className="whatsapp-greeting-close" type="button" onClick={closeGreeting} aria-label="Fechar mensagem de boas-vindas"><X size={14} /></button>
           <div className="whatsapp-greeting-heading">
-            <Image src="/debora.card.PNG" width={46} height={46} alt="Débora" />
-            <strong>Oi, posso ajudar?</strong>
+            <Image src="/debora.card.PNG" width={48} height={48} alt="Débora" className="whatsapp-avatar" />
+            <div><strong>Oi, posso ajudar?</strong><span>Débora Nails</span></div>
           </div>
           <p>Ficou com alguma dúvida ou não encontrou o horário ideal? Fale comigo no WhatsApp e eu vou te ajudar.</p>
           <a href={whatsappUrl} target="_blank" rel="noreferrer">Conversar agora</a>

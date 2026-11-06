@@ -8,6 +8,8 @@ import SiteHeader from './components/SiteHeader';
 import Sobre from './components/Sobre';
 import ServicesShowcase from './components/ServicesShowcase';
 import WhatsAppWidget from './components/WhatsAppWidget';
+import { Marquee } from '@/components/marquee';
+import { WordsStagger } from '@/components/words-stagger';
 
 const whatsappUrl = (message: string) =>
   `https://wa.me/5547996987519?text=${encodeURIComponent(message)}`;
@@ -25,12 +27,18 @@ export default function Home() {
         <div className="hero-copy">
           <p className="hero-kicker">Unhas e maquiagem com escuta, técnica e intenção</p>
           <h1 id="hero-title"><span>o detalhe</span><em>muda tudo.</em></h1>
+          <WordsStagger className="hero-words" delay={0.45} stagger={0.08} speed={0.45}>beleza com intenção, feita para o seu tempo.</WordsStagger>
           <p className="hero-description">Um intervalo na rotina para se sentir você, só que ainda mais confiante.</p>
           <a className="hero-action" href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer">Agendar meu momento <ArrowUpRight size={18} /></a>
         </div>
+        <p className="hero-seal" aria-hidden="true"><span>déboranails · beleza em cada detalhe · </span></p>
         <a className="hero-scroll" href="#sobre"><span>deslize para descobrir</span><ArrowDown size={18} /></a>
       </section>
-      <div className="statement-marquee" aria-hidden="true"><div>feito para você &nbsp; cuidado nos detalhes &nbsp; feito para você &nbsp; cuidado nos detalhes &nbsp;</div></div>
+      <Marquee className="statement-marquee spell-marquee" duration={32} pauseOnHover fade={false} aria-label="Feito para você. Cuidado nos detalhes.">
+        <span>feito para você <i>cuidado nos detalhes</i></span>
+        <span>feito para você <i>cuidado nos detalhes</i></span>
+        <span>feito para você <i>cuidado nos detalhes</i></span>
+      </Marquee>
       <Sobre />
       <ServicesShowcase />
       <ExperienceTimeline />

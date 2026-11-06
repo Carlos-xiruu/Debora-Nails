@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight, Expand, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { TiltCard } from '@/components/tilt-card';
 
 const nailImages = ['/01.jpg', '/vermelha.jpeg', '/02.jpg', '/nude-branca.jpeg', '/delicada.jpeg', '/branca-nude.jpeg', '/roxa.jpeg', '/nude-dourada.jpeg'];
 const makeupImages = ['/make01.jpeg', '/make-loira.jpeg', '/make-rabico.jpeg', '/make02.jpeg', '/make-batomv.jpeg', '/make03.jpeg', '/make-menina.jpg', '/make04.jpeg'];
@@ -43,11 +44,14 @@ function PortfolioRail({ title, images, aspect, onSelect }: { title: string; ima
       }}>
         {images.map((image, index) => {
           const alt = `${title}, trabalho ${index + 1}`;
-          return (
-            <button className={`portfolio-card portfolio-card-${aspect}`} type="button" key={image} onClick={() => onSelect(image, alt)} aria-label={`Ampliar ${alt}`}>
+          const card = (
+            <button className={`portfolio-card portfolio-card-${aspect}`} type="button" onClick={() => onSelect(image, alt)} aria-label={`Ampliar ${alt}`}>
               <Image src={image} alt={alt} fill sizes="(max-width: 639px) 82vw, (max-width: 1023px) 42vw, 300px" className="object-cover" />
               <span><Expand size={17} /></span>
             </button>
+          );
+          return (
+            index === 0 ? <TiltCard key={image} className="portfolio-feature-tilt" tiltLimit={5} scale={1.015} perspective={1100} effect="gravitate">{card}</TiltCard> : <div key={image} className="portfolio-card-frame">{card}</div>
           );
         })}
       </div>
