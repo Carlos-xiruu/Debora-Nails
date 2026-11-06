@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { Menu, MessageCircle, X } from 'lucide-react';
+import { CalendarDays, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const links = [
@@ -26,15 +26,19 @@ export default function SiteHeader() {
           <span><strong>Debora Nails</strong><small>Beauty Studio</small></span>
         </a>
 
-        <button className="menu-toggle" type="button" aria-expanded={isOpen} aria-controls="primary-navigation" onClick={() => setIsOpen((open) => !open)}>
-          {isOpen ? <X size={21} /> : <Menu size={21} />}
-          <span className="sr-only">{isOpen ? 'Fechar menu' : 'Abrir menu'}</span>
-        </button>
-
-        <nav id="primary-navigation" className={`nav-links${isOpen ? ' is-open' : ''}`} aria-label="Navegação principal">
-          {links.map((link) => <a href={link.href} key={link.href} onClick={closeMenu}>{link.label}</a>)}
-          <a className="nav-whatsapp" href={whatsappUrl} target="_blank" rel="noreferrer" onClick={closeMenu}><MessageCircle size={16} /> WhatsApp</a>
-        </nav>
+        <div className="header-controls">
+          <nav id="primary-navigation" className={`nav-links${isOpen ? ' is-open' : ''}`} aria-label="Navegação principal">
+            {links.map((link) => <a href={link.href} key={link.href} onClick={closeMenu}>{link.label}</a>)}
+          </nav>
+          <a className="header-booking" href={whatsappUrl} target="_blank" rel="noreferrer">
+            <CalendarDays size={16} aria-hidden="true" />
+            <span>Agendar</span>
+          </a>
+          <button className="menu-toggle" type="button" aria-expanded={isOpen} aria-controls="primary-navigation" onClick={() => setIsOpen((open) => !open)}>
+            {isOpen ? <X size={21} /> : <Menu size={21} />}
+            <span className="sr-only">{isOpen ? 'Fechar menu' : 'Abrir menu'}</span>
+          </button>
+        </div>
       </div>
     </header>
   );

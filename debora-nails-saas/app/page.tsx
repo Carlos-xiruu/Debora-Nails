@@ -1,5 +1,6 @@
 import Image from 'next/image';
 import { ArrowRight, MapPin, MessageCircle } from 'lucide-react';
+import { FlowButton } from '@/components/flow-button';
 import Espaco from './components/Espaco';
 import ExperienceTimeline from './components/ExperienceTimeline';
 import FAQ from './components/FAQ';
@@ -20,26 +21,33 @@ export default function Home() {
       <SiteHeader />
 
       <section id="inicio" className="hero-section">
+        <div className="hero-orb hero-orb-left" aria-hidden="true" />
+        <div className="hero-orb hero-orb-right" aria-hidden="true" />
         <div className="hero-content">
-          <span className="hero-tag glow-text">Beauty studio · Jaraguá do Sul</span>
-          <h1>Seu momento de<br /><em>se sentir bem.</em></h1>
-          <p className="hero-description">Unhas, maquiagem e aquele cuidado especial que faz toda a diferença no seu dia.</p>
+          <span className="hero-tag">Seu momento de cuidado</span>
+          <h1>Beleza que acompanha <em>o seu ritmo.</em></h1>
+          <p className="hero-description">Unhas e maquiagem em um atendimento leve, atencioso e feito para você se sentir bem de verdade.</p>
           <div className="hero-actions">
-            <a className="social-button main-action-button" href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer">
-              Agendar meu horário <ArrowRight size={18} />
-            </a>
-            <a className="social-button secondary-action-button" href="#servicos">Conhecer serviços</a>
+            <FlowButton asChild size="lg" borderColor="rgba(255, 244, 238, 0.75)" className="hero-booking-button">
+              <a href={whatsappUrl('Olá, Débora! Gostaria de agendar um horário.')} target="_blank" rel="noreferrer">
+                Agendar meu horário <ArrowRight size={18} />
+              </a>
+            </FlowButton>
+            <a className="hero-services-link" href="#servicos">Ver serviços <ArrowRight size={16} aria-hidden="true" /></a>
           </div>
-          <a className="hero-scroll-cue" href="#sobre"><span aria-hidden="true" />Conheça a experiência</a>
+          <ul className="hero-reassurance" aria-label="Informações de atendimento">
+            <li><span aria-hidden="true" />Jaraguá do Sul</li>
+            <li><span aria-hidden="true" />Horário marcado</li>
+            <li><span aria-hidden="true" />Unhas e maquiagem</li>
+          </ul>
         </div>
 
-        <div className="hero-media has-glow">
-          <div className="hero-float-wrapper">
-            <div className="hero-portrait hero-portrait-frame">
-              <Image src="/debora.jpg" alt="Débora Silva, nail designer" fill priority sizes="(max-width: 1023px) 100vw, 42vw" className="object-cover object-[50%_25%]" />
-              <div className="hero-portrait-caption"><span>Debora Nails</span><strong>Beauty Studio</strong></div>
-            </div>
-            <div className="hero-note"><span>Atendimento</span><strong>com cuidado em cada detalhe</strong></div>
+        <div className="hero-media">
+          <div className="hero-portrait hero-portrait-frame">
+            <Image src="/fotonova.jpeg" alt="Débora apresentando esmaltes usados no atendimento" fill preload sizes="(max-width: 767px) 100vw, (max-width: 1023px) 78vw, 46vw" className="object-cover object-[55%_center]" />
+            <div className="hero-photo-wash" aria-hidden="true" />
+            <div className="hero-portrait-caption"><span>Débora Nails</span><strong>Cuidado que se vê nos detalhes.</strong></div>
+            <div className="hero-availability"><span aria-hidden="true" />Atendimento com horário marcado</div>
           </div>
         </div>
       </section>
