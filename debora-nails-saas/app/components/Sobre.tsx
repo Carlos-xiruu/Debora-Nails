@@ -1,20 +1,21 @@
 import Image from 'next/image';
 import { Heart, Sparkles } from 'lucide-react';
+import Reveal from './Reveal';
 
 export default function Sobre() {
   return (
     <section id="sobre" className="about-section relative z-10">
       <div className="about-container">
-        <div className="about-photo-wrap">
+        <Reveal className="about-photo-wrap" delay={40}>
           <div className="about-photo about-photo-editorial">
-             <Image src="/fotonova.jpeg" alt="Débora Silva, nail designer e maquiadora" fill sizes="(max-width: 767px) 100vw, 33vw" className="object-cover object-[50%_20%]" />
-          </div>
+             <Image src="/debora.jpg" alt="Débora Silva, nail designer e maquiadora" fill sizes="(max-width: 767px) 100vw, 33vw" className="object-cover object-[50%_25%]" />
+           </div>
           <div className="about-experience">
             <span className="text-3xl font-serif font-bold text-[#DCAE96]">6+</span>
             <span className="text-[9px] uppercase tracking-widest text-center font-bold mt-1">Anos de<br/>Experiência</span>
           </div>
-        </div>
-        <div className="about-copy">
+        </Reveal>
+        <Reveal className="about-copy" delay={120}>
           <span><Heart size={14}/> A especialista</span>
           <h2>Muito prazer,<br />sou a <em>Débora.</em></h2>
           <div className="about-copy-body">
@@ -23,7 +24,7 @@ export default function Sobre() {
             <p>Para mim, cada cliente é única, e cada atendimento é uma oportunidade de fazer você se olhar no espelho e pensar: “uau, era exatamente isso que eu queria.” Mais do que unhas, eu entrego cuidado, confiança e uma experiência feita para você.</p>
           </div>
           <p className="about-signature"><Sparkles size={15} /> Técnica que valoriza a sua beleza.</p>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

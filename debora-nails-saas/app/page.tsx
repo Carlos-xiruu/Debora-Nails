@@ -25,7 +25,12 @@ export default function Home() {
         <div className="hero-orb hero-orb-right" aria-hidden="true" />
         <div className="hero-content">
           <span className="hero-tag">Seu momento de cuidado</span>
-          <h1>Beleza que acompanha <em>o seu ritmo.</em></h1>
+          <h1 aria-label="Beleza que acompanha o seu ritmo.">
+            <span className="hero-title-word">Beleza</span>{" "}
+            <span className="hero-title-word">que</span>{" "}
+            <span className="hero-title-word">acompanha</span>
+            <em><span className="hero-title-word">o</span>{" "}<span className="hero-title-word">seu</span>{" "}<span className="hero-title-word">ritmo.</span></em>
+          </h1>
           <p className="hero-description">Unhas e maquiagem em um atendimento leve, atencioso e feito para você se sentir bem de verdade.</p>
           <div className="hero-actions">
             <FlowButton asChild size="lg" borderColor="rgba(255, 244, 238, 0.75)" className="hero-booking-button">
@@ -42,13 +47,19 @@ export default function Home() {
           </ul>
         </div>
 
-        <div className="hero-media">
-          <div className="hero-portrait hero-portrait-frame">
-            <Image src="/fotonova.jpeg" alt="Débora apresentando esmaltes usados no atendimento" fill preload sizes="(max-width: 767px) 100vw, (max-width: 1023px) 78vw, 46vw" className="object-cover object-[55%_center]" />
+        <div className="hero-media hero-gallery">
+          <figure className="hero-portrait hero-portrait-frame hero-photo-main">
+            <Image src="/nude-dourada.jpeg" alt="Unhas em tom nude com detalhes dourados realizadas pela Débora Nails" fill preload sizes="(max-width: 767px) 100vw, (max-width: 1023px) 78vw, 37vw" className="object-cover object-[center_62%]" />
             <div className="hero-photo-wash" aria-hidden="true" />
-            <div className="hero-portrait-caption"><span>Débora Nails</span><strong>Cuidado que se vê nos detalhes.</strong></div>
+            <figcaption className="hero-portrait-caption"><span>Trabalho autoral</span><strong>Detalhes que acompanham você.</strong></figcaption>
             <div className="hero-availability"><span aria-hidden="true" />Atendimento com horário marcado</div>
-          </div>
+          </figure>
+          <figure className="hero-photo-secondary">
+            <Image src="/delicada.jpeg" alt="Unhas delicadas em tom rosado realizadas pela Débora Nails" fill sizes="(max-width: 767px) 42vw, 18vw" className="object-cover" />
+          </figure>
+          <figure className="hero-photo-tertiary">
+            <Image src="/make01.jpeg" alt="Maquiagem realizada pela Débora Nails" fill sizes="18vw" className="object-cover object-[center_35%]" />
+          </figure>
         </div>
       </section>
 

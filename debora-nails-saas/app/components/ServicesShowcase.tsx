@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Clock3, ImageOff, MessageCircle, Sparkles } from 'lucide-react';
 import { servicesStorageBucket, supabase, supabaseUrl } from '../lib/supabase';
+import Reveal from './Reveal';
 
 type Service = {
   id: string | number;
@@ -129,18 +130,18 @@ export default function ServicesShowcase() {
   return (
     <section id="servicos" className="services-section" ref={sectionRef}>
       <div className="services-container">
-        <div className="services-heading">
+        <Reveal className="services-heading">
           <span className="services-eyebrow"><Sparkles size={14} /> Especialidades</span>
           <h2>Seu ritual de beleza,<br /><em>do seu jeito.</em></h2>
           <p>Escolha o cuidado que combina com você e fale diretamente com a Débora para encontrar seu horário.</p>
-        </div>
+        </Reveal>
 
         {status === 'loading' && <LoadingCards />}
         {status === 'error' && <ServicesMessage title="Não foi possível carregar os serviços agora." description="Fale diretamente com a Débora pelo WhatsApp para conhecer as opções disponíveis." />}
         {status === 'ready' && individualServices.length === 0 && <ServicesMessage title="Novos cuidados estão sendo preparados." description="Fale com a Débora para conhecer os serviços disponíveis." />}
         {status === 'ready' && individualServices.length > 0 && (
           <div className="services-grid">
-            {individualServices.map((service) => <ServiceCard key={service.id} service={service} />)}
+            {individualServices.map((service, index) => <Reveal key={service.id} delay={Math.min(index * 80, 160)}><ServiceCard service={service} /></Reveal>)}
           </div>
         )}
 
