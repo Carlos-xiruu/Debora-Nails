@@ -10,7 +10,7 @@
         "shadcn@latest",
         "mcp"
       ],
-      "enabled": true
+      "enabled": false
     },
     "inspo": {
       "type": "remote",

@@ -15,27 +15,27 @@ export default function FAQ() {
   ];
 
   return (
-    <section className="py-20 px-6 max-w-3xl mx-auto relative z-10 border-t border-[#3a2522]">
-      <div className="text-center mb-10">
-        <span className="glow-text text-sm font-bold uppercase tracking-widest">FAQ</span>
-        <h2 className="font-serif text-3xl md:text-4xl text-white mt-2">Dúvidas Frequentes</h2>
+    <section className="faq-section" aria-labelledby="faq-title">
+      <div className="faq-heading">
+        <span className="section-label">Para você se planejar</span>
+        <h2 id="faq-title">Dúvidas frequentes</h2>
       </div>
-      <div className="space-y-4">
+      <div className="faq-list">
         {faqs.map((faq, index) => (
-          <article key={index} className="glass-card border border-[#3a2522] rounded-xl md:rounded-2xl overflow-hidden transition-all">
+          <article key={index} className={`faq-item${faqAberto === index ? ' is-open' : ''}`}>
             <button
               type="button"
               id={`faq-question-${index}`}
               aria-expanded={faqAberto === index}
               aria-controls={`faq-answer-${index}`}
               onClick={() => setFaqAberto(faqAberto === index ? null : index)}
-              className="w-full text-left p-4 md:p-6 flex justify-between items-center text-white font-serif text-base md:text-lg hover:text-[#F8D1BE] transition-colors"
+              className="faq-question"
             >
               {faq.q}
-              <ChevronDown className={`transition-transform duration-300 shrink-0 ml-4 ${faqAberto === index ? 'rotate-180 text-[#C7977D]' : 'text-gray-500'}`} />
+              <ChevronDown className="faq-arrow" />
             </button>
-            <div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} hidden={faqAberto !== index} className="px-4 md:px-6 pb-4 md:pb-6">
-              <p className="text-gray-400 text-sm md:text-base leading-relaxed font-light">{faq.a}</p>
+            <div id={`faq-answer-${index}`} role="region" aria-labelledby={`faq-question-${index}`} hidden={faqAberto !== index} className="faq-answer">
+              <p>{faq.a}</p>
             </div>
           </article>
         ))}

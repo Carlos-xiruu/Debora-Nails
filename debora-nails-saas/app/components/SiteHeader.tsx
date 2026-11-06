@@ -1,7 +1,6 @@
 'use client';
 
-import Image from 'next/image';
-import { CalendarDays, Menu, X } from 'lucide-react';
+import { ArrowUpRight, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 const links = [
@@ -22,8 +21,7 @@ export default function SiteHeader() {
     <header className="site-header">
       <div className="header-inner">
         <a className="brand" href="#inicio" aria-label="Debora Nails, início" onClick={closeMenu}>
-          <Image src="/logo.PNG" alt="" width={46} height={46} priority />
-          <span><strong>Debora Nails</strong><small>Beauty Studio</small></span>
+          <span><strong>Débora</strong><small>Nails & beauty</small></span>
         </a>
 
         <div className="header-controls">
@@ -31,8 +29,7 @@ export default function SiteHeader() {
             {links.map((link) => <a href={link.href} key={link.href} onClick={closeMenu}>{link.label}</a>)}
           </nav>
           <a className="header-booking" href={whatsappUrl} target="_blank" rel="noreferrer">
-            <CalendarDays size={16} aria-hidden="true" />
-            <span>Agendar</span>
+            <span>Agendar</span><ArrowUpRight size={16} aria-hidden="true" />
           </a>
           <button className="menu-toggle" type="button" aria-expanded={isOpen} aria-controls="primary-navigation" onClick={() => setIsOpen((open) => !open)}>
             {isOpen ? <X size={21} /> : <Menu size={21} />}
