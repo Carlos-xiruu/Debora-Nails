@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowUpRight, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const links = [
   { href: '#sobre', label: 'Sobre' },
@@ -17,6 +17,13 @@ export default function SiteHeader() {
 
   const closeMenu = () => setIsOpen(false);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isOpen]);
+
   return (
     <header className="site-header">
       <div className="header-inner">
@@ -25,6 +32,7 @@ export default function SiteHeader() {
         </a>
 
         <div className="header-controls">
+          {isOpen && <button className="nav-scrim" type="button" onClick={closeMenu} aria-label="Fechar menu" />}
           <nav id="primary-navigation" className={`nav-links${isOpen ? ' is-open' : ''}`} aria-label="Navegação principal">
             {links.map((link) => <a href={link.href} key={link.href} onClick={closeMenu}>{link.label}</a>)}
           </nav>
