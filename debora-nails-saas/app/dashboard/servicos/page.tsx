@@ -1,416 +1,253 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react';
-import Image from 'next/image'; 
-import { Plus, Trash2, Clock, DollarSign, X, Sparkles, Loader2, Image as ImageIcon, CheckCircle2, Edit2, ShieldAlert, Upload, Crown, Package } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+/* eslint-disable @next/next/no-img-element -- Storage URLs and local legacy images share this editor. */
 
-const imagensDisponiveis = [
-  '/01.jpg', '/02.jpg', '/03.jpg', 
-  '/make01.jpeg', '/make02.jpeg', '/make03.jpeg', '/make04.jpeg', 
-  '/vermelha.jpeg'
-];
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ArrowDown, ArrowUp, Check, ExternalLink, ImagePlus, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { servicesStorageBucket, supabase, supabaseUrl } from '../../lib/supabase';
 
-export default function ServicosPage() {
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  
-  const [servicos, setServicos] = useState<any[]>([]);
-  const [imagensSelecionadas, setImagensSelecionadas] = useState<string[]>([]);
-  const [servicoEditando, setServicoEditando] = useState<any>(null);
+type Service = {
+  id: string;
+  nome: string;
+  descricao: string | null;
+  duracao: string | null;
+  preco: number | string | null;
+  taxa_sinal: number | null;
+  sinal: string | null;
+  imagens: string[] | null;
+  ativo: boolean | null;
+  is_pacote: boolean | null;
+  qtd_sessoes: number | null;
+};
 
-  // 🛡️ NOVOS ESTADOS PARA O MOTOR DE PACOTES
-  const [isPacote, setIsPacote] = useState(false);
-  const [qtdSessoes, setQtdSessoes] = useState(1);
+type Notice = { type: 'success' | 'error'; text: string } | null;
+
+const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const heicTypes = new Set(['image/heic', 'image/heif']);
+
+const money = (value: Service['preco']) => Number(value ?? 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+const imagesOf = (service: Service | null) => service?.imagens?.filter((image): image is string => Boolean(image?.trim())) ?? [];
+
+function storagePathFromUrl(value: string) {
+  if (value.startsWith('storage://')) {
+    const prefix = `storage://${servicesStorageBucket}/`;
+    return value.startsWith(prefix) ? value.slice(prefix.length) : null;
+  }
+
+  if (!supabaseUrl) return null;
+  const publicPrefix = `${supabaseUrl}/storage/v1/object/public/${servicesStorageBucket}/`;
+  return value.startsWith(publicPrefix) ? decodeURIComponent(value.slice(publicPrefix.length).split('?')[0]) : null;
+}
+
+async function convertHeic(file: File) {
+  const url = URL.createObjectURL(file);
+  try {
+    const image = new Image();
+    image.src = url;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    canvas.getContext('2d')?.drawImage(image, 0, 0);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+    if (!blob) throw new Error('Não foi possível converter esta foto.');
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '') || 'foto'}.jpg`, { type: 'image/jpeg' });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+async function imageForUpload(file: File) {
+  if (file.size > 15 * 1024 * 1024) throw new Error(`${file.name}: escolha uma foto de até 15 MB.`);
+  if (allowedTypes.has(file.type)) return file;
+  if (heicTypes.has(file.type) || /\.hei[cf]$/i.test(file.name)) {
+    try {
+      return await convertHeic(file);
+    } catch {
+      throw new Error(`${file.name}: o Safari não conseguiu converter HEIC. Em Ajustes > Câmera > Formatos, escolha "Mais Compatível" e selecione a foto novamente.`);
+    }
+  }
+  throw new Error(`${file.name}: use JPEG, PNG ou WebP.`);
+}
+
+export default function ServicesPage() {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [editing, setEditing] = useState<Service | null>(null);
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [images, setImages] = useState<string[]>([]);
+  const [notice, setNotice] = useState<Notice>(null);
+  const [deleting, setDeleting] = useState<Service | null>(null);
+
+  const loadServices = async () => {
+    const { data, error } = await supabase.from('servicos').select('*').order('created_at', { ascending: false });
+    if (error) setNotice({ type: 'error', text: `Não foi possível carregar os serviços: ${error.message}` });
+    else setServices((data ?? []) as Service[]);
+    setLoading(false);
+  };
 
   useEffect(() => {
-    fetchServicos();
+    const timeout = window.setTimeout(() => { void loadServices(); }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
-  const fetchServicos = async () => {
-    setIsLoading(true);
-    const { data, error } = await supabase.from('servicos').select('*').order('created_at', { ascending: false });
-    if (!error && data) setServicos(data);
-    setIsLoading(false);
+  const openEditor = (service: Service | null) => {
+    setNotice(null);
+    setEditing(service);
+    setImages(imagesOf(service));
+    setEditorOpen(true);
   };
 
-  const abrirModal = (servico: any = null) => {
-    setServicoEditando(servico);
-    setImagensSelecionadas(servico ? (servico.imagens || []) : []);
-    
-    // 🛡️ Puxa o status do banco se estiver editando, senão reseta para serviço comum
-    setIsPacote(servico ? servico.is_pacote : false);
-    setQtdSessoes(servico ? servico.qtd_sessoes : 1);
-    
-    setIsModalOpen(true);
+  const closeEditor = () => {
+    if (saving || uploading) return;
+    setEditorOpen(false);
+    setEditing(null);
+    setImages([]);
   };
 
-  const handleUploadFoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+  const uploadImages = async (event: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = '';
+    if (!files.length) return;
 
-    setIsUploading(true);
-    const novasImagens: string[] = [];
-
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
-      const filePath = `${fileName}`;
-
-      const { error: uploadError } = await supabase.storage.from('servicos').upload(filePath, file);
-
-      if (uploadError) {
-        console.error("Erro no upload:", uploadError.message);
-        alert(`Erro ao enviar a imagem ${file.name}. Verifique se o bucket 'servicos' é público no Supabase.`);
-      } else {
-        const { data } = supabase.storage.from('servicos').getPublicUrl(filePath);
-        if (data?.publicUrl) {
-          novasImagens.push(data.publicUrl);
-        }
+    setUploading(true);
+    const added: string[] = [];
+    const errors: string[] = [];
+    for (const originalFile of files) {
+      try {
+        const file = await imageForUpload(originalFile);
+        const extension = file.type.split('/')[1] === 'jpeg' ? 'jpg' : file.type.split('/')[1];
+        const name = `${Date.now()}-${crypto.randomUUID()}.${extension}`;
+        const { error } = await supabase.storage.from(servicesStorageBucket).upload(name, file, { contentType: file.type, upsert: false });
+        if (error) throw new Error(error.message);
+        const { data } = supabase.storage.from(servicesStorageBucket).getPublicUrl(name);
+        added.push(data.publicUrl);
+      } catch (error) {
+        errors.push(error instanceof Error ? error.message : `${originalFile.name}: não foi possível enviar.`);
       }
     }
-
-    setImagensSelecionadas(prev => [...prev, ...novasImagens]);
-    setIsUploading(false);
+    if (added.length) setImages((current) => [...current, ...added]);
+    if (errors.length) setNotice({ type: 'error', text: errors.join(' ') });
+    setUploading(false);
   };
 
-  const handleSalvarServico = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    const formData = new FormData(e.target as HTMLFormElement);
-    
-    const precoRaw = (formData.get('preco') as string) || '0';
-    const precoCalc = parseFloat(precoRaw.replace(',', '.'));
-    
-    const taxaSinal = parseInt((formData.get('taxa_sinal') as string) || '0');
-    const valorSinal = precoCalc * (taxaSinal / 100);
-    const sinalCalc = taxaSinal > 0 ? `${taxaSinal}% (R$ ${valorSinal.toFixed(2).replace('.', ',')})` : 'Não exigido';
+  const saveService = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const rawPrice = String(form.get('preco') ?? '').replace(',', '.');
+    const price = Number(rawPrice);
+    const depositRate = Number(form.get('taxa_sinal') ?? 0);
+    const name = String(form.get('nome') ?? '').trim();
 
-    const dadosServico = {
-      nome: formData.get('nome') as string,
-      descricao: formData.get('desc') as string,
-      duracao: formData.get('duracao') as string,
-      preco: precoCalc,
-      taxa_sinal: taxaSinal,
-      sinal: sinalCalc,
-      imagens: imagensSelecionadas.length > 0 ? imagensSelecionadas : ['/01.jpg'],
-      is_pacote: isPacote,
-      qtd_sessoes: isPacote ? qtdSessoes : 1
+    if (!name || !Number.isFinite(price) || price < 0 || !Number.isInteger(depositRate) || depositRate < 0 || depositRate > 100) {
+      setNotice({ type: 'error', text: 'Preencha o nome, um preço válido e um sinal entre 0% e 100%.' });
+      return;
+    }
+
+    setSaving(true);
+    const sinal = depositRate ? `${depositRate}% (R$ ${(price * depositRate / 100).toFixed(2).replace('.', ',')})` : 'Não exigido';
+    const values = {
+      nome: name,
+      descricao: String(form.get('descricao') ?? '').trim(),
+      duracao: String(form.get('duracao') ?? '').trim(),
+      preco: price,
+      taxa_sinal: depositRate,
+      sinal,
+      imagens: images,
     };
+    const result = editing
+      ? await supabase.from('servicos').update(values).eq('id', editing.id).select().single()
+      : await supabase.from('servicos').insert({ ...values, ativo: true, is_pacote: false, qtd_sessoes: 1 }).select().single();
 
-    if (servicoEditando) {
-      const { data, error } = await supabase.from('servicos').update(dadosServico).eq('id', servicoEditando.id).select();
-      if (!error && data) {
-        setServicos(servicos.map(s => s.id === servicoEditando.id ? data[0] : s));
-        setIsModalOpen(false);
+    if (result.error || !result.data) {
+      setNotice({ type: 'error', text: `Não foi possível salvar: ${result.error?.message ?? 'resposta inválida'}` });
+      setSaving(false);
+      return;
+    }
+
+    const saved = result.data as Service;
+    if (editing) {
+      setServices((current) => current.map((service) => service.id === saved.id ? saved : service));
+      const removedPaths = imagesOf(editing).filter((image) => !images.includes(image)).map(storagePathFromUrl).filter((path): path is string => Boolean(path));
+      if (removedPaths.length) {
+        const { error } = await supabase.storage.from(servicesStorageBucket).remove(removedPaths);
+        if (error) setNotice({ type: 'success', text: 'Serviço salvo. A foto foi removida do site, mas não do armazenamento.' });
       }
     } else {
-      const novoServicoCompleto = { ...dadosServico, ativo: true };
-      const { data, error } = await supabase.from('servicos').insert([novoServicoCompleto]).select();
-      if (!error && data) {
-        setServicos([data[0], ...servicos]);
-        setIsModalOpen(false);
-      }
+      setServices((current) => [saved, ...current]);
     }
-    setIsSaving(false);
+    setEditorOpen(false);
+    setEditing(null);
+    setImages([]);
+    setNotice({ type: 'success', text: 'Alterações salvas e já disponíveis no site.' });
+    setSaving(false);
   };
 
-  const toggleAtivo = async (id: string, ativoAtual: boolean) => {
-    setServicos(servicos.map(s => s.id === id ? { ...s, ativo: !ativoAtual } : s));
-    await supabase.from('servicos').update({ ativo: !ativoAtual }).eq('id', id);
-  };
-
-  const deletarServico = async (id: string) => {
-    if (!window.confirm('Excluir este item? Esta ação não pode ser desfeita.')) return;
-    
-    const { error } = await supabase.from('servicos').delete().eq('id', id);
-    
+  const toggleActive = async (service: Service) => {
+    const nextActive = !service.ativo;
+    setServices((current) => current.map((item) => item.id === service.id ? { ...item, ativo: nextActive } : item));
+    const { error } = await supabase.from('servicos').update({ ativo: nextActive }).eq('id', service.id);
     if (error) {
-      if (error.code === '23503') {
-        alert("⚠️ ATENÇÃO: Você não pode excluir este item porque ele já está vinculado a agendamentos ou ao histórico financeiro do sistema. \n\nEm vez de excluí-lo, recomendamos usar o botão 'Desativar' para que ele não apareça mais para os clientes.");
-      } else {
-        alert(`Erro ao excluir: ${error.message}`);
-      }
-    } else {
-      setServicos(servicos.filter(s => s.id !== id));
+      setServices((current) => current.map((item) => item.id === service.id ? service : item));
+      setNotice({ type: 'error', text: `Não foi possível alterar a visibilidade: ${error.message}` });
     }
   };
 
-  const toggleImagem = (img: string) => {
-    setImagensSelecionadas(prev => prev.includes(img) ? prev.filter(i => i !== img) : [...prev, img]);
+  const deleteService = async () => {
+    if (!deleting) return;
+    const { error } = await supabase.from('servicos').delete().eq('id', deleting.id);
+    if (error) {
+      setNotice({ type: 'error', text: error.code === '23503' ? 'Este serviço tem histórico vinculado. Desative-o em vez de excluir.' : `Não foi possível excluir: ${error.message}` });
+    } else {
+      setServices((current) => current.filter((service) => service.id !== deleting.id));
+      setNotice({ type: 'success', text: 'Serviço excluído.' });
+    }
+    setDeleting(null);
   };
-
-  // 🛡️ SEPARAÇÃO DAS LISTAS
-  const pacotesVip = servicos.filter(s => s.is_pacote);
-  const servicosComuns = servicos.filter(s => !s.is_pacote);
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-        <div>
-          <h1 className="font-serif text-3xl text-white mb-2 flex items-center gap-3"><Sparkles className="text-[#C7977D]" size={28} /> Meus Serviços & Pacotes</h1>
-          <p className="text-[#E8D3C8]">Gerencie o seu catálogo e crie assinaturas mensais.</p>
+    <div className="space-y-6">
+      <section className="rounded-3xl bg-[#621c35] px-5 py-6 text-[#fff8f5] shadow-sm sm:px-7">
+        <p className="text-xs font-bold uppercase tracking-[0.16em] text-[#f1d9d1]">Edição do site</p>
+        <div className="mt-2 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div><h1 className="font-serif text-4xl leading-none">Seus serviços</h1><p className="mt-2 text-sm text-[#f1d9d1]">Edite preços, textos e fotos. A primeira foto é a capa.</p></div>
+          <div className="flex gap-2"><a href="/#servicos" target="_blank" rel="noreferrer" className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-[#f1d9d1] px-4 text-sm font-bold text-white"><ExternalLink size={16} /> Ver site</a><button type="button" onClick={() => openEditor(null)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#fff8f5] px-5 font-bold text-[#621c35]"><Plus size={19} /> Novo serviço</button></div>
         </div>
-        <button onClick={() => abrirModal(null)} className="w-full md:w-auto bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-6 py-3 rounded-xl font-bold flex items-center justify-center gap-2 hover:scale-105 transition-all shadow-[0_0_15px_rgba(248,209,190,0.3)]">
-          <Plus size={20} /> Adicionar Novo
-        </button>
-      </div>
+      </section>
 
-      {isLoading ? (
-        <div className="flex justify-center py-20 text-[#C7977D]"><Loader2 className="animate-spin" size={40} /></div>
-      ) : (
-        <div className="space-y-12">
-          
-          {/* 🛡️ PRATELEIRA 1: PACOTES VIP */}
-          <div>
-            <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2 mb-6 border-b border-[#DCAE96]/20 pb-3">
-              <Crown size={22} className="text-[#C7977D]"/> Assinaturas & Pacotes VIP
-            </h2>
-            
-            {pacotesVip.length === 0 ? (
-              <div className="py-12 text-center text-gray-500 border border-dashed border-[#DCAE96]/20 rounded-xl bg-[#2D0A12]/20">
-                Nenhum pacote cadastrado. Use o botão "Adicionar Novo" para criar suas assinaturas.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {pacotesVip.map(servico => {
-                  const fotos = servico.imagens || [];
-                  return (
-                    <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
-                      
-                      <div className="absolute top-4 left-4 z-20 bg-gradient-to-r from-[#DCAE96] to-[#C7977D] text-[#120308] px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg">
-                        <Crown size={12} /> {servico.qtd_sessoes} Sessões
-                      </div>
+      {notice && <div role="status" className={`rounded-2xl border px-4 py-3 text-sm font-medium ${notice.type === 'success' ? 'border-[#9ab89d] bg-[#edf6ed] text-[#315d39]' : 'border-[#d7a0a0] bg-[#fff0f0] text-[#8a2d2d]'}`}>{notice.text}</div>}
 
-                      <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
-                        {fotos.length > 0 ? (
-                          <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
-                        ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
-                        <div className="absolute top-4 right-4 z-10">
-                          {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
-                        </div>
-                      </div>
+      {loading ? <div className="flex justify-center py-16 text-[#621c35]"><Loader2 className="animate-spin" size={32} /></div> : services.length === 0 ? (
+        <div className="rounded-3xl border border-dashed border-[#cda7a6] bg-white p-10 text-center"><p className="font-serif text-2xl">Nenhum serviço cadastrado</p><p className="mt-2 text-sm text-[#795962]">Use o botão acima para adicionar o primeiro.</p></div>
+      ) : <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{services.map((service) => <ServiceCard key={service.id} service={service} onEdit={() => openEditor(service)} onToggle={() => void toggleActive(service)} onDelete={() => setDeleting(service)} />)}</div>}
 
-                      <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
-                        <h3 className={`text-2xl font-serif mb-2 leading-tight ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
-                        <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
-                        
-                        <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10 shrink-0">
-                          <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
-                          <span className="text-gray-600">|</span>
-                          <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
-                        </div>
-
-                        <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5 self-start">
-                          <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20 mt-auto">
-                          <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium hover:bg-[#DCAE96]/10 transition-colors">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
-                          <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl hover:bg-[#DCAE96]/20 transition-colors"><Edit2 size={18} /></button>
-                          <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"><Trash2 size={18} /></button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-          {/* 🛡️ PRATELEIRA 2: SERVIÇOS AVULSOS */}
-          <div>
-            <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2 mb-6 border-b border-[#DCAE96]/20 pb-3">
-              <Sparkles size={22} className="text-[#C7977D]"/> Serviços Avulsos
-            </h2>
-            
-            {servicosComuns.length === 0 ? (
-              <div className="py-12 text-center text-gray-500 border border-dashed border-[#DCAE96]/20 rounded-xl bg-[#2D0A12]/20">
-                Nenhum serviço avulso cadastrado.
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {servicosComuns.map(servico => {
-                  const fotos = servico.imagens || [];
-                  return (
-                    <div key={servico.id} className={`backdrop-blur-md border rounded-2xl shadow-lg overflow-hidden transition-all duration-300 group flex flex-col ${servico.ativo ? 'bg-[#120308]/80 border-[#DCAE96]/30 hover:border-[#DCAE96]/50' : 'bg-[#120308]/40 border-gray-800 opacity-60'}`}>
-                      
-                      <div className="h-48 relative overflow-hidden bg-[#2D0A12] shrink-0">
-                        {fotos.length > 0 ? (
-                          <Image src={fotos[0]} alt={servico.nome} fill sizes="(max-width: 768px) 100vw, 33vw" className="object-cover group-hover:scale-110 transition-transform duration-700" />
-                        ) : <div className="flex items-center justify-center h-full opacity-30"><Sparkles size={48} className="text-[#C7977D]" /></div>}
-                        <div className="absolute top-4 right-4 z-10">
-                          {servico.ativo ? <span className="bg-[#DCAE96]/90 text-[#120308] font-bold text-[10px] uppercase px-3 py-1 rounded-full shadow-lg">Ativo</span> : <span className="bg-gray-800 text-gray-400 text-[10px] uppercase px-3 py-1 rounded-full border border-gray-600">Inativo</span>}
-                        </div>
-                      </div>
-
-                      <div className="p-6 relative z-10 -mt-6 flex-1 flex flex-col bg-gradient-to-t from-[#120308] via-[#120308] to-transparent pt-8">
-                        <h3 className={`text-2xl font-serif mb-2 leading-tight ${servico.ativo ? 'text-white' : 'text-gray-400'}`}>{servico.nome}</h3>
-                        <p className="text-[#E8D3C8] text-sm mb-4 line-clamp-2">{servico.descricao}</p>
-                        
-                        <div className="flex items-center gap-4 text-white font-medium mb-4 bg-[#2D0A12]/40 p-3 rounded-xl border border-[#DCAE96]/10 shrink-0">
-                          <span className="flex items-center gap-2"><Clock size={16} className="text-[#C7977D]"/> {servico.duracao}</span>
-                          <span className="text-gray-600">|</span>
-                          <span className="flex items-center gap-2"><DollarSign size={16} className="text-[#C7977D]"/> R$ {parseFloat(servico.preco).toFixed(2).replace('.', ',')}</span>
-                        </div>
-
-                        <div className="inline-flex items-center gap-2 bg-[#F8D1BE]/10 border border-[#F8D1BE]/30 text-[#F8D1BE] text-xs px-3 py-1.5 rounded-full mb-5 self-start">
-                          <ShieldAlert size={14} /> Sinal: {servico.taxa_sinal > 0 ? `${servico.taxa_sinal}%` : 'Não'}
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-5 border-t border-[#DCAE96]/20 mt-auto">
-                          <button onClick={() => toggleAtivo(servico.id, servico.ativo)} className="flex-1 bg-[#120308] border border-[#DCAE96]/30 text-[#E8D3C8] py-2.5 rounded-xl text-sm font-medium hover:bg-[#DCAE96]/10 transition-colors">{servico.ativo ? 'Desativar' : 'Ativar'}</button>
-                          <button onClick={() => abrirModal(servico)} className="p-2.5 text-[#F8D1BE] bg-[#DCAE96]/10 border border-[#DCAE96]/20 rounded-xl hover:bg-[#DCAE96]/20 transition-colors"><Edit2 size={18} /></button>
-                          <button onClick={() => deletarServico(servico.id)} className="p-2.5 text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-colors"><Trash2 size={18} /></button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-
-        </div>
-      )}
-
-      {/* 🛡️ Z-INDEX 999 E SCROLL SEGURO NO MODAL DE SERVIÇOS */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 sm:p-6 overflow-y-auto">
-          <div className="bg-[#120308] border border-[#DCAE96]/40 rounded-3xl w-full max-w-2xl shadow-[0_0_50px_rgba(199,151,125,0.2)] animate-in zoom-in-95 flex flex-col max-h-[90dvh]">
-            
-            <div className="bg-[#2D0A12] px-6 md:px-8 py-5 flex justify-between items-center border-b border-[#DCAE96]/20 shrink-0 rounded-t-3xl">
-              <h2 className="text-xl font-serif text-[#F8D1BE] flex items-center gap-2">
-                {servicoEditando ? <><Edit2 size={20}/> Editar Catálogo</> : <><Sparkles size={20}/> Adicionar Novo</>}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-white bg-[#120308] p-2 rounded-full"><X size={20} /></button>
-            </div>
-            
-            <form onSubmit={handleSalvarServico} className="flex flex-col flex-1 overflow-hidden">
-              <div className="p-6 md:p-8 overflow-y-auto custom-scrollbar space-y-6 flex-1">
-                
-                {/* 🛡️ CHAVE MESTRA: TRANSFORMANDO EM PACOTE */}
-                <div className="bg-gradient-to-r from-[#2D0A12] to-[#120308] border border-[#DCAE96]/30 rounded-2xl p-5 mb-2 shadow-lg">
-                  <div className="flex items-center justify-between cursor-pointer" onClick={() => setIsPacote(!isPacote)}>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-full ${isPacote ? 'bg-[#DCAE96]/20 text-[#DCAE96]' : 'bg-gray-800 text-gray-500'}`}>
-                        <Package size={20} />
-                      </div>
-                      <div>
-                        <h4 className="text-white font-bold text-sm">Transformar em Pacote Mensal?</h4>
-                        <p className="text-gray-400 text-xs">Venda múltiplas sessões com desconto de uma vez só.</p>
-                      </div>
-                    </div>
-                    <div className={`w-12 h-6 rounded-full p-1 transition-colors ${isPacote ? 'bg-[#DCAE96]' : 'bg-[#3a2522]'}`}>
-                      <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isPacote ? 'translate-x-6' : 'translate-x-0'}`}></div>
-                    </div>
-                  </div>
-
-                  {isPacote && (
-                    <div className="mt-4 pt-4 border-t border-[#DCAE96]/20 animate-in fade-in slide-in-from-top-2">
-                      <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Número de Sessões do Pacote</label>
-                      <div className="flex items-center gap-3">
-                        <button type="button" onClick={() => setQtdSessoes(Math.max(2, qtdSessoes - 1))} className="bg-[#120308] border border-[#DCAE96]/30 text-[#DCAE96] w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[#DCAE96]/10 font-bold text-lg">-</button>
-                        <span className="text-xl font-bold text-white w-8 text-center">{qtdSessoes}</span>
-                        <button type="button" onClick={() => setQtdSessoes(qtdSessoes + 1)} className="bg-[#120308] border border-[#DCAE96]/30 text-[#DCAE96] w-10 h-10 rounded-lg flex items-center justify-center hover:bg-[#DCAE96]/10 font-bold text-lg">+</button>
-                      </div>
-                      <p className="text-[10px] text-[#C7977D] mt-2">A cliente vai agendar {qtdSessoes} horários de uma vez na Landing Page.</p>
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Nome da Assinatura/Pacote *' : 'Nome do Serviço *'}</label>
-                    <input type="text" name="nome" defaultValue={servicoEditando?.nome} placeholder={isPacote ? "Ex: Assinatura: Banho de Gel" : "Ex: Banho de Gel Tradicional"} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
-                  </div>
-                  
-                  <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Descrição</label>
-                    <textarea name="desc" rows={2} defaultValue={servicoEditando?.descricao} className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none resize-none transition-colors"></textarea>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">{isPacote ? 'Duração (Por Sessão) *' : 'Duração Média *'}</label>
-                    <input type="text" name="duracao" defaultValue={servicoEditando?.duracao || ''} placeholder="Ex: 1h 30m" required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors"/>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-1.5">Preço Total (R$) *</label>
-                    <input type="number" step="0.01" min="0" name="preco" defaultValue={servicoEditando?.preco} required className="w-full bg-[#2D0A12]/50 border border-[#DCAE96]/30 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-[#F8D1BE] transition-colors font-mono"/>
-                  </div>
-                  
-                  <div className="col-span-1 md:col-span-2">
-                    <label className="block text-xs uppercase tracking-wider font-bold text-[#E8D3C8] mb-2">Exigir pagamento antecipado (Sinal)</label>
-                    <div className="flex gap-2 flex-wrap sm:flex-nowrap">
-                      {['0', '10', '20', '30', '40', '50','100'].map(taxa => (
-                        <label key={taxa} className="flex-1 min-w-[3rem] cursor-pointer">
-                          <input type="radio" name="taxa_sinal" value={taxa} defaultChecked={(servicoEditando?.taxa_sinal?.toString() || '0') === taxa} className="peer sr-only" />
-                          <div className="py-2.5 text-center rounded-lg border border-[#DCAE96]/20 bg-[#2D0A12]/30 text-gray-400 peer-checked:bg-[#C7977D] peer-checked:text-[#120308] peer-checked:font-bold transition-all text-sm">
-                            {taxa}%
-                          </div>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-[#DCAE96]/20">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
-                    <label className="text-sm font-bold text-white flex items-center gap-2"><ImageIcon size={18} className="text-[#C7977D]" /> Fotos de Referência</label>
-                    
-                    <label className="bg-[#C7977D] text-[#120308] px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer hover:scale-105 transition-transform w-full sm:w-auto justify-center">
-                      {isUploading ? <Loader2 className="animate-spin" size={14} /> : <><Upload size={14} /> Upar do Dispositivo</>}
-                      <input type="file" accept="image/*" multiple onChange={handleUploadFoto} className="hidden" />
-                    </label>
-                  </div>
-
-                  {imagensSelecionadas.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-[10px] uppercase font-bold tracking-wider text-[#E8D3C8] mb-2">Imagens vinculadas:</p>
-                      <div className="flex flex-wrap gap-2">
-                        {imagensSelecionadas.map((imgUrl, idx) => (
-                          <div key={idx} className="relative w-16 h-16 rounded-lg overflow-hidden border border-[#C7977D] shadow-lg">
-                            <Image src={imgUrl} alt="Upload" fill sizes="64px" className="object-cover" />
-                            <button type="button" onClick={() => setImagensSelecionadas(imagensSelecionadas.filter(i => i !== imgUrl))} className="absolute top-0 right-0 z-10 bg-red-600/90 text-white p-1 rounded-bl-lg hover:bg-red-500 transition-colors">
-                              <X size={10} />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  <p className="text-[10px] uppercase font-bold tracking-wider text-gray-400 mb-2">Ou escolha das imagens padrão:</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                    {imagensDisponiveis.map((img) => (
-                      <div key={img} onClick={() => toggleImagem(img)} className={`relative aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${imagensSelecionadas.includes(img) ? 'border-[#C7977D] scale-95 shadow-[0_0_15px_rgba(199,151,125,0.4)]' : 'border-transparent opacity-50 hover:opacity-80'}`}>
-                        <Image src={img} alt="Padrão" fill sizes="100px" className="object-cover" />
-                        {imagensSelecionadas.includes(img) && <div className="absolute inset-0 z-10 bg-[#120308]/60 flex items-center justify-center backdrop-blur-[1px]"><CheckCircle2 size={28} className="text-[#F8D1BE] drop-shadow-md" /></div>}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="px-6 md:px-8 py-5 bg-[#2D0A12] border-t border-[#DCAE96]/20 shrink-0 rounded-b-3xl">
-                <button type="submit" disabled={isSaving || isUploading} className="w-full bg-gradient-to-r from-[#F8D1BE] to-[#C7977D] text-[#120308] px-8 py-4 rounded-xl font-bold flex justify-center items-center gap-2 hover:scale-[1.02] transition-transform shadow-lg disabled:opacity-50">
-                  {isSaving ? <Loader2 className="animate-spin" size={20} /> : 'Salvar no Catálogo'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-      
-      <style dangerouslySetInnerHTML={{__html: `
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(220, 174, 150, 0.3); border-radius: 10px; }
-      `}} />
+      {editorOpen && <Editor service={editing} images={images} saving={saving} uploading={uploading} onClose={closeEditor} onSave={saveService} onUpload={uploadImages} onImagesChange={setImages} />}
+      {deleting && <ConfirmDelete service={deleting} onCancel={() => setDeleting(null)} onConfirm={() => void deleteService()} />}
     </div>
   );
 }
+
+function ServiceCard({ service, onEdit, onToggle, onDelete }: { service: Service; onEdit: () => void; onToggle: () => void; onDelete: () => void }) {
+  const image = imagesOf(service)[0];
+  return <article className={`overflow-hidden rounded-3xl border bg-white shadow-sm ${service.ativo ? 'border-[#ead8d1]' : 'border-[#d7c9c5] opacity-70'}`}>
+    <div className="aspect-[16/10] bg-[#f1d9d1]">{image ? <img src={image} alt="" className="size-full object-cover" /> : <div className="grid size-full place-items-center text-sm text-[#795962]">Sem foto</div>}</div>
+    <div className="p-4"><div className="flex items-start justify-between gap-3"><div><h2 className="font-serif text-2xl leading-none">{service.nome}</h2><p className="mt-2 text-sm font-bold text-[#621c35]">{money(service.preco)}</p></div><span className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${service.ativo ? 'bg-[#edf6ed] text-[#315d39]' : 'bg-[#f1e8e5] text-[#795962]'}`}>{service.ativo ? 'No site' : 'Oculto'}</span></div>
+    {service.descricao && <p className="mt-3 line-clamp-2 text-sm leading-5 text-[#795962]">{service.descricao}</p>}
+    <div className="mt-4 flex gap-2"><button type="button" onClick={onEdit} className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-[#621c35] px-3 text-sm font-bold text-white"><Pencil size={16} /> Editar</button><button type="button" onClick={onToggle} className="min-h-11 rounded-xl border border-[#d8b7b2] px-3 text-sm font-semibold text-[#621c35]">{service.ativo ? 'Ocultar' : 'Mostrar'}</button><button type="button" onClick={onDelete} className="grid size-11 place-items-center rounded-xl border border-[#e8c4c1] text-[#9d3938]" aria-label={`Excluir ${service.nome}`}><Trash2 size={17} /></button></div></div>
+  </article>;
+}
+
+function Editor({ service, images, saving, uploading, onClose, onSave, onUpload, onImagesChange }: { service: Service | null; images: string[]; saving: boolean; uploading: boolean; onClose: () => void; onSave: (event: FormEvent<HTMLFormElement>) => void; onUpload: (event: ChangeEvent<HTMLInputElement>) => void; onImagesChange: (images: string[]) => void }) {
+  const moveImage = (index: number, direction: -1 | 1) => { const next = [...images]; const target = index + direction; [next[index], next[target]] = [next[target], next[index]]; onImagesChange(next); };
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-[#260d18]/45 p-3 backdrop-blur-sm sm:p-6"><div className="mx-auto min-h-full max-w-2xl"><form onSubmit={onSave} className="my-auto overflow-hidden rounded-3xl bg-[#fffaf7] shadow-2xl"><div className="flex items-center justify-between border-b border-[#ead8d1] px-5 py-4 sm:px-6"><div><p className="text-xs font-bold uppercase tracking-[0.14em] text-[#8c5a68]">Catálogo</p><h2 className="font-serif text-2xl">{service ? 'Editar serviço' : 'Novo serviço'}</h2></div><button type="button" onClick={onClose} disabled={saving || uploading} className="grid size-11 place-items-center rounded-full hover:bg-[#f1d9d1]" aria-label="Fechar"><X size={20} /></button></div>
+    <div className="space-y-5 p-5 sm:p-6"><Field label="Nome do serviço"><input name="nome" required defaultValue={service?.nome ?? ''} className="dashboard-input" placeholder="Ex.: Banho de gel" /></Field><Field label="Descrição"><textarea name="descricao" rows={3} defaultValue={service?.descricao ?? ''} className="dashboard-input resize-y" placeholder="Conte brevemente sobre este cuidado" /></Field><div className="grid gap-5 sm:grid-cols-2"><Field label="Duração"><input name="duracao" defaultValue={service?.duracao ?? ''} className="dashboard-input" placeholder="Ex.: 1h 30min" /></Field><Field label="Preço (R$)"><input name="preco" type="number" inputMode="decimal" min="0" step="0.01" required defaultValue={service?.preco ?? ''} className="dashboard-input" placeholder="0,00" /></Field></div><Field label="Sinal"><select name="taxa_sinal" defaultValue={service?.taxa_sinal ?? 0} className="dashboard-input">{[0, 10, 20, 30, 40, 50, 100].map((rate) => <option key={rate} value={rate}>{rate === 0 ? 'Não exigir sinal' : `${rate}% do valor`}</option>)}</select></Field>
+    <section className="border-t border-[#ead8d1] pt-5"><div className="flex items-start justify-between gap-4"><div><h3 className="font-serif text-2xl">Fotos</h3><p className="mt-1 text-sm text-[#795962]">A primeira é a capa do serviço. Arraste a ordem pelos botões.</p></div><label className="flex min-h-11 shrink-0 cursor-pointer items-center gap-2 rounded-xl bg-[#f1d9d1] px-3 text-sm font-bold text-[#621c35]"><ImagePlus size={17} /> {uploading ? 'Enviando' : 'Adicionar'}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple onChange={onUpload} disabled={uploading} /></label></div>
+    {images.length === 0 ? <div className="mt-4 rounded-2xl border border-dashed border-[#d8b7b2] p-6 text-center text-sm text-[#795962]">Nenhuma foto selecionada.</div> : <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">{images.map((image, index) => <div key={image} className="overflow-hidden rounded-2xl border border-[#ead8d1] bg-white"><div className="relative aspect-square"><img src={image} alt={`Foto ${index + 1}`} className="size-full object-cover" />{index === 0 && <span className="absolute left-2 top-2 rounded-full bg-[#621c35] px-2 py-1 text-[10px] font-bold text-white">CAPA</span>}</div><div className="flex items-center justify-between p-1"><button type="button" disabled={index === 0} onClick={() => moveImage(index, -1)} className="grid size-9 place-items-center disabled:opacity-30" aria-label="Mover foto para antes"><ArrowUp size={16} /></button><button type="button" onClick={() => onImagesChange(images.filter((item) => item !== image))} className="grid size-9 place-items-center text-[#9d3938]" aria-label="Remover foto"><Trash2 size={16} /></button><button type="button" disabled={index === images.length - 1} onClick={() => moveImage(index, 1)} className="grid size-9 place-items-center disabled:opacity-30" aria-label="Mover foto para depois"><ArrowDown size={16} /></button></div></div>)}</div>}</section></div>
+    <div className="flex flex-col-reverse gap-3 border-t border-[#ead8d1] bg-[#fff5f1] p-5 sm:flex-row sm:justify-between sm:px-6"><button type="button" onClick={onClose} disabled={saving || uploading} className="min-h-12 rounded-xl px-4 font-semibold text-[#621c35]">Cancelar</button><button type="submit" disabled={saving || uploading} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-[#621c35] px-6 font-bold text-white disabled:opacity-60">{saving ? <Loader2 className="animate-spin" size={18} /> : <Check size={18} />} Salvar alterações</button></div></form></div></div>;
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-sm font-bold text-[#621c35]">{label}</span>{children}</label>; }
+
+function ConfirmDelete({ service, onCancel, onConfirm }: { service: Service; onCancel: () => void; onConfirm: () => void }) { return <div className="fixed inset-0 z-[60] grid place-items-center bg-[#260d18]/50 p-4"><div role="alertdialog" aria-modal="true" aria-labelledby="delete-title" className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-2xl"><h2 id="delete-title" className="font-serif text-3xl">Excluir serviço?</h2><p className="mt-3 text-sm leading-6 text-[#795962]">“{service.nome}” será excluído. Se houver agendamentos ou histórico relacionado, a exclusão será bloqueada.</p><div className="mt-6 flex gap-3"><button type="button" onClick={onCancel} className="min-h-12 flex-1 rounded-xl border border-[#d8b7b2] font-bold text-[#621c35]">Cancelar</button><button type="button" onClick={onConfirm} className="min-h-12 flex-1 rounded-xl bg-[#9d3938] font-bold text-white">Excluir</button></div></div></div>; }

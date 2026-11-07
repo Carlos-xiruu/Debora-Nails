@@ -9,6 +9,9 @@ body { margin:0; color:var(--ink); background:var(--paper); font-family:var(--fo
 a { color:inherit; text-decoration:none; }
 button, a { -webkit-tap-highlight-color:transparent; }
 a:focus-visible,button:focus-visible,input:focus-visible { outline:2px solid var(--rose); outline-offset:4px; }
+.dashboard-input { width:100%; min-height:48px; border:1px solid #d8b7b2; border-radius:12px; padding:10px 12px; color:var(--ink); background:#fff; font:inherit; }
+.dashboard-input:focus { border-color:var(--wine); outline:none; box-shadow:0 0 0 3px rgba(214,134,130,.2); }
+.dashboard-input.resize-y { min-height:96px; }
 .sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 .site-shell { overflow:hidden; }
 .section-label,.hero-kicker,.services-eyebrow { display:block; color:var(--wine); font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
